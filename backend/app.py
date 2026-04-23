@@ -8,8 +8,8 @@ import uuid
 from typing import Optional
 
 # Imports desde la lógica unificada
-from backend.scraper import get_rainfall_metadata, create_animated_video_from_data
-from backend.processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
+from scraper import get_rainfall_metadata, create_animated_video_from_data
+from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
 
 app = FastAPI(title="BCR Servicios Unificados")
 
