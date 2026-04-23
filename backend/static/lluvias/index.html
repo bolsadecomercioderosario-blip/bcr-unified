@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador BCR Lluvias v2.0</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-placeholder">☔️</div>
+            <h1>Reporte de Lluvias BCR</h1>
+            <p>Generación automatizada progresiva con identidad institucional.</p>
+        </header>
+
+        <section class="main-actions">
+            <button id="generarBtn" class="btn-primary">1. Obtener Datos y Mapa</button>
+            <div id="statusMsg" class="status-msg hidden">⚙️ Conectando con GEA...</div>
+        </section>
+
+        <div id="resultado" class="hidden">
+            <div class="grid-container">
+                <!-- Bloque X/Twitter -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Opciones para X</h3>
+                        <span class="badge">Texto</span>
+                    </div>
+                    <textarea id="textoResultado" readonly></textarea>
+                    <button id="copiarBtn" class="btn-copy">Copiar texto para X</button>
+                </div>
+
+                <!-- Bloque Mapa -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Mapa BCR GEA</h3>
+                        <span class="badge">Imagen</span>
+                    </div>
+                    <div class="img-preview">
+                        <img id="imagenMapa" src="" alt="Mapa de lluvias">
+                    </div>
+                    <a id="descargarBtn" href="" download class="btn-download">Descargar mapa.jpg</a>
+                </div>
+            </div>
+
+            <!-- Bloque Video (Carga Progresiva) -->
+            <div class="card video-card" id="videoCard">
+                <div class="card-header">
+                    <h3>Video Historia Instagram</h3>
+                    <span class="badge highlight">Premium</span>
+                </div>
+                
+                <div id="videoLoader" class="video-loader">
+                    <div class="loader-content">
+                        <div class="spinner-editorial"></div>
+                        <p id="videoStatusText">Renderizando video con tipografía institucional...</p>
+                        <small>Esto puede demorar 15-20 segundos.</small>
+                    </div>
+                </div>
+
+                <div id="videoContent" class="hidden">
+                    <video id="historiaVideo" controls></video>
+                    <a id="descargarVideoBtn" href="" download="historia_lluvias.mp4" class="btn-download">Descargar Video MP4</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
