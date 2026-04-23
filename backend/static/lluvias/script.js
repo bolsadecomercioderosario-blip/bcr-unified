@@ -25,15 +25,15 @@ document.getElementById('generarBtn').addEventListener('click', async () => {
     if (pollInterval) clearInterval(pollInterval);
 
     try {
-        const response = await fetch(`${API_BASE}/api/generar_pieza`);
+        const response = await fetch(`${API_BASE}/generar_pieza`);
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
         
         const data = await response.json();
         
         textarea.value = data.texto;
         if(data.imagen_url) {
-            imagenMapa.src = `${API_BASE}${data.imagen_url}?t=${Date.now()}`;
-            descargarBtn.href = `${API_BASE}${data.imagen_url}`;
+            imagenMapa.src = `${data.imagen_url}?t=${Date.now()}`;
+            descargarBtn.href = `${data.imagen_url}`;
         }
 
         statusMsg.classList.add('hidden');
@@ -59,13 +59,13 @@ async function pollVideoStatus() {
 
     pollInterval = setInterval(async () => {
         try {
-            const resp = await fetch(`${API_BASE}/api/video_status`);
+            const resp = await fetch(`${API_BASE}/video_status`);
             const data = await resp.json();
 
             if (data.status === 'ready') {
                 clearInterval(pollInterval);
                 
-                const videoUrl = `${API_BASE}${data.video_url}?t=${Date.now()}`;
+                const videoUrl = `${data.video_url}?t=${Date.now()}`;
                 historiaVideo.src = videoUrl;
                 historiaVideo.load();
                 descargarVideoBtn.href = videoUrl;
