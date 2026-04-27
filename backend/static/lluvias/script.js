@@ -44,7 +44,7 @@ document.getElementById('generarBtn').addEventListener('click', async () => {
 
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al conectar con el servidor.');
+        alert('Error al conectar: ' + error.message);
         btn.disabled = false;
         statusMsg.classList.add('hidden');
     }

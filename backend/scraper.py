@@ -194,7 +194,7 @@ def get_rainfall_metadata():
         os.makedirs(STATIC_DIR, exist_ok=True)
         r_down = requests.get(imagen_url, headers={'User-Agent': 'Mozilla/5.0'})
         imagen_local_name = 'mapa_lluvias.jpg'
-        imagen_local_path = os.path.join(STATIC_DIR, imagen_local_name)
+        imagen_local_path = os.path.join(STATIC_DIR, 'uploads', imagen_local_name)
         with open(imagen_local_path, 'wb') as f:
             f.write(r_down.content)
         return top5, texto_tweet, f"/static/uploads/{imagen_local_name}"
