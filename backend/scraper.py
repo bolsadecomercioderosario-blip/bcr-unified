@@ -128,6 +128,7 @@ def create_animated_video_legacy(top_5, map_path, output_mp4):
     DURATION = 6
     bg_color = (15, 45, 80)
     font_title = ensure_font(38)
+    font_subtitle = ensure_font(28)
     font_items = ensure_font(32)
     
     frames = []

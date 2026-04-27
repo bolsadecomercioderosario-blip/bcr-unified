@@ -4,7 +4,6 @@ __pycache__/
 venv/
 backend/static/uploads/*
 !backend/static/uploads/.gitkeep
-backend/static/background_rain.mp4
 # No subir archivos generados locales si existen
 backend/static/lluvias/mapa_lluvias.jpg
 backend/static/social/*.pdf
