@@ -1,15 +1,23 @@
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, APIRouter
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 import os
 import shutil
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 # Imports desde la lógica unificada
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
+
+# Base de datos
+from sqlalchemy.orm import Session
+from database import engine, Base, get_db
+import agenda_models
+
+# Crear tablas
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BCR Servicios Unificados")
 
@@ -145,10 +153,52 @@ async def descargar(filename: str, name: str):
     return {"error": "Archivo no encontrado"}
 
 # ---------------------------------------------------------
+# AGENDA API ROUTER
+# ---------------------------------------------------------
+agenda_api = APIRouter(prefix="/api/agenda")
+
+@agenda_api.get("/actividades", response_model=List[agenda_models.ActivityOut])
+def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
+    activities = db.query(agenda_models.Activity).offset(skip).limit(limit).all()
+    return activities
+
+@agenda_api.post("/actividades", response_model=agenda_models.ActivityOut)
+def create_activity(activity: agenda_models.ActivityCreate, db: Session = Depends(get_db)):
+    db_activity = agenda_models.Activity(**activity.model_dump())
+    db.add(db_activity)
+    db.commit()
+    db.refresh(db_activity)
+    return db_activity
+
+@agenda_api.put("/actividades/{activity_id}", response_model=agenda_models.ActivityOut)
+def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, db: Session = Depends(get_db)):
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    update_data = activity.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_activity, key, value)
+        
+    db.commit()
+    db.refresh(db_activity)
+    return db_activity
+
+@agenda_api.delete("/actividades/{activity_id}")
+def delete_activity(activity_id: str, db: Session = Depends(get_db)):
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    db.delete(db_activity)
+    db.commit()
+    return {"ok": True}
+
+# ---------------------------------------------------------
 # MONTAJE Y RUTAS ESTÁTICAS
 # ---------------------------------------------------------
 app.include_router(lluvias_api)
 app.include_router(social_api)
+app.include_router(agenda_api)
 
 # Archivos estáticos (Mapas, videos generados)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

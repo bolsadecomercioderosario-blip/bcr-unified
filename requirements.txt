@@ -8,3 +8,5 @@ numpy
 moviepy
 imageio-ffmpeg
 pymupdf
+sqlalchemy
+psycopg2-binary

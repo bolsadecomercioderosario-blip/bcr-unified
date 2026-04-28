@@ -1,117 +1,25 @@
 export const state = {
     view: 'list',
     showPast: false,
-    activities: [
-        {
-            id: '1',
-            date: '2026-04-20',
-            time: '10:00',
-            title: 'Reunión de Equipo - Agenda Semanal',
-            description: 'Coordinación de temas de prensa y redes.',
-            responsible: 'Paku',
-            channels: ['LinkedIn', 'Conectados'],
-            conectados_title: 'Estrategia y Gestión: El equipo de Comunicación define los ejes de la semana',
-            conectados_text: 'En una nueva reunión de coordinación, se establecieron las prioridades de prensa y contenidos digitales para los próximos días.',
-            done: false
-        },
-        {
-            id: '2',
-            date: '2026-04-20',
-            time: '15:00',
-            title: 'Grabación Podcast Institucional',
-            description: 'Entrevista al Director sobre innovación agropecuaria.',
-            responsible: 'Juan',
-            channels: ['Spotify', 'YouTube'],
-            done: false
-        },
-        {
-            id: '3',
-            date: '2026-04-21',
-            time: '09:00',
-            title: 'Conferencia de Prensa - Reporte Lluvia',
-            description: 'Presentación de datos climáticos ante medios locales.',
-            responsible: 'Lucía',
-            channels: ['X', 'Prensa'],
-            done: false
-        },
-        {
-            id: '4',
-            date: '2026-04-21',
-            time: '14:00',
-            title: 'Revisión de Métricas Mensuales',
-            description: 'Análisis de impacto en redes sociales del mes pasado.',
-            responsible: 'Paula',
-            channels: ['Reporte Interno'],
-            done: false
-        },
-        {
-            id: '5',
-            date: '2026-04-23',
-            time: '11:00',
-            title: 'Lanzamiento Nueva Web Institucional',
-            description: 'Publicación oficial del sitio renovado.',
-            responsible: 'Equipo IT / Comms',
-            channels: ['Todos los canales'],
-            conectados_title: 'Transformación Digital: La BCR estrena una renovada plataforma web institucional',
-            conectados_text: 'Ya se encuentra online el sitio oficial rediseñado, con una experiencia de usuario optimizada para el sector.',
-            done: false
-        },
-        {
-            id: '6',
-            date: '2026-04-25',
-            time: '10:00',
-            title: 'Evento: Puertas Abiertas BCR',
-            description: 'Visita guiada para estudiantes universitarios.',
-            responsible: 'Juan',
-            channels: ['Instagram', 'Conectados'],
-            conectados_title: 'Vinculación Universitaria: Estudiantes recorrieron las instalaciones de la Bolsa',
-            conectados_text: 'En el marco del programa de Puertas Abiertas, recibimos a futuros profesionales interesados en los mercados y la tecnología.',
-            done: false
-        },
-        {
-            id: '7',
-            date: '2026-04-27',
-            time: '16:00',
-            title: 'Capacitación Vocería en Crisis',
-            description: 'Taller práctico para el equipo de directores.',
-            responsible: 'Consultora Externa',
-            channels: ['Interno'],
-            done: false
-        },
-        {
-            id: '8',
-            date: '2026-05-02',
-            time: '09:00',
-            title: 'Planificación Estratégica Trimestral',
-            description: 'Definición de objetivos para el segundo trimestre.',
-            responsible: 'Directores',
-            channels: ['Estrategia'],
-            done: false
-        },
-        {
-            id: '9',
-            date: '2026-05-15',
-            time: '12:00',
-            title: 'Aniversario Institucional - Evento Central',
-            description: 'Celebración por los 140 años de la institución.',
-            responsible: 'Paku',
-            channels: ['Streaming', 'Prensa', 'Social'],
-            done: false
-        },
-        {
-            id: '10',
-            date: '2026-04-20',
-            time: '08:30',
-            title: 'Chequeo de Mails Matutino',
-            description: 'Tarea ya realizada a primera hora.',
-            responsible: 'Juan',
-            channels: ['Mail a asociados', 'LinkedIn', 'X', 'Conectados'],
-            done: true
-        }
-    ],
+    activities: [],
     currentActivity: null,
     searchQuery: ''
 };
+
+// Cargar actividades desde el servidor
+export async function loadActivities() {
+    try {
+        const response = await fetch('/api/agenda/actividades');
+        if (response.ok) {
+            state.activities = await response.json();
+            notify();
+        } else {
+            console.error('Error fetching activities');
+        }
+    } catch (error) {
+        console.error('Network error loading activities:', error);
+    }
+}
 
 export const listeners = [];
 
@@ -140,28 +48,65 @@ function sanitizeActivity(activity) {
     };
 }
 
-export function addActivity(activity) {
+export async function addActivity(activity) {
     const newActivity = {
         ...sanitizeActivity(activity),
         id: Date.now().toString(),
         done: false
     };
+    
+    // Optimistic update
     state.activities.push(newActivity);
     notify();
+
+    // Persist
+    try {
+        await fetch('/api/agenda/actividades', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newActivity)
+        });
+    } catch (e) {
+        console.error("Failed to add activity to server", e);
+    }
+    
     return newActivity;
 }
 
-export function updateActivity(id, updates, shouldNotify = true) {
+export async function updateActivity(id, updates, shouldNotify = true) {
     const index = state.activities.findIndex(a => a.id === id);
     if (index !== -1) {
-        state.activities[index] = { ...state.activities[index], ...sanitizeActivity(updates) };
+        // Optimistic update
+        const updatedActivity = { ...state.activities[index], ...sanitizeActivity(updates) };
+        state.activities[index] = updatedActivity;
         if (shouldNotify) notify();
+
+        // Persist
+        try {
+            await fetch(`/api/agenda/actividades/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+        } catch (e) {
+            console.error("Failed to update activity on server", e);
+        }
     }
 }
 
-export function deleteActivity(id) {
+export async function deleteActivity(id) {
+    // Optimistic update
     state.activities = state.activities.filter(a => a.id !== id);
     notify();
+
+    // Persist
+    try {
+        await fetch(`/api/agenda/actividades/${id}`, {
+            method: 'DELETE'
+        });
+    } catch (e) {
+        console.error("Failed to delete activity on server", e);
+    }
 }
 
 export function setCurrentActivity(activity) {

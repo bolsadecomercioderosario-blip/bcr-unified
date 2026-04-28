@@ -1,4 +1,4 @@
-import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast } from './state.js';
+import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities } from './state.js';
 import { renderList } from './components/List.js';
 import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
@@ -130,4 +130,6 @@ state.activities = state.activities.map(a => {
 
 // Initial Render
 subscribe(updateUI);
-updateUI();
+loadActivities().then(() => {
+    updateUI();
+});
