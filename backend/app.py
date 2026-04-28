@@ -156,11 +156,11 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Frontends (Cada uno en su subruta)
 app.mount("/lluvias", StaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=True), name="lluvias_ui")
 app.mount("/social", StaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=True), name="social_ui")
+app.mount("/agenda", StaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=True), name="agenda_ui")
 
 @app.get("/")
 async def root():
-    # Redirección por defecto a lluvias
-    return RedirectResponse(url="/lluvias")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 if __name__ == "__main__":
     import uvicorn

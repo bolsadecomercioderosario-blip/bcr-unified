@@ -1,0 +1,127 @@
+import { state, updateActivity, addActivity, suggestJournalisticTitle } from '../state.js';
+
+export function renderConectados(container) {
+    const conectadosActivities = state.activities
+        .filter(a => a.channels.includes('Conectados'))
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'content-wrapper';
+
+    if (conectadosActivities.length === 0) {
+        wrapper.innerHTML = '<div style="text-align: center; padding: 4rem; color: var(--text-muted);">No hay actividades marcadas para "Conectados" esta semana.</div>';
+        container.appendChild(wrapper);
+        return;
+    }
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;';
+    header.innerHTML = `
+        <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
+        <button id="btn-add-conectados-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">
+            <i data-lucide="plus-circle"></i> Agregar Bloque Manual
+        </button>
+    `;
+    wrapper.appendChild(header);
+
+    const listContainer = document.createElement('div');
+    listContainer.id = 'conectados-sortable-list';
+    listContainer.className = 'conectados-grid';
+
+    conectadosActivities.forEach((act) => {
+        const item = document.createElement('div');
+        item.className = 'conectados-item';
+        item.dataset.id = act.id;
+
+        item.innerHTML = `
+            <div class="drag-handle">
+                <i data-lucide="grip-vertical" style="width: 16px;"></i>
+            </div>
+            <button class="btn-ia-suggest" title="Generar con IA (Tono Periodístico)">
+                <i data-lucide="sparkles" style="width: 14px;"></i>
+            </button>
+            <textarea class="input-conectados-title" rows="1" 
+                      placeholder="Título del bloque...">${act.conectados_title || act.title}</textarea>
+            <textarea class="input-conectados-text" rows="1" 
+                      placeholder="Texto del bloque...">${act.conectados_text || act.copy_linkedin || ''}</textarea>
+        `;
+
+        // Auto-save logic
+        const titleInput = item.querySelector('.input-conectados-title');
+        const textInput = item.querySelector('.input-conectados-text');
+        const btnIA = item.querySelector('.btn-ia-suggest');
+
+        const saveChanges = (silent = true) => {
+            updateActivity(act.id, {
+                conectados_title: titleInput.value,
+                conectados_text: textInput.value
+            }, !silent);
+        };
+
+        const autoGrow = (el) => {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        };
+
+        btnIA.onclick = () => {
+            const suggested = suggestJournalisticTitle(act);
+            titleInput.value = suggested;
+            autoGrow(titleInput);
+            saveChanges();
+            // Brief animation or feedback
+            btnIA.style.color = 'var(--primary)';
+            setTimeout(() => btnIA.style.color = '', 500);
+        };
+
+        titleInput.oninput = () => {
+            autoGrow(titleInput);
+            saveChanges(true);
+        };
+        textInput.oninput = () => {
+            autoGrow(textInput);
+            saveChanges(true);
+        };
+
+        // Initial grow
+        setTimeout(() => {
+            autoGrow(titleInput);
+            autoGrow(textInput);
+        }, 0);
+
+        listContainer.appendChild(item);
+    });
+
+    wrapper.appendChild(listContainer);
+    container.appendChild(wrapper);
+    
+    // Initialize SortableJS
+    if (window.Sortable) {
+        window.Sortable.create(listContainer, {
+            handle: '.drag-handle',
+            animation: 150,
+            onEnd: () => {
+                // Update order_index for all items
+                const items = listContainer.querySelectorAll('.conectados-item');
+                items.forEach((item, index) => {
+                    updateActivity(item.dataset.id, { order_index: index }, false); // Silent update
+                });
+                // No notify() here to keep the SortableJS DOM state stable
+                console.log('Order updated silently');
+            }
+        });
+    }
+
+    // Add Manual Block handler
+    wrapper.querySelector('#btn-add-conectados-block').onclick = () => {
+        addActivity({
+            title: 'Nuevo Bloque',
+            description: 'Descripción del bloque manual...',
+            channels: ['Conectados'],
+            date: new Date().toISOString().split('T')[0],
+            time: '00:00',
+            is_custom: true
+        });
+    };
+
+    if (window.lucide) window.lucide.createIcons();
+}

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCR Herramientas | Hub de Comunicación</title>
+    <meta name="description" content="Hub centralizado de herramientas de comunicación de la Bolsa de Comercio de Rosario.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --primary-dark: #3730a3;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #273548;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent-rain: #38bdf8;
+            --accent-social: #f472b6;
+            --accent-agenda: #a78bfa;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 50%, rgba(56, 189, 248, 0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(167, 139, 250, 0.05) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite alternate;
+            z-index: 0;
+        }
+
+        @keyframes bgShift {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-5%, 3%) rotate(3deg); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+            max-width: 960px;
+            width: 100%;
+        }
+
+        .header {
+            margin-bottom: 3rem;
+        }
+
+        .header .logo-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text) 0%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            margin-top: 0.75rem;
+            font-weight: 300;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .tool-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .tool-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 1rem 1rem 0 0;
+            transition: height 0.35s ease;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-6px);
+            background: var(--bg-card-hover);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .tool-card:hover::before {
+            height: 4px;
+        }
+
+        /* Accent colors per card */
+        .tool-card.rain::before { background: var(--accent-rain); }
+        .tool-card.social::before { background: var(--accent-social); }
+        .tool-card.agenda::before { background: var(--accent-agenda); }
+
+        .tool-card.rain:hover { border-color: rgba(56, 189, 248, 0.3); }
+        .tool-card.social:hover { border-color: rgba(244, 114, 182, 0.3); }
+        .tool-card.agenda:hover { border-color: rgba(167, 139, 250, 0.3); }
+
+        .tool-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            transition: transform 0.3s ease;
+        }
+
+        .tool-card:hover .tool-icon {
+            transform: scale(1.1);
+        }
+
+        .tool-card.rain .tool-icon { background: rgba(56, 189, 248, 0.15); }
+        .tool-card.social .tool-icon { background: rgba(244, 114, 182, 0.15); }
+        .tool-card.agenda .tool-icon { background: rgba(167, 139, 250, 0.15); }
+
+        .tool-card h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .tool-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .tool-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.25rem 0.65rem;
+            border-radius: 999px;
+            margin-top: 0.25rem;
+        }
+
+        .tool-card.rain .tool-badge { background: rgba(56, 189, 248, 0.12); color: var(--accent-rain); }
+        .tool-card.social .tool-badge { background: rgba(244, 114, 182, 0.12); color: var(--accent-social); }
+        .tool-card.agenda .tool-badge { background: rgba(167, 139, 250, 0.12); color: var(--accent-agenda); }
+
+        .footer-text {
+            margin-top: 3rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        /* Entry animation */
+        .tool-card {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: cardIn 0.5s ease-out forwards;
+        }
+        .tool-card:nth-child(1) { animation-delay: 0.1s; }
+        .tool-card:nth-child(2) { animation-delay: 0.2s; }
+        .tool-card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes cardIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tools-grid {
+                grid-template-columns: 1fr;
+                max-width: 400px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .header h1 { font-size: 1.75rem; }
+            body { justify-content: flex-start; padding-top: 3rem; overflow-y: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-text">Bolsa de Comercio de Rosario</div>
+            <h1>Hub de Herramientas</h1>
+            <p>Comunicación institucional centralizada</p>
+        </div>
+
+        <div class="tools-grid">
+            <a href="/lluvias" class="tool-card rain" id="tool-lluvias">
+                <div class="tool-icon">☔</div>
+                <h3>Reporte de Lluvias</h3>
+                <p>Generá el texto para X, el mapa y el video para IG Stories con datos de GEA en un clic.</p>
+                <span class="tool-badge">Datos + Video</span>
+            </a>
+
+            <a href="/social" class="tool-card social" id="tool-social">
+                <div class="tool-icon">📱</div>
+                <h3>Generador Social</h3>
+                <p>Subí un comunicado PDF y obtené el copy para X y el mockup de IG Story listos para publicar.</p>
+                <span class="tool-badge">PDF → Redes</span>
+            </a>
+
+            <a href="/agenda" class="tool-card agenda" id="tool-agenda">
+                <div class="tool-icon">📋</div>
+                <h3>Agenda Comu</h3>
+                <p>Gestioná las actividades del equipo, generá copies con IA y armá el newsletter Conectados.</p>
+                <span class="tool-badge">Planificación + IA</span>
+            </a>
+        </div>
+
+        <div class="footer-text">
+            Área de Comunicación BCR — Herramientas internas
+        </div>
+    </div>
+</body>
+</html>

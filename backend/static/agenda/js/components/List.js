@@ -1,0 +1,143 @@
+import { state, updateActivity } from '../state.js';
+
+export function renderList(container) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString().split('T')[0];
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowISO = tomorrow.toISOString().split('T')[0];
+    
+    const nextWeekEnd = new Date(today);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 8); // +7 days after tomorrow
+    const nextWeekEndISO = nextWeekEnd.toISOString().split('T')[0];
+
+    const filteredActivities = state.activities.filter(a => {
+        if (a.is_custom) return false;
+        const query = state.searchQuery.toLowerCase();
+        return a.title.toLowerCase().includes(query) || 
+               a.description.toLowerCase().includes(query) ||
+               (a.responsible && a.responsible.toLowerCase().includes(query));
+    });
+
+    const sortedActivities = filteredActivities.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
+    });
+
+    const groups = {
+        'PASADAS': [],
+        'HOY': [],
+        'MAÑANA': [],
+        'PRÓXIMA SEMANA': [],
+        'MÁS ADELANTE': []
+    };
+
+    sortedActivities.forEach(act => {
+        if (act.date < todayISO) {
+            groups['PASADAS'].push(act);
+        } else if (act.date === todayISO) {
+            groups['HOY'].push(act);
+        } else if (act.date === tomorrowISO) {
+            groups['MAÑANA'].push(act);
+        } else if (act.date > tomorrowISO && act.date < nextWeekEndISO) {
+            groups['PRÓXIMA SEMANA'].push(act);
+        } else if (act.date >= nextWeekEndISO) {
+            groups['MÁS ADELANTE'].push(act);
+        }
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'content-wrapper';
+
+    const formatFullDate = (dateStr) => {
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const [year, month, day] = dateStr.split('-');
+        const date = new Date(year, month - 1, day);
+        const dayName = days[date.getDay()];
+        return `${dayName} ${parseInt(day)}/${parseInt(month)}`;
+    };
+
+    const renderChannelNames = (channels) => {
+        if (!channels || channels.length === 0) return '-';
+        return `
+            <div class="channel-badges-flex" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                ${channels.map(ch => `
+                    <span style="background: #f1f5f9; color: var(--text-muted); font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 0.25rem; font-weight: 600; border: 1px solid var(--border); white-space: nowrap;">
+                        ${ch}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    };
+
+    const renderGroup = (title, items) => {
+        if (items.length === 0) return '';
+        if (title === 'PASADAS' && !state.showPast) return '';
+
+        return `
+            <div class="list-group">
+                <div class="group-header">
+                    <span class="group-title">${title}</span>
+                    <div class="group-line"></div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Fecha</th>
+                            <th style="width: 75px;">Hora</th>
+                            <th>Actividad</th>
+                            <th style="width: 130px;">Responsable</th>
+                            <th style="width: 200px;">Canales</th>
+                            <th style="width: 60px; text-align: center;">Ok</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(act => `
+                            <tr class="${act.done ? 'tr-done' : ''}" onclick="window.openActivityDetail('${act.id}')">
+                                <td style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">
+                                    ${formatFullDate(act.date)}
+                                </td>
+                                <td style="font-weight: 500; font-variant-numeric: tabular-nums;">${act.time}</td>
+                                <td>
+                                    <div style="font-weight: 600;">${act.title}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">${act.description.substring(0, 80)}${act.description.length > 80 ? '...' : ''}</div>
+                                </td>
+                                <td><span class="badge-user">${act.responsible || '-'}</span></td>
+                                <td>${renderChannelNames(act.channels)}</td>
+                                <td style="text-align: center;" onclick="event.stopPropagation()">
+                                    <input type="checkbox" class="list-check-done" data-id="${act.id}" ${act.done ? 'checked' : ''} 
+                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    };
+
+    let html = '';
+    const groupOrder = ['PASADAS', 'HOY', 'MAÑANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE'];
+    
+    groupOrder.forEach(g => {
+        html += renderGroup(g, groups[g]);
+    });
+
+    if (html === '') {
+        html = '<div style="text-align: center; padding: 4rem; color: var(--text-muted);">No hay actividades pendientes.</div>';
+    }
+
+    wrapper.innerHTML = html;
+    
+    // Add checkbox listeners
+    wrapper.querySelectorAll('.list-check-done').forEach(cb => {
+        cb.onchange = (e) => {
+            const id = e.target.dataset.id;
+            updateActivity(id, { done: e.target.checked });
+        };
+    });
+    
+    container.appendChild(wrapper);
+}
