@@ -38,7 +38,7 @@ export function renderActivityForm(container, preData = null) {
                 
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Datos Generales</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-grid-2">
                         <div class="form-group">
                             <label>Fecha</label>
                             <input type="date" name="date" value="${act.date}" required>
@@ -56,7 +56,7 @@ export function renderActivityForm(container, preData = null) {
                         <label>Descripción</label>
                         <textarea name="description" rows="3">${act.description}</textarea>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="form-grid-2" style="margin-top: 1rem;">
                         <div class="form-group">
                             <label>Lugar</label>
                             <input type="text" name="location" value="${act.location}">
@@ -74,7 +74,7 @@ export function renderActivityForm(container, preData = null) {
 
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Operativo</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-grid-2">
                         <div class="form-group">
                             <label>Responsable</label>
                             <select name="responsible" id="select-responsible">
