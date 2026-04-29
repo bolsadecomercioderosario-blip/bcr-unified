@@ -78,6 +78,12 @@ globalSearch.addEventListener('input', (e) => {
 });
 
 // Sheet Logic
+activitySheet.addEventListener('click', (e) => {
+    if (e.target === activitySheet) {
+        closeActivitySheet();
+    }
+});
+
 function openActivitySheet() {
     activitySheet.classList.remove('hidden');
     renderActivityForm(activitySheet.querySelector('.sheet-content'));
