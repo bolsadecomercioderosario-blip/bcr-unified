@@ -447,17 +447,105 @@ body {
     animation: fadeIn 0.4s ease-out;
 }
 
-/* Responsive */
+/* Responsive (Mobile Version) */
 @media (max-width: 768px) {
-    .sidebar {
-        display: none; /* Add a mobile drawer later */
+    /* 1. Ocultar vistas innecesarias y el buscador */
+    .nav-item[data-view="conectados"],
+    .nav-item[data-view="santi"],
+    .search-box {
+        display: none !important;
     }
+    
+    /* 2. Top Bar simplificada */
     .top-bar {
         padding: 0 1rem;
+        gap: 0.5rem;
     }
-    .search-box input {
-        width: 150px;
+    .logo {
+        padding-right: 0.5rem;
+        border-right: none;
     }
+    .logo span {
+        display: none; /* Hide 'Comu BCR' text, keep icon */
+    }
+    .btn-new-activity span {
+        display: none; /* Hide text, keep plus icon */
+    }
+    .btn-new-activity {
+        padding: 0.6rem;
+    }
+    .view-container {
+        padding: 1rem;
+    }
+
+    /* 3. Transformar la Tabla a Tarjetas (Cards) */
+    .data-table thead {
+        display: none; /* Ocultar cabeceras */
+    }
+    
+    .data-table, 
+    .data-table tbody, 
+    .data-table tr, 
+    .data-table td {
+        display: block;
+        width: 100%;
+    }
+    
+    .data-table tr {
+        margin-bottom: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        position: relative;
+        background: white;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .data-table td {
+        padding: 0.25rem 0;
+        border-bottom: none;
+    }
+
+    /* Ajustar celdas para el diseño de tarjeta */
+    /* Celda 1 (Fecha) y Celda 2 (Hora) */
+    .data-table td:nth-child(1),
+    .data-table td:nth-child(2) {
+        display: inline-block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-right: 0.5rem;
+    }
+    
+    /* Celda 3 (Actividad) */
+    .data-table td:nth-child(3) {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Celda 4 (Responsable) */
+    .data-table td:nth-child(4) {
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    
+    /* Celda 5 (Canales) */
+    .data-table td:nth-child(5) {
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+    }
+    
+    /* Celda 6 (Ok) */
+    .data-table td:nth-child(6) {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        text-align: right;
+        width: auto;
+        padding: 0;
+    }
+    
+    /* 4. Ajustes del Modal/Sheet */
     .sheet-content {
         width: 100%;
     }
