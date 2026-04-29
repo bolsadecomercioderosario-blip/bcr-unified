@@ -10,3 +10,4 @@ imageio-ffmpeg
 pymupdf
 sqlalchemy
 psycopg2-binary
+openai
