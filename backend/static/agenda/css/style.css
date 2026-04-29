@@ -450,8 +450,7 @@ body {
 /* Responsive (Mobile Version) */
 @media (max-width: 768px) {
     /* 1. Ocultar vistas innecesarias y el buscador */
-    .nav-item[data-view="conectados"],
-    .nav-item[data-view="santi"],
+    .top-nav,
     .search-box {
         display: none !important;
     }
