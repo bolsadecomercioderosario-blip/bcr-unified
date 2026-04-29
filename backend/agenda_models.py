@@ -81,3 +81,10 @@ class ActivityUpdate(BaseModel):
 class ActivityOut(ActivityBase):
     class Config:
         from_attributes = True
+
+class GenerateCopyRequest(BaseModel):
+    mode: str  # 'ig' or 'li'
+    title: str
+    description: Optional[str] = ""
+    observations: Optional[str] = ""
+    participants_enriched: Optional[str] = ""

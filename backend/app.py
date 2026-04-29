@@ -6,6 +6,7 @@ import os
 import shutil
 import uuid
 from typing import Optional, List
+import openai
 
 # Imports desde la lógica unificada
 from scraper import get_rainfall_metadata, create_animated_video_from_data
@@ -156,6 +157,81 @@ async def descargar(filename: str, name: str):
 # AGENDA API ROUTER
 # ---------------------------------------------------------
 agenda_api = APIRouter(prefix="/api/agenda")
+
+@agenda_api.post("/generate-copy")
+def generate_copy(request: agenda_models.GenerateCopyRequest):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en el servidor.")
+        
+    client = openai.OpenAI(api_key=api_key)
+    
+    if request.mode == 'ig':
+        system_prompt = """Sos redactor institucional de la Bolsa de Comercio de Rosario.
+Tu tarea es redactar un copy para Instagram Stories a partir de la información disponible de una actividad.
+
+⚠️ REGLAS CLAVE
+Usar únicamente la información disponible
+No inventar datos ni agregar información no proporcionada
+Si hay poca información, mantener el texto general y breve
+Integrar los campos de forma natural, sin asumir jerarquías entre ellos
+
+📐 FORMATO DE SALIDA
+Generar siempre:
+Un título
+Un primer párrafo
+Un segundo párrafo
+No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar.
+
+✍️ ESTILO
+Redacción en pasado
+Tono institucional, claro y sobrio
+Lenguaje profesional y accesible
+Evitar adjetivos innecesarios o grandilocuentes
+No usar emojis
+No usar citas textuales
+
+🧩 CONSTRUCCIÓN
+Título: Claro y descriptivo.
+Primer párrafo: Explicar qué ocurrió. Incluir a la Bolsa de Comercio de Rosario como protagonista.
+Segundo párrafo: Explicar el sentido del encuentro, temas abordados o marco institucional. Si no hay detalles suficientes, usar formulaciones generales institucionales (por ejemplo: fortalecimiento de vínculos, agenda de trabajo, articulación, intercambio)."""
+    elif request.mode == 'li':
+        system_prompt = """Sos redactor institucional de la Bolsa de Comercio de Rosario.
+Tu tarea es redactar un copy para LinkedIn a partir de la información disponible de una actividad.
+
+⚠️ REGLAS CLAVE
+Usar únicamente la información disponible.
+No inventar datos, cargos, ni agregar información no proporcionada.
+Si se envían nombres de personas ("Presentes"), DEBES mencionarlos explícitamente en el texto, respetando sus cargos tal como se te envían. No alteres ni inventes cargos.
+
+📐 FORMATO DE SALIDA
+No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar en LinkedIn.
+Estructura sugerida: Título institucional, párrafo de contexto de la actividad, mención de los presentes y cierre institucional.
+
+✍️ ESTILO
+Redacción en pasado.
+Tono institucional, profesional, enfocado en el fortalecimiento institucional.
+Evitar adjetivos innecesarios o grandilocuentes.
+No usar emojis."""
+    else:
+        raise HTTPException(status_code=400, detail="Modo inválido. Use 'ig' o 'li'.")
+
+    user_content = f"Título: {request.title}\nDescripción: {request.description}\nObservaciones: {request.observations}"
+    if request.mode == 'li' and request.participants_enriched:
+        user_content += f"\nPresentes (Integrarlos al texto de forma natural con sus cargos): {request.participants_enriched}"
+        
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.3
+        )
+        return {"copy": response.choices[0].message.content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @agenda_api.get("/actividades", response_model=List[agenda_models.ActivityOut])
 def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):

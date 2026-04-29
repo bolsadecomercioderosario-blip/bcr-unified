@@ -42,74 +42,99 @@ function synthesizeDescription(desc) {
     return cleaned.length > 150 ? cleaned.substring(0, 150) + '...' : cleaned;
 }
 
-export function generateIGCopy(title, description) {
-    const cleanTitle = cleanText(title);
-    const cleanDesc = synthesizeDescription(description);
-
-    let header = cleanTitle.toUpperCase();
-    let action = "participó de";
-    let mainTopic = cleanTitle;
-
-    if (cleanTitle.includes(':')) {
-        const parts = cleanTitle.split(':');
-        header = `${parts[0].trim().toUpperCase()}: ${parts[1].trim().toLowerCase()}`;
-        mainTopic = parts[0].trim();
-        action = parts[1].trim().toLowerCase();
+export async function generateIGCopy(title, description, observations) {
+    try {
+        const response = await fetch('/api/agenda/generate-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'ig',
+                title: title || '',
+                description: description || '',
+                observations: observations || ''
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Error al generar copy IG');
+        }
+        
+        const data = await response.json();
+        return data.copy;
+    } catch (error) {
+        console.error(error);
+        alert("Error de IA: " + error.message);
+        return "";
     }
-
-    const p1 = `La Bolsa de Comercio de Rosario ${action} ${mainTopic}, un encuentro institucional orientado a fortalecer la vinculación y el desarrollo del sector productivo regional.`;
-    const p2 = cleanDesc 
-        ? `${cleanDesc} La actividad permitió profundizar en la agenda de trabajo de la institución y coordinar esfuerzos conjuntos.`
-        : `La jornada promovió un espacio de diálogo y reflexión sobre las oportunidades que se presentan para las organizaciones en el contexto actual.`;
-
-    return `${header}\n\n${p1}\n\n${p2}`;
 }
 
-export function generateLICopy(title, igCopy, participantsText, responsible) {
-    const cleanTitle = cleanText(title);
-    const liTitle = `𝗣𝗿𝗲𝘀𝗲𝗻𝗰𝗶𝗮 𝗱𝗲 𝗹𝗮 𝗕𝗖𝗥 𝗲𝗻 ${cleanTitle}`;
-    
-    const paragraphs = igCopy.split('\n\n');
-    const newsContent = paragraphs.length > 1 ? paragraphs.slice(1).join('\n\n') : igCopy;
-    
-    let liText = `${liTitle}\n\n${newsContent}`;
-
+export async function generateLICopy(title, description, observations, participantsText) {
+    // 1. Enriquecer los nombres de los participantes usando BCR_AUTHORITIES
+    let enrichedParticipants = "";
     if (participantsText) {
         let workingString = cleanText(participantsText);
         const matched = [];
+        
+        // Remove common words
         const noise = [/Participan\s+/i, /Participa\s+/i, /Estuvieron\s+/i, /Estuvo\s+/i, /Por BCR\s+/i];
         noise.forEach(r => workingString = workingString.replace(r, ''));
 
+        // Match against database
         BCR_AUTHORITIES.forEach(auth => {
+            // Simplified matching (case insensitive)
             if (workingString.toLowerCase().includes(auth.name.toLowerCase())) {
                 matched.push(auth);
+                // Remove matched name from the working string
                 const regex = new RegExp(auth.name, 'gi');
                 workingString = workingString.replace(regex, '');
             }
         });
 
+        // Get unmatched people
         const others = workingString
-            .split(/[,\by\b]/gi)
+            .split(/[,\by\b\/]/gi)
             .map(s => s.trim())
             .filter(s => s.length > 2);
 
         matched.sort((a, b) => a.priority - b.priority);
 
-        if (matched.length > 0 || others.length > 0) {
-            liText += `\n\nPor parte de la BCR estuvieron presentes: `;
-            const staffStrings = matched.map(m => `${m.cargo} ${m.name}`);
-            liText += staffStrings.join('; ');
-            
-            if (others.length > 0) {
-                liText += `${matched.length > 0 ? '; junto a ' : ''}${others.join(', ')}.`;
-            } else if (matched.length > 0) {
-                liText += `.`;
-            }
-        }
+        // Build enriched string
+        const enrichedList = [];
+        matched.forEach(m => {
+            enrichedList.push(`${m.name} (${m.cargo})`);
+        });
+        others.forEach(o => {
+            enrichedList.push(o); // Unmatched names passed as is
+        });
+        
+        enrichedParticipants = enrichedList.join(', ');
     }
 
-    const area = (responsible && responsible !== '') ? `área de ${responsible}` : 'la institución';
-    liText += `\n\nLa actividad fue impulsada por ${area}.`;
-    
-    return liText;
+    // 2. Llamar a la API
+    try {
+        const response = await fetch('/api/agenda/generate-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'li',
+                title: title || '',
+                description: description || '',
+                observations: observations || '',
+                participants_enriched: enrichedParticipants
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Error al generar copy LI');
+        }
+        
+        const data = await response.json();
+        return data.copy;
+    } catch (error) {
+        console.error(error);
+        alert("Error de IA: " + error.message);
+        return "";
+    }
 }

@@ -195,24 +195,42 @@ export function renderActivityForm(container, preData = null) {
     const txtIg = container.querySelector('#copy-ig');
     const txtLi = container.querySelector('#copy-li');
 
-    btnGenIg.onclick = () => {
+    btnGenIg.onclick = async () => {
         const title = form.title.value;
         const desc = form.description.value;
+        const obs = form.observations.value;
+        
         if (!title) return alert('Ingresa un título.');
         
-        txtIg.value = generateIGCopy(title, desc);
-        btnGenLi.style.display = 'flex'; 
+        btnGenIg.disabled = true;
+        const originalTextIg = btnGenIg.innerHTML;
+        btnGenIg.innerHTML = '<i data-lucide="loader" class="spin"></i> IG...';
+        if (window.lucide) window.lucide.createIcons();
+
+        txtIg.value = await generateIGCopy(title, desc, obs);
         
+        btnGenIg.innerHTML = originalTextIg;
+        btnGenIg.disabled = false;
+        btnGenLi.style.display = 'flex'; 
         if (window.lucide) window.lucide.createIcons();
     };
 
-    btnGenLi.onclick = () => {
-        const participants = form.participants.value;
-        const igText = txtIg.value;
+    btnGenLi.onclick = async () => {
         const title = form.title.value;
-        const responsible = form.responsible.value;
+        const desc = form.description.value;
+        const obs = form.observations.value;
+        const participants = form.participants.value;
         
-        txtLi.value = generateLICopy(title, igText, participants, responsible);
+        btnGenLi.disabled = true;
+        const originalTextLi = btnGenLi.innerHTML;
+        btnGenLi.innerHTML = '<i data-lucide="loader" class="spin"></i> LI...';
+        if (window.lucide) window.lucide.createIcons();
+
+        txtLi.value = await generateLICopy(title, desc, obs, participants);
+        
+        btnGenLi.innerHTML = originalTextLi;
+        btnGenLi.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
     };
 
     // Save logic
