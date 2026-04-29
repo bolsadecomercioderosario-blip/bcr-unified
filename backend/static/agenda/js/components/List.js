@@ -104,11 +104,12 @@ export function renderList(container) {
                                     <div style="font-weight: 600;">${act.title}</div>
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">${act.description.substring(0, 80)}${act.description.length > 80 ? '...' : ''}</div>
                                 </td>
-                                <td><span class="badge-user">${act.responsible || '-'}</span></td>
+                                <td class="td-responsible"><span class="badge-user">${act.responsible || '-'}</span></td>
                                 <td>${renderChannelNames(act.channels)}</td>
                                 <td style="text-align: center;" onclick="event.stopPropagation()">
-                                    <input type="checkbox" class="list-check-done" data-id="${act.id}" ${act.done ? 'checked' : ''} 
-                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+                                    <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado">
+                                        <i data-lucide="check-circle-2"></i>
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -131,11 +132,13 @@ export function renderList(container) {
 
     wrapper.innerHTML = html;
     
-    // Add checkbox listeners
-    wrapper.querySelectorAll('.list-check-done').forEach(cb => {
-        cb.onchange = (e) => {
-            const id = e.target.dataset.id;
-            updateActivity(id, { done: e.target.checked });
+    // Add check button listeners
+    wrapper.querySelectorAll('.btn-check-done').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            const isDone = btn.classList.contains('is-done');
+            updateActivity(id, { done: !isDone });
         };
     });
     

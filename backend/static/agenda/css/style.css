@@ -264,6 +264,29 @@ body {
     cursor: pointer;
 }
 
+/* Check Button Custom Styles */
+.btn-check-done {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--border);
+    transition: color 0.2s;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-check-done:hover {
+    color: var(--text-muted);
+}
+.btn-check-done.is-done {
+    color: var(--secondary);
+}
+.btn-check-done i {
+    width: 24px;
+    height: 24px;
+}
+
 /* Modal/Sheet */
 .sheet-overlay {
     position: fixed;
@@ -525,6 +548,14 @@ body {
     .data-table td:nth-child(4) {
         display: inline-block;
         margin-right: 0.5rem;
+    }
+    .data-table td.td-responsible::before {
+        content: "Responsable:";
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-right: 0.5rem;
+        text-transform: uppercase;
     }
     
     /* Celda 5 (Canales) */
