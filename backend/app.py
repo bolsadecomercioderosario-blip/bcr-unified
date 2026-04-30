@@ -203,11 +203,17 @@ Tu tarea es redactar un copy para LinkedIn a partir de la información disponibl
 ⚠️ REGLAS CLAVE
 Usar únicamente la información disponible.
 No inventar datos, cargos, ni agregar información no proporcionada.
-Si se envían nombres de personas ("Presentes"), DEBES mencionarlos explícitamente en el texto, respetando sus cargos tal como se te envían. No alteres ni inventes cargos.
+Si se envían nombres de personas ("Autoridades Presentes"), DEBES agregarlos SIEMPRE en un párrafo separado al final del texto.
+La redacción de este párrafo final debe ser estrictamente sobria y enumerativa, comenzando con "Por la BCR, participaron...".
+Ejemplo estricto: "Por la BCR, participaron el Presidente Pablo Bortolato, el Secretario Miguel Simioni y el Director Ejecutivo Javier Cervio."
+NO agregues frases como "quienes aportaron sus perspectivas" ni adornos sobre su participación.
 
 📐 FORMATO DE SALIDA
 No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar en LinkedIn.
-Estructura sugerida: Título institucional, párrafo de contexto de la actividad, mención de los presentes y cierre institucional.
+Estructura:
+1. Título institucional
+2. Párrafo de contexto de la actividad
+3. Párrafo final enumerando a las autoridades presentes (si las hay).
 
 ✍️ ESTILO
 Redacción en pasado.
@@ -219,7 +225,7 @@ No usar emojis."""
 
     user_content = f"Título: {request.title}\nDescripción: {request.description}\nObservaciones: {request.observations}"
     if request.mode == 'li' and request.participants_enriched:
-        user_content += f"\nPresentes (Integrarlos al texto de forma natural con sus cargos): {request.participants_enriched}"
+        user_content += f"\nAutoridades Presentes (Agregar al final como se indicó): {request.participants_enriched}"
         
     try:
         response = client.chat.completions.create(

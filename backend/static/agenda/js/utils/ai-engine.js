@@ -80,43 +80,45 @@ export async function generateLICopy(title, description, observations, participa
         const noise = [/Participan\s+/i, /Participa\s+/i, /Estuvieron\s+/i, /Estuvo\s+/i, /Por BCR\s+/i];
         noise.forEach(r => workingString = workingString.replace(r, ''));
 
-        const terms = workingString
+        // Extract and match
+        BCR_AUTHORITIES.forEach(auth => {
+            const parts = auth.name.split(' ');
+            const lastName = parts[parts.length - 1]; // last word is usually the last name
+            const regex = new RegExp(`\\b${lastName}\\b`, 'i');
+            
+            if (workingString.toLowerCase().includes(auth.name.toLowerCase()) || regex.test(workingString)) {
+                if (!matched.some(m => m.name === auth.name)) {
+                    matched.push(auth);
+                }
+                // remove matched part from working string to find "others" later
+                workingString = workingString.replace(new RegExp(auth.name, 'gi'), '');
+                workingString = workingString.replace(regex, '');
+            }
+        });
+
+        const others = workingString
             .split(/[,\by\b\/]/gi)
             .map(s => s.trim())
             .filter(s => s.length > 2);
 
-        const others = [];
-
-        terms.forEach(term => {
-            let found = false;
-            for (let auth of BCR_AUTHORITIES) {
-                // Check if authority name includes the typed term (e.g. "Pablo Bortolato" includes "Bortolato")
-                // Or if the typed term includes the authority name
-                if (auth.name.toLowerCase().includes(term.toLowerCase()) || term.toLowerCase().includes(auth.name.toLowerCase())) {
-                    if (!matched.some(m => m.name === auth.name)) {
-                        matched.push(auth);
-                    }
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                others.push(term);
-            }
-        });
-
         matched.sort((a, b) => a.priority - b.priority);
 
-        // Build enriched string
+        // Build enriched string using the required structure "el [Cargo] [Nombre]"
         const enrichedList = [];
         matched.forEach(m => {
-            enrichedList.push(`${m.name} (${m.cargo})`);
+            enrichedList.push(`el ${m.cargo} ${m.name}`);
         });
         others.forEach(o => {
-            enrichedList.push(o); // Unmatched names passed as is
+            enrichedList.push(o);
         });
         
-        enrichedParticipants = enrichedList.join(', ');
+        // Join properly: "A, B y C"
+        if (enrichedList.length > 1) {
+            const last = enrichedList.pop();
+            enrichedParticipants = enrichedList.join(', ') + ' y ' + last;
+        } else if (enrichedList.length === 1) {
+            enrichedParticipants = enrichedList[0];
+        }
     }
 
     // 2. Llamar a la API

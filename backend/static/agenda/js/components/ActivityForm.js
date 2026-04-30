@@ -67,7 +67,7 @@ export function renderActivityForm(container, preData = null) {
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 1rem;">
-                        <label>Presentes (para LinkedIn)</label>
+                        <label>Autoridades Presentes</label>
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>
                 </section>
