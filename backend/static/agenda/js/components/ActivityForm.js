@@ -130,25 +130,27 @@ export function renderActivityForm(container, preData = null) {
                         <input type="url" name="drive_santiago" value="${act.drive_santiago}" placeholder="https://...">
                     </div>
 
-                    <div style="margin-top: 1.5rem; background: #f8fafc; padding: 1rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <span style="font-weight: 600; font-size: 0.9rem;">Generación de Copies (IA)</span>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: #e1306c;">
-                                    <i data-lucide="instagram"></i> IG
-                                </button>
-                                <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: #0077b5; display: ${act.copy_instagram ? 'flex' : 'none'};">
-                                    <i data-lucide="linkedin"></i> LI
+                    <div style="margin-top: 1.5rem; background: #f8fafc; padding: 1.5rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
+                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">Generación de Copies (IA)</div>
+                        
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <label style="margin: 0;">Copy Instagram</label>
+                                <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.3rem 0.7rem; font-size: 0.75rem; background: #e1306c; border-radius: 4px;">
+                                    <i data-lucide="instagram" style="width: 14px; height: 14px; margin-right: 4px;"></i> IG
                                 </button>
                             </div>
+                            <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_instagram}</textarea>
                         </div>
-                        <div class="form-group">
-                            <label>Copy Instagram</label>
-                            <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem;">${act.copy_instagram}</textarea>
-                        </div>
-                        <div class="form-group" style="margin-top: 1rem;">
-                            <label>Copy LinkedIn</label>
-                            <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem;">${act.copy_linkedin}</textarea>
+
+                        <div class="form-group" style="margin-top: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <label style="margin: 0;">Copy LinkedIn / Conectados</label>
+                                <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.3rem 0.7rem; font-size: 0.75rem; background: #0077b5; border-radius: 4px;">
+                                    <i data-lucide="linkedin" style="width: 14px; height: 14px; margin-right: 4px;"></i> LI
+                                </button>
+                            </div>
+                            <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_linkedin}</textarea>
                         </div>
                     </div>
                 </section>
@@ -211,7 +213,6 @@ export function renderActivityForm(container, preData = null) {
         
         btnGenIg.innerHTML = originalTextIg;
         btnGenIg.disabled = false;
-        btnGenLi.style.display = 'flex'; 
         if (window.lucide) window.lucide.createIcons();
     };
 

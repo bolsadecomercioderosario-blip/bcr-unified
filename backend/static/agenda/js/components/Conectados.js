@@ -67,9 +67,6 @@ export function renderConectados(container) {
             <div class="drag-handle">
                 <i data-lucide="grip-vertical" style="width: 16px;"></i>
             </div>
-            <button class="btn-ia-suggest" title="Generar con IA (Tono Periodístico)">
-                <i data-lucide="sparkles" style="width: 14px;"></i>
-            </button>
             <button class="btn-delete-conectados" title="Eliminar Bloque" style="position: absolute; top: 0.5rem; right: 2rem; background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: opacity 0.2s;">
                 <i data-lucide="trash-2" style="width: 14px;"></i>
             </button>
@@ -82,7 +79,6 @@ export function renderConectados(container) {
         // Auto-save logic
         const titleInput = item.querySelector('.input-conectados-title');
         const textInput = item.querySelector('.input-conectados-text');
-        const btnIA = item.querySelector('.btn-ia-suggest');
         const btnDelete = item.querySelector('.btn-delete-conectados');
 
         btnDelete.onmouseover = () => btnDelete.style.opacity = '1';
@@ -104,16 +100,6 @@ export function renderConectados(container) {
         const autoGrow = (el) => {
             el.style.height = 'auto';
             el.style.height = el.scrollHeight + 'px';
-        };
-
-        btnIA.onclick = () => {
-            const suggested = suggestJournalisticTitle(act);
-            titleInput.value = suggested;
-            autoGrow(titleInput);
-            saveChanges();
-            // Brief animation or feedback
-            btnIA.style.color = 'var(--primary)';
-            setTimeout(() => btnIA.style.color = '', 500);
         };
 
         titleInput.oninput = () => {
