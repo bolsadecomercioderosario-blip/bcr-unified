@@ -1,4 +1,4 @@
-import { state, updateActivity, addActivity, suggestJournalisticTitle } from '../state.js';
+import { state, updateActivity, addActivity, deleteActivity, suggestJournalisticTitle } from '../state.js';
 
 function isCurrentNewsletterWeek(dateStr) {
     if (!dateStr) return false;
@@ -70,6 +70,9 @@ export function renderConectados(container) {
             <button class="btn-ia-suggest" title="Generar con IA (Tono Periodístico)">
                 <i data-lucide="sparkles" style="width: 14px;"></i>
             </button>
+            <button class="btn-delete-conectados" title="Eliminar Bloque" style="position: absolute; top: 0.5rem; right: 2rem; background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: opacity 0.2s;">
+                <i data-lucide="trash-2" style="width: 14px;"></i>
+            </button>
             <textarea class="input-conectados-title" rows="1" 
                       placeholder="Título del bloque...">${act.conectados_title || act.title}</textarea>
             <textarea class="input-conectados-text" rows="1" 
@@ -80,6 +83,16 @@ export function renderConectados(container) {
         const titleInput = item.querySelector('.input-conectados-title');
         const textInput = item.querySelector('.input-conectados-text');
         const btnIA = item.querySelector('.btn-ia-suggest');
+        const btnDelete = item.querySelector('.btn-delete-conectados');
+
+        btnDelete.onmouseover = () => btnDelete.style.opacity = '1';
+        btnDelete.onmouseout = () => btnDelete.style.opacity = '0.6';
+
+        btnDelete.onclick = () => {
+            if (confirm('¿Estás seguro de que querés eliminar este bloque?')) {
+                deleteActivity(act.id);
+            }
+        };
 
         const saveChanges = (silent = true) => {
             updateActivity(act.id, {
