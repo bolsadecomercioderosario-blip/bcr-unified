@@ -1,8 +1,33 @@
 import { state, updateActivity, addActivity, suggestJournalisticTitle } from '../state.js';
 
+function isCurrentNewsletterWeek(dateStr) {
+    if (!dateStr) return false;
+    const actDate = new Date(dateStr + "T00:00:00");
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    const day = today.getDay();
+    // Newsletter week: Saturday to Friday
+    // Sat = 6, Sun = 0, Mon = 1, etc.
+    const diff = day === 6 ? 0 : -(day + 1);
+    
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + diff);
+    
+    const nextFriday = new Date(saturday);
+    nextFriday.setDate(saturday.getDate() + 6);
+    nextFriday.setHours(23, 59, 59, 999);
+    
+    return actDate >= saturday && actDate <= nextFriday;
+}
+
 export function renderConectados(container) {
     const conectadosActivities = state.activities
-        .filter(a => a.channels.includes('Conectados'))
+        .filter(a => {
+            if (!a.channels.includes('Conectados')) return false;
+            if (a.is_custom && a.observations === 'FIXED_BLOCK') return true;
+            return isCurrentNewsletterWeek(a.date);
+        })
         .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
     const wrapper = document.createElement('div');
@@ -10,19 +35,24 @@ export function renderConectados(container) {
 
     if (conectadosActivities.length === 0) {
         wrapper.innerHTML = '<div style="text-align: center; padding: 4rem; color: var(--text-muted);">No hay actividades marcadas para "Conectados" esta semana.</div>';
-        container.appendChild(wrapper);
-        return;
     }
 
     const header = document.createElement('div');
     header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;';
     header.innerHTML = `
         <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
-        <button id="btn-add-conectados-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">
-            <i data-lucide="plus-circle"></i> Agregar Bloque Manual
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-add-fixed-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #64748b;">
+                <i data-lucide="pin"></i> Bloque Fijo
+            </button>
+            <button id="btn-add-var-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">
+                <i data-lucide="plus-circle"></i> Bloque Variable
+            </button>
+        </div>
     `;
-    wrapper.appendChild(header);
+    if (conectadosActivities.length > 0 || true) {
+        wrapper.appendChild(header);
+    }
 
     const listContainer = document.createElement('div');
     listContainer.id = 'conectados-sortable-list';
@@ -111,15 +141,28 @@ export function renderConectados(container) {
         });
     }
 
-    // Add Manual Block handler
-    wrapper.querySelector('#btn-add-conectados-block').onclick = () => {
+    // Add Variable Block
+    wrapper.querySelector('#btn-add-var-block').onclick = () => {
         addActivity({
-            title: 'Nuevo Bloque',
-            description: 'Descripción del bloque manual...',
+            title: 'Bloque Variable',
+            description: 'Contenido específico de esta semana...',
             channels: ['Conectados'],
             date: new Date().toISOString().split('T')[0],
             time: '00:00',
             is_custom: true
+        });
+    };
+
+    // Add Fixed Block
+    wrapper.querySelector('#btn-add-fixed-block').onclick = () => {
+        addActivity({
+            title: 'Bloque Fijo',
+            description: 'Sección permanente...',
+            channels: ['Conectados'],
+            date: '2099-12-31', // Far future so it doesn't mess with chronological sorting in other views if ever visible
+            time: '00:00',
+            is_custom: true,
+            observations: 'FIXED_BLOCK'
         });
     };
 
