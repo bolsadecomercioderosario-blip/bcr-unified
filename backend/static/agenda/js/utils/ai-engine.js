@@ -80,22 +80,30 @@ export async function generateLICopy(title, description, observations, participa
         const noise = [/Participan\s+/i, /Participa\s+/i, /Estuvieron\s+/i, /Estuvo\s+/i, /Por BCR\s+/i];
         noise.forEach(r => workingString = workingString.replace(r, ''));
 
-        // Match against database
-        BCR_AUTHORITIES.forEach(auth => {
-            // Simplified matching (case insensitive)
-            if (workingString.toLowerCase().includes(auth.name.toLowerCase())) {
-                matched.push(auth);
-                // Remove matched name from the working string
-                const regex = new RegExp(auth.name, 'gi');
-                workingString = workingString.replace(regex, '');
-            }
-        });
-
-        // Get unmatched people
-        const others = workingString
+        const terms = workingString
             .split(/[,\by\b\/]/gi)
             .map(s => s.trim())
             .filter(s => s.length > 2);
+
+        const others = [];
+
+        terms.forEach(term => {
+            let found = false;
+            for (let auth of BCR_AUTHORITIES) {
+                // Check if authority name includes the typed term (e.g. "Pablo Bortolato" includes "Bortolato")
+                // Or if the typed term includes the authority name
+                if (auth.name.toLowerCase().includes(term.toLowerCase()) || term.toLowerCase().includes(auth.name.toLowerCase())) {
+                    if (!matched.some(m => m.name === auth.name)) {
+                        matched.push(auth);
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                others.push(term);
+            }
+        });
 
         matched.sort((a, b) => a.priority - b.priority);
 

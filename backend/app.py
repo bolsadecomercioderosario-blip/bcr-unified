@@ -175,6 +175,7 @@ Usar únicamente la información disponible
 No inventar datos ni agregar información no proporcionada
 Si hay poca información, mantener el texto general y breve
 Integrar los campos de forma natural, sin asumir jerarquías entre ellos
+No escribas la palabra 'Título:' ni uses prefijos, simplemente redactá el texto del título.
 
 📐 FORMATO DE SALIDA
 Generar siempre:

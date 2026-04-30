@@ -78,10 +78,17 @@ globalSearch.addEventListener('input', (e) => {
 });
 
 // Sheet Logic
-activitySheet.addEventListener('click', (e) => {
-    if (e.target === activitySheet) {
+let isMouseDownOnOverlay = false;
+
+activitySheet.addEventListener('mousedown', (e) => {
+    isMouseDownOnOverlay = (e.target === activitySheet);
+});
+
+activitySheet.addEventListener('mouseup', (e) => {
+    if (isMouseDownOnOverlay && e.target === activitySheet) {
         closeActivitySheet();
     }
+    isMouseDownOnOverlay = false;
 });
 
 function openActivitySheet() {
