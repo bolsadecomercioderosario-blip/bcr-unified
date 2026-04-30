@@ -203,21 +203,24 @@ Tu tarea es redactar un copy para LinkedIn a partir de la información disponibl
 ⚠️ REGLAS CLAVE
 Usar únicamente la información disponible.
 No inventar datos, cargos, ni agregar información no proporcionada.
+NO ESCRIBAS NINGÚN TÍTULO. El texto debe arrancar directamente con el primer párrafo de desarrollo (ej. "La Bolsa de Comercio de Rosario llevó a cabo...").
+Sigue la misma lógica narrativa y sobria que el copy de Instagram, pero con mayor desarrollo y extensión.
 Si se envían nombres de personas ("Autoridades Presentes"), DEBES agregarlos SIEMPRE en un párrafo separado al final del texto.
 La redacción de este párrafo final debe ser estrictamente sobria y enumerativa, comenzando con "Por la BCR, participaron...".
 Ejemplo estricto: "Por la BCR, participaron el Presidente Pablo Bortolato, el Secretario Miguel Simioni y el Director Ejecutivo Javier Cervio."
 NO agregues frases como "quienes aportaron sus perspectivas" ni adornos sobre su participación.
 
 📐 FORMATO DE SALIDA
-No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar en LinkedIn.
+No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar.
 Estructura:
-1. Título institucional
-2. Párrafo de contexto de la actividad
+1. Párrafo de desarrollo principal (sin título previo).
+2. Párrafos adicionales de contexto si la información lo permite.
 3. Párrafo final enumerando a las autoridades presentes (si las hay).
 
 ✍️ ESTILO
 Redacción en pasado.
 Tono institucional, profesional, enfocado en el fortalecimiento institucional.
+Sin citas textuales.
 Evitar adjetivos innecesarios o grandilocuentes.
 No usar emojis."""
     else:
