@@ -131,13 +131,13 @@ export function renderActivityForm(container, preData = null) {
                     </div>
 
                     <div style="margin-top: 1.5rem; background: #f8fafc; padding: 1.5rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
-                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">Generación de Copies (IA)</div>
+                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">GENERACIÓN DE TEXTOS (IA)</div>
                         
                         <div class="form-group">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy Instagram</label>
-                                <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.3rem 0.7rem; font-size: 0.75rem; background: #e1306c; border-radius: 4px;">
-                                    <i data-lucide="instagram" style="width: 14px; height: 14px; margin-right: 4px;"></i> IG
+                                <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
+                                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
                                 </button>
                             </div>
                             <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_instagram}</textarea>
@@ -146,8 +146,8 @@ export function renderActivityForm(container, preData = null) {
                         <div class="form-group" style="margin-top: 1.5rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy LinkedIn / Conectados</label>
-                                <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.3rem 0.7rem; font-size: 0.75rem; background: #0077b5; border-radius: 4px;">
-                                    <i data-lucide="linkedin" style="width: 14px; height: 14px; margin-right: 4px;"></i> LI
+                                <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
+                                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
                                 </button>
                             </div>
                             <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_linkedin}</textarea>
@@ -206,7 +206,7 @@ export function renderActivityForm(container, preData = null) {
         
         btnGenIg.disabled = true;
         const originalTextIg = btnGenIg.innerHTML;
-        btnGenIg.innerHTML = '<i data-lucide="loader" class="spin"></i> IG...';
+        btnGenIg.innerHTML = '<i data-lucide="loader" class="spin"></i> ...';
         if (window.lucide) window.lucide.createIcons();
 
         txtIg.value = await generateIGCopy(title, desc, obs);
@@ -224,7 +224,7 @@ export function renderActivityForm(container, preData = null) {
         
         btnGenLi.disabled = true;
         const originalTextLi = btnGenLi.innerHTML;
-        btnGenLi.innerHTML = '<i data-lucide="loader" class="spin"></i> LI...';
+        btnGenLi.innerHTML = '<i data-lucide="loader" class="spin"></i> ...';
         if (window.lucide) window.lucide.createIcons();
 
         txtLi.value = await generateLICopy(title, desc, obs, participants);
