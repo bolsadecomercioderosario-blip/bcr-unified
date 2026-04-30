@@ -174,11 +174,19 @@ def get_rainfall_metadata():
                 pass
     data.sort(key=lambda x: x['mm'], reverse=True)
     top5 = data[:5]
+    
+    no_lluvias = len(top5) == 0
+    
     labels = get_day_labels()
-    texto_tweet = f"{labels['tweet_header']}\n\n"
-    for d in top5:
-        texto_tweet += f"- {d['localidad']}: {d['mm']} mm\n"
-    texto_tweet += "\nMapas y más info en:\nhttps://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
+    
+    if no_lluvias:
+        texto_tweet = "No se registraron precipitaciones en la red de estaciones de la BCR durante el período relevado."
+    else:
+        texto_tweet = f"{labels['tweet_header']}\n\n"
+        for d in top5:
+            texto_tweet += f"- {d['localidad']}: {d['mm']} mm\n"
+        texto_tweet += "\nMapas y más info en:\nhttps://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
+    
     url_mapa_base = "https://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
     r_img = requests.get(url_mapa_base, headers={'User-Agent': 'Mozilla/5.0'})
     soup_img = BeautifulSoup(r_img.text, 'html.parser')
@@ -198,5 +206,5 @@ def get_rainfall_metadata():
         imagen_local_path = os.path.join(STATIC_DIR, 'uploads', imagen_local_name)
         with open(imagen_local_path, 'wb') as f:
             f.write(r_down.content)
-        return top5, texto_tweet, f"/static/uploads/{imagen_local_name}"
-    return top5, texto_tweet, None
+        return top5, texto_tweet, f"/static/uploads/{imagen_local_name}", no_lluvias
+    return top5, texto_tweet, None, no_lluvias

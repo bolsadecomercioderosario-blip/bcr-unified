@@ -49,14 +49,20 @@ lluvias_api = APIRouter(prefix="/api/lluvias")
 
 @lluvias_api.get("/generar_pieza")
 async def generar_lluvias(background_tasks: BackgroundTasks):
-    top_5, texto, imagen_url = get_rainfall_metadata()
-    # Guardamos el mapa en la carpeta compartida de uploads
-    map_local_path = os.path.join(UPLOADS_DIR, "mapa_lluvias.jpg")
-    background_tasks.add_task(video_generation_task, top_5, map_local_path)
+    top_5, texto, imagen_url, no_lluvias = get_rainfall_metadata()
+    
+    video_enabled = not no_lluvias
+    
+    if video_enabled:
+        # Guardamos el mapa en la carpeta compartida de uploads
+        map_local_path = os.path.join(UPLOADS_DIR, "mapa_lluvias.jpg")
+        background_tasks.add_task(video_generation_task, top_5, map_local_path)
+    
     return {
         "texto": texto,
         "imagen_url": imagen_url,
-        "video_status": "processing"
+        "video_status": "processing" if video_enabled else "disabled",
+        "no_lluvias": no_lluvias
     }
 
 @lluvias_api.get("/video_status")

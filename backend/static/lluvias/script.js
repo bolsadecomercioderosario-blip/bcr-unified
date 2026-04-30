@@ -40,7 +40,12 @@ document.getElementById('generarBtn').addEventListener('click', async () => {
         resultado.classList.remove('hidden');
         btn.disabled = false;
 
-        pollVideoStatus();
+        if (data.no_lluvias) {
+            videoCard.classList.add('hidden');
+            console.log("No se registraron lluvias, video desactivado.");
+        } else {
+            pollVideoStatus();
+        }
 
     } catch (error) {
         console.error('Error:', error);
