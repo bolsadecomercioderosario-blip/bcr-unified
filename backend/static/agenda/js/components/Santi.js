@@ -2,7 +2,12 @@ import { state } from '../state.js';
 
 export function renderSanti(container) {
     const avActivities = state.activities
-        .filter(a => !a.is_custom && a.channels.includes('Instagram Story'))
+        .filter(a => {
+            if (a.is_custom) return false;
+            const isStoryVideo = a.channels.includes('Instagram Story') && a.story_type !== 'Layout';
+            const isYoutube = a.channels.includes('YouTube');
+            return isStoryVideo || isYoutube;
+        })
         .sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.time.localeCompare(b.time);

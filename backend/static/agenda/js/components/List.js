@@ -120,7 +120,7 @@ export function renderList(container) {
     };
 
     let html = '';
-    const groupOrder = ['PASADAS', 'HOY', 'MAÑANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE'];
+    const groupOrder = ['HOY', 'MAÑANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE', 'PASADAS'];
     
     groupOrder.forEach(g => {
         html += renderGroup(g, groups[g]);

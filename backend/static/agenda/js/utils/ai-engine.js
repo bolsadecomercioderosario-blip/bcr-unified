@@ -103,11 +103,25 @@ export async function generateLICopy(title, description, observations, participa
 
         matched.sort((a, b) => a.priority - b.priority);
 
-        // Build enriched string using the required structure "el [Cargo] [Nombre]"
+        // Build enriched string using the required structure
         const enrichedList = [];
-        matched.forEach(m => {
-            enrichedList.push(`el ${m.cargo} ${m.name}`);
+        
+        const cargosConNombre = matched.filter(m => m.priority <= 4 || m.priority >= 14);
+        const otrosDirectivos = matched.filter(m => m.priority > 4 && m.priority < 14);
+
+        cargosConNombre.forEach(m => {
+            const articulo = m.cargo.includes('Gerenta') || m.cargo.includes('Prosecretaria') || m.cargo.includes('Directora') ? 'la' : 'el';
+            enrichedList.push(`${articulo} ${m.cargo} ${m.name}`);
         });
+
+        if (otrosDirectivos.length > 1) {
+            const names = otrosDirectivos.map(m => m.name);
+            const last = names.pop();
+            enrichedList.push(`los directivos BCR ${names.join(', ')} y ${last}`);
+        } else if (otrosDirectivos.length === 1) {
+            enrichedList.push(`el directivo BCR ${otrosDirectivos[0].name}`);
+        }
+
         others.forEach(o => {
             enrichedList.push(o);
         });

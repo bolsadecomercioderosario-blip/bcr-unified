@@ -51,7 +51,7 @@ function sanitizeActivity(activity) {
 export async function addActivity(activity) {
     const newActivity = {
         ...sanitizeActivity(activity),
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         done: false
     };
     
