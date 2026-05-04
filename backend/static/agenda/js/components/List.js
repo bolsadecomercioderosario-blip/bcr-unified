@@ -1,4 +1,4 @@
-import { state, updateActivity } from '../state.js';
+import { state, updateActivity, deleteActivity } from '../state.js';
 
 export function renderList(container) {
     const today = new Date();
@@ -90,7 +90,7 @@ export function renderList(container) {
                             <th>Actividad</th>
                             <th style="width: 130px;">Responsable</th>
                             <th style="width: 200px;">Canales</th>
-                            <th style="width: 60px; text-align: center;">Ok</th>
+                            <th style="width: 90px; text-align: center;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -106,9 +106,12 @@ export function renderList(container) {
                                 </td>
                                 <td class="td-responsible"><span class="badge-user">${act.responsible || '-'}</span></td>
                                 <td>${renderChannelNames(act.channels)}</td>
-                                <td style="text-align: center;" onclick="event.stopPropagation()">
-                                    <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado">
+                                <td style="text-align: center; white-space: nowrap;" onclick="event.stopPropagation()">
+                                    <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado" style="margin-right: 0.2rem;">
                                         <i data-lucide="check-circle-2"></i>
+                                    </button>
+                                    <button class="btn-delete-activity" data-id="${act.id}" title="Eliminar actividad" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: inline-flex; vertical-align: middle;">
+                                        <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -139,6 +142,17 @@ export function renderList(container) {
             const id = btn.dataset.id;
             const isDone = btn.classList.contains('is-done');
             updateActivity(id, { done: !isDone });
+        };
+    });
+    
+    // Add delete button listeners
+    wrapper.querySelectorAll('.btn-delete-activity').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm('¿Estás seguro de que querés eliminar esta actividad?')) {
+                const id = btn.dataset.id;
+                deleteActivity(id);
+            }
         };
     });
     

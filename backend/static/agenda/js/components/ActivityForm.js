@@ -1,4 +1,4 @@
-import { state, addActivity, updateActivity } from '../state.js';
+import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
 import { generateIGCopy, generateLICopy } from '../utils/ai-engine.js';
 
 export function renderActivityForm(container, preData = null) {
@@ -160,6 +160,7 @@ export function renderActivityForm(container, preData = null) {
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
             <button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>
             <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
+            ${!isNew ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
     `;
 
@@ -269,4 +270,13 @@ export function renderActivityForm(container, preData = null) {
         
         window.closeActivitySheet();
     };
+
+    if (!isNew) {
+        container.querySelector('#btn-delete-activity-form').onclick = () => {
+            if (confirm('¿Estás seguro de que querés eliminar esta actividad? Esta acción no se puede deshacer.')) {
+                deleteActivity(act.id);
+                window.closeActivitySheet();
+            }
+        };
+    }
 }
