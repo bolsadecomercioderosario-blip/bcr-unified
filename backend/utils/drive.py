@@ -92,3 +92,30 @@ def create_activity_folder(date_iso, title):
     except Exception as e:
         print(f"Error inesperado al crear carpeta en Drive: {e}")
         return ""
+
+def delete_drive_folder(url):
+    """
+    Elimina una carpeta de Drive dado su webViewLink.
+    Extrae el ID de la URL y lo borra definitivamente.
+    """
+    if not url or "drive.google.com" not in url:
+        return
+        
+    service = get_drive_service()
+    if not service:
+        return
+        
+    try:
+        # Extraer ID de la URL
+        # Soporta formatos: /folders/ID o ?id=ID
+        folder_id = None
+        if 'folders/' in url:
+            folder_id = url.split('folders/')[-1].split('?')[0]
+        elif 'id=' in url:
+            folder_id = url.split('id=')[-1].split('&')[0]
+            
+        if folder_id:
+            service.files().delete(fileId=folder_id).execute()
+            print(f"Carpeta de Drive eliminada con éxito: {folder_id}")
+    except Exception as e:
+        print(f"Error al intentar eliminar carpeta de Drive ({url}): {e}")

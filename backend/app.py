@@ -8,7 +8,7 @@ import uuid
 from typing import Optional, List
 import openai
 
-from utils.drive import CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE, create_activity_folder
+from utils.drive import CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE, create_activity_folder, delete_drive_folder
 from google_auth_oauthlib.flow import Flow
 
 # Imports desde la lógica unificada
@@ -281,6 +281,13 @@ def delete_activity(activity_id: str, db: Session = Depends(get_db)):
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+    
+    # Si tiene carpeta en Drive, intentar borrarla
+    if db_activity.drive_bcr:
+        delete_drive_folder(db_activity.drive_bcr)
+    if db_activity.drive_santiago:
+        delete_drive_folder(db_activity.drive_santiago)
+        
     db.delete(db_activity)
     db.commit()
     return {"ok": True}
