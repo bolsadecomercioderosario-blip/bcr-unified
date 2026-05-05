@@ -1,4 +1,5 @@
 import { state, updateActivity, addActivity, deleteActivity, suggestJournalisticTitle } from '../state.js';
+import { generateLICopy } from '../utils/ai-engine.js';
 
 function isCurrentNewsletterWeek(dateStr) {
     if (!dateStr) return false;
@@ -67,11 +68,16 @@ export function renderConectados(container) {
             <div class="drag-handle">
                 <i data-lucide="grip-vertical" style="width: 16px;"></i>
             </div>
-            <button class="btn-delete-conectados" title="Eliminar Bloque" style="position: absolute; top: 0.5rem; right: 2rem; background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: opacity 0.2s;">
-                <i data-lucide="trash-2" style="width: 14px;"></i>
-            </button>
+            <div style="display: flex; justify-content: flex-end; position: absolute; top: 0.5rem; right: 0.5rem; gap: 0.5rem; z-index: 10;">
+                <button class="btn-gen-conectados" title="Generar texto con IA" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">
+                    <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+                </button>
+                <button class="btn-delete-conectados" title="Eliminar Bloque" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: opacity 0.2s;">
+                    <i data-lucide="trash-2" style="width: 14px;"></i>
+                </button>
+            </div>
             <textarea class="input-conectados-title" rows="1" 
-                      placeholder="Título del bloque...">${act.title || ''}</textarea>
+                      placeholder="Título del bloque..." style="padding-right: 4rem;">${act.title || ''}</textarea>
             <textarea class="input-conectados-text" rows="1" 
                       placeholder="Texto del bloque...">${act.copy_linkedin || act.conectados_text || act.description || ''}</textarea>
         `;
@@ -80,6 +86,7 @@ export function renderConectados(container) {
         const titleInput = item.querySelector('.input-conectados-title');
         const textInput = item.querySelector('.input-conectados-text');
         const btnDelete = item.querySelector('.btn-delete-conectados');
+        const btnGen = item.querySelector('.btn-gen-conectados');
 
         btnDelete.onmouseover = () => btnDelete.style.opacity = '1';
         btnDelete.onmouseout = () => btnDelete.style.opacity = '0.6';
@@ -88,6 +95,28 @@ export function renderConectados(container) {
             if (confirm('¿Estás seguro de que querés eliminar este bloque?')) {
                 deleteActivity(act.id);
             }
+        };
+
+        btnGen.onclick = async () => {
+            btnGen.disabled = true;
+            btnGen.innerHTML = '<i data-lucide="loader" class="spin" style="width: 16px; height: 16px;"></i>';
+            if (window.lucide) window.lucide.createIcons();
+            
+            const title = act.title || '';
+            const desc = act.description || '';
+            const obs = act.observations || '';
+            const participants = act.participants || '';
+            
+            const copy = await generateLICopy(title, desc, obs, participants);
+            if (copy) {
+                textInput.value = copy;
+                autoGrow(textInput);
+                saveChanges(true);
+            }
+            
+            btnGen.innerHTML = '<i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>';
+            btnGen.disabled = false;
+            if (window.lucide) window.lucide.createIcons();
         };
 
         const saveChanges = (silent = true) => {
