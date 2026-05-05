@@ -9,9 +9,16 @@ export function renderList(container) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowISO = tomorrow.toISOString().split('T')[0];
     
-    const nextWeekEnd = new Date(today);
-    nextWeekEnd.setDate(nextWeekEnd.getDate() + 8); // +7 days after tomorrow
-    const nextWeekEndISO = nextWeekEnd.toISOString().split('T')[0];
+    const currentDayOfWeek = today.getDay();
+    const daysToSunday = currentDayOfWeek === 0 ? 0 : 7 - currentDayOfWeek;
+    
+    const endOfThisWeek = new Date(today);
+    endOfThisWeek.setDate(today.getDate() + daysToSunday);
+    const endOfThisWeekISO = endOfThisWeek.toISOString().split('T')[0];
+
+    const endOfNextWeek = new Date(endOfThisWeek);
+    endOfNextWeek.setDate(endOfThisWeek.getDate() + 7);
+    const endOfNextWeekISO = endOfNextWeek.toISOString().split('T')[0];
 
     const filteredActivities = state.activities.filter(a => {
         if (a.is_custom) return false;
@@ -30,6 +37,7 @@ export function renderList(container) {
         'PASADAS': [],
         'HOY': [],
         'MAÑANA': [],
+        'ESTA SEMANA': [],
         'PRÓXIMA SEMANA': [],
         'MÁS ADELANTE': []
     };
@@ -41,9 +49,11 @@ export function renderList(container) {
             groups['HOY'].push(act);
         } else if (act.date === tomorrowISO) {
             groups['MAÑANA'].push(act);
-        } else if (act.date > tomorrowISO && act.date < nextWeekEndISO) {
+        } else if (act.date <= endOfThisWeekISO) {
+            groups['ESTA SEMANA'].push(act);
+        } else if (act.date <= endOfNextWeekISO) {
             groups['PRÓXIMA SEMANA'].push(act);
-        } else if (act.date >= nextWeekEndISO) {
+        } else {
             groups['MÁS ADELANTE'].push(act);
         }
     });
@@ -123,7 +133,7 @@ export function renderList(container) {
     };
 
     let html = '';
-    const groupOrder = ['HOY', 'MAÑANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE', 'PASADAS'];
+    const groupOrder = ['HOY', 'MAÑANA', 'ESTA SEMANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE', 'PASADAS'];
     
     groupOrder.forEach(g => {
         html += renderGroup(g, groups[g]);
