@@ -285,13 +285,6 @@ def create_activity(activity: agenda_models.ActivityCreate, background_tasks: Ba
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
-    
-    # Si tiene link de Santiago desde el inicio, disparar webhook
-    if db_activity.drive_santiago:
-        background_tasks.add_task(
-            trigger_santiago_webhook, 
-            db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
-        )
         
     return db_activity
 
@@ -308,15 +301,23 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
         
     db.commit()
     db.refresh(db_activity)
-    
-    # Si el link de Santiago se completó o cambió, disparar webhook
-    if db_activity.drive_santiago and db_activity.drive_santiago != old_santiago:
-        background_tasks.add_task(
-            trigger_santiago_webhook, 
-            db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
-        )
         
     return db_activity
+
+@agenda_api.post("/actividades/{activity_id}/notify-santiago")
+def notify_santiago(activity_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+        
+    if not db_activity.drive_santiago:
+        raise HTTPException(status_code=400, detail="No hay link de Santiago configurado")
+        
+    background_tasks.add_task(
+        trigger_santiago_webhook, 
+        db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
+    )
+    return {"ok": True}
 
 @agenda_api.delete("/actividades/{activity_id}")
 def delete_activity(activity_id: str, db: Session = Depends(get_db)):

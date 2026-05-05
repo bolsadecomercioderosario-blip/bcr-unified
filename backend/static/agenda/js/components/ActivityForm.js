@@ -268,13 +268,37 @@ export function renderActivityForm(container, preData = null) {
     // WhatsApp logic
     const btnWpp = container.querySelector('#btn-whatsapp-santiago');
     if (btnWpp) {
-        btnWpp.onclick = () => {
+        btnWpp.onclick = async () => {
             const link = form.drive_santiago.value;
-            const title = form.title.value;
-            if (!link) return alert('Primero ingresa el link de Santiago.');
+            if (!link) {
+                alert('Primero ingresa el link de Santiago.');
+                return;
+            }
             
-            const text = encodeURIComponent(`*COBERTURA BCR*\n\nHola! Ya está disponible el material de Santiago para la actividad: *${title}*\n\nLink: ${link}`);
-            window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+            // Si la actividad ya tiene ID (ya fue guardada antes), disparamos el circuito automático
+            if (act.id) {
+                btnWpp.disabled = true;
+                const originalContent = btnWpp.innerHTML;
+                btnWpp.innerHTML = '<span style="font-size: 0.7rem;">...</span>';
+                
+                try {
+                    const response = await fetch(`/api/agenda/actividades/${act.id}/notify-santiago`, { method: 'POST' });
+                    if (response.ok) {
+                        alert('✅ ¡Aviso enviado al grupo de WhatsApp!');
+                    } else {
+                        const err = await response.json();
+                        alert('Error: ' + (err.detail || 'No se pudo enviar el aviso.'));
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Hubo un problema al conectar con el servidor.');
+                } finally {
+                    btnWpp.disabled = false;
+                    btnWpp.innerHTML = originalContent;
+                }
+            } else {
+                alert('Primero guardá la actividad para que el sistema pueda generar el aviso automático.');
+            }
         };
     }
 
