@@ -276,15 +276,11 @@ def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_d
 def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_activity = agenda_models.Activity(**activity.model_dump())
     
-    # Intentar crear la carpeta en Drive si es una actividad normal y no tiene link
-    if not db_activity.is_custom and not db_activity.drive_bcr:
-        link = create_activity_folder(db_activity.date, db_activity.title)
-        if link:
-            db_activity.drive_bcr = link
-            
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
+        
+    return db_activity
         
     return db_activity
 
@@ -318,6 +314,24 @@ def notify_santiago(activity_id: str, background_tasks: BackgroundTasks, db: Ses
         db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
     )
     return {"ok": True}
+
+@agenda_api.post("/actividades/{activity_id}/create-folder")
+def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+        
+    if db_activity.drive_bcr:
+        return {"link": db_activity.drive_bcr, "already_existed": True}
+        
+    link = create_activity_folder(db_activity.date, db_activity.title)
+    if link:
+        db_activity.drive_bcr = link
+        db.commit()
+        db.refresh(db_activity)
+        return {"link": link, "ok": True}
+    else:
+        raise HTTPException(status_code=500, detail="No se pudo crear la carpeta en Google Drive")
 
 @agenda_api.delete("/actividades/{activity_id}")
 def delete_activity(activity_id: str, db: Session = Depends(get_db)):

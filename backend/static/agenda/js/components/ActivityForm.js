@@ -123,7 +123,12 @@ export function renderActivityForm(container, preData = null) {
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Links y Contenido</h3>
                     <div class="form-group">
                         <label>Link Drive Cobertura BCR</label>
-                        <input type="url" name="drive_bcr" value="${act.drive_bcr}" placeholder="https://...">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="url" name="drive_bcr" id="input-drive-bcr" value="${act.drive_bcr}" placeholder="https://..." style="flex-grow: 1;">
+                            <button type="button" id="btn-create-folder-bcr" class="btn-primary" style="background: #4285F4; border: none; padding: 0 0.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;" title="Crear carpeta en Drive">
+                                <i data-lucide="folder-plus" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group" id="group-santiago" style="margin-top: 1rem; display: none;">
                         <label>Link Drive Santiago</label>
@@ -264,6 +269,41 @@ export function renderActivityForm(container, preData = null) {
 
     copyToClipboard('btn-copy-ig', txtIg);
     copyToClipboard('btn-copy-li', txtLi);
+
+    // Drive Folder Creation logic
+    const btnCreateFolder = container.querySelector('#btn-create-folder-bcr');
+    if (btnCreateFolder) {
+        btnCreateFolder.onclick = async () => {
+            if (!act.id) {
+                alert('Primero guardá la actividad para poder crear la carpeta.');
+                return;
+            }
+            
+            btnCreateFolder.disabled = true;
+            btnCreateFolder.innerHTML = '<span style="font-size: 0.7rem;">...</span>';
+            
+            try {
+                const response = await fetch(`/api/agenda/actividades/${act.id}/create-folder`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    container.querySelector('#input-drive-bcr').value = result.link;
+                    // Actualizamos el objeto local por si guardan de nuevo
+                    act.drive_bcr = result.link;
+                    alert('✅ Carpeta creada exitosamente en Google Drive.');
+                } else {
+                    alert('Error: ' + (result.detail || 'No se pudo crear la carpeta.'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Hubo un problema al conectar con el servidor.');
+            } finally {
+                btnCreateFolder.disabled = false;
+                btnCreateFolder.innerHTML = '<i data-lucide="folder-plus" style="width: 18px; height: 18px;"></i>';
+                if (window.lucide) window.lucide.createIcons();
+            }
+        };
+    }
 
     // WhatsApp logic
     const btnWpp = container.querySelector('#btn-whatsapp-santiago');
