@@ -9,9 +9,22 @@ from googleapiclient.errors import HttpError
 SCOPES = ['https://www.googleapis.com/auth/drive']
 PARENT_FOLDER_ID = '1C9NICdm1iQN82kEEF04tRZQuxTAoN0kA'
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, 'client_secret.json')
-TOKEN_FILE = os.path.join(BASE_DIR, 'token.json')
+# Render places secret files in /etc/secrets or the app root
+POSSIBLE_DIRS = [
+    "/etc/secrets",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), # backend/
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # repo root
+]
+
+def find_file(filename):
+    for d in POSSIBLE_DIRS:
+        path = os.path.join(d, filename)
+        if os.path.exists(path):
+            return path
+    return os.path.join(POSSIBLE_DIRS[1], filename)
+
+CLIENT_SECRETS_FILE = find_file('client_secret.json')
+TOKEN_FILE = find_file('token.json')
 
 def get_drive_service():
     creds = None
@@ -21,6 +34,12 @@ def get_drive_service():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            # Render's /etc/secrets is read-only, so we catch permission errors
+            try:
+                with open(TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                print(f"No se pudo guardar el token actualizado (probable sistema de solo lectura): {e}")
         else:
             return None # Must go through auth flow first
             
