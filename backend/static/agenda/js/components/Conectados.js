@@ -266,6 +266,9 @@ export function renderConectados(container) {
                     <button id="copy-newsletter-html" class="btn-primary" style="flex: 1; background: #0742ab;">
                         <i data-lucide="copy"></i> Copiar Código HTML
                     </button>
+                    <button id="btn-close-preview" class="btn-primary" style="background: #64748b; padding: 0.5rem 1.5rem;">
+                        Cerrar
+                    </button>
                 </div>
             </div>
         `;
@@ -275,6 +278,7 @@ export function renderConectados(container) {
         iframe.srcdoc = html;
 
         modal.querySelector('#close-newsletter').onclick = () => modal.remove();
+        modal.querySelector('#btn-close-preview').onclick = () => modal.remove();
         modal.querySelector('#copy-newsletter-html').onclick = () => {
             navigator.clipboard.writeText(html);
             const btn = modal.querySelector('#copy-newsletter-html');
