@@ -15,6 +15,26 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <div class="logo" style="margin-bottom: 1.5rem; justify-content: center;">
+                <i data-lucide="lock" style="width: 24px; height: 24px;"></i>
+                <span style="font-size: 1.2rem;">Acceso Protegido</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; text-align: center;">
+                Ingresá la contraseña para acceder a la Agenda de Comunicación.
+            </p>
+            <input type="password" id="login-password" placeholder="Contraseña" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border); margin-bottom: 1rem; text-align: center;">
+            <button id="btn-login" class="btn-primary" style="width: 100%; justify-content: center;">
+                Entrar
+            </button>
+            <p id="login-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 1rem; text-align: center; display: none;">
+                Contraseña incorrecta. Reintentá.
+            </p>
+        </div>
+    </div>
+
     <div id="app" class="app-container">
         <!-- Main Content Area -->
         <main class="main-content">

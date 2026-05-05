@@ -141,6 +141,48 @@ if (logo) {
     logo.appendChild(badge);
 }
 
+// Auth Logic
+const loginOverlay = document.getElementById('login-overlay');
+const loginPassword = document.getElementById('login-password');
+const btnLogin = document.getElementById('btn-login');
+const loginError = document.getElementById('login-error');
+
+function checkAuth() {
+    if (localStorage.getItem('agenda_auth') === 'true') {
+        loginOverlay.classList.add('hidden');
+        return true;
+    }
+    return false;
+}
+
+async function tryLogin() {
+    const password = loginPassword.value;
+    try {
+        const res = await fetch('/api/agenda/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        
+        if (res.ok) {
+            localStorage.setItem('agenda_auth', 'true');
+            loginOverlay.classList.add('hidden');
+            loadActivities().then(updateUI);
+        } else {
+            loginError.style.display = 'block';
+            loginPassword.value = '';
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error al conectar con el servidor');
+    }
+}
+
+if (btnLogin) {
+    btnLogin.onclick = tryLogin;
+    loginPassword.onkeydown = (e) => { if (e.key === 'Enter') tryLogin(); };
+}
+
 // Initial Cleanup
 state.activities = state.activities.map(a => {
     return {
@@ -151,7 +193,13 @@ state.activities = state.activities.map(a => {
 });
 
 // Initial Render
-subscribe(updateUI);
-loadActivities().then(() => {
-    updateUI();
-});
+if (checkAuth()) {
+    subscribe(updateUI);
+    loadActivities().then(() => {
+        updateUI();
+    });
+} else {
+    // Si no está autenticado, esperamos a que el usuario se loguee
+    subscribe(updateUI);
+}
+

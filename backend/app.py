@@ -243,6 +243,15 @@ No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final dire
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@agenda_api.post("/auth")
+def authenticate_agenda(payload: dict):
+    password = payload.get("password")
+    # Password por defecto si no se configura en Render
+    correct_password = os.getenv("AGENDA_PASSWORD", "bcr2024")
+    if password == correct_password:
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
 def trigger_santiago_webhook(activity_id, title, date, drive_santiago):
     """
     Envía una notificación a Pipedream si hay un link de Santiago.
