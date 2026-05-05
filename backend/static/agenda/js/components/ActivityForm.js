@@ -127,7 +127,12 @@ export function renderActivityForm(container, preData = null) {
                     </div>
                     <div class="form-group" id="group-santiago" style="margin-top: 1rem; display: none;">
                         <label>Link Drive Santiago</label>
-                        <input type="url" name="drive_santiago" value="${act.drive_santiago}" placeholder="https://...">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="url" name="drive_santiago" id="input-drive-santiago" value="${act.drive_santiago}" placeholder="https://..." style="flex-grow: 1;">
+                            <button type="button" id="btn-whatsapp-santiago" class="btn-primary" style="background: #25D366; border: none; padding: 0 0.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;" title="Compartir por WhatsApp">
+                                <i data-lucide="message-circle" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div style="margin-top: 1.5rem; background: #f8fafc; padding: 1.5rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
@@ -259,6 +264,19 @@ export function renderActivityForm(container, preData = null) {
 
     copyToClipboard('btn-copy-ig', txtIg);
     copyToClipboard('btn-copy-li', txtLi);
+
+    // WhatsApp logic
+    const btnWpp = container.querySelector('#btn-whatsapp-santiago');
+    if (btnWpp) {
+        btnWpp.onclick = () => {
+            const link = form.drive_santiago.value;
+            const title = form.title.value;
+            if (!link) return alert('Primero ingresa el link de Santiago.');
+            
+            const text = encodeURIComponent(`*COBERTURA BCR*\n\nHola! Ya está disponible el material de Santiago para la actividad: *${title}*\n\nLink: ${link}`);
+            window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+        };
+    }
 
     // Save logic
     container.querySelector('#btn-save-activity').onclick = async () => {
