@@ -28,6 +28,7 @@ class Activity(Base):
     conectados_text = Column(String, default="")
     is_custom = Column(Boolean, default=False)
     order_index = Column(Integer, default=0)
+    image_url = Column(String, default="")
 
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
@@ -52,6 +53,7 @@ class ActivityBase(BaseModel):
     conectados_text: Optional[str] = ""
     is_custom: Optional[bool] = False
     order_index: Optional[int] = 0
+    image_url: Optional[str] = ""
 
 class ActivityCreate(ActivityBase):
     pass
@@ -77,6 +79,7 @@ class ActivityUpdate(BaseModel):
     conectados_text: Optional[str] = None
     is_custom: Optional[bool] = None
     order_index: Optional[int] = None
+    image_url: Optional[str] = None
 
 class ActivityOut(ActivityBase):
     class Config:

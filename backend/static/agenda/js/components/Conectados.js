@@ -1,5 +1,6 @@
 import { state, updateActivity, addActivity, deleteActivity, suggestJournalisticTitle } from '../state.js';
 import { generateLICopy } from '../utils/ai-engine.js';
+import { generateNewsletterHTML } from '../utils/NewsletterGenerator.js';
 
 function isCurrentNewsletterWeek(dateStr) {
     if (!dateStr) return false;
@@ -43,6 +44,9 @@ export function renderConectados(container) {
     header.innerHTML = `
         <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
         <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-gen-newsletter" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0742ab;">
+                <i data-lucide="mail"></i> Generar Newsletter
+            </button>
             <button id="btn-add-fixed-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #64748b;">
                 <i data-lucide="pin"></i> Bloque Fijo
             </button>
@@ -76,10 +80,24 @@ export function renderConectados(container) {
                     <i data-lucide="trash-2" style="width: 14px;"></i>
                 </button>
             </div>
-            <textarea class="input-conectados-title" rows="1" 
-                      placeholder="Título del bloque..." style="padding-right: 4rem;">${act.title || ''}</textarea>
-            <textarea class="input-conectados-text" rows="1" 
-                      placeholder="Texto del bloque...">${act.copy_linkedin || act.conectados_text || act.description || ''}</textarea>
+            <div class="conectados-content">
+                <div class="conectados-image-area">
+                    ${act.image_url ? 
+                        `<img src="${act.image_url}" class="newsletter-img-preview">` : 
+                        `<div class="newsletter-img-placeholder">
+                            <i data-lucide="image"></i>
+                            <span>Arrastrar imagen</span>
+                         </div>`
+                    }
+                    <input type="file" class="input-newsletter-file" style="display: none;" accept="image/*">
+                </div>
+                <div class="conectados-text-area">
+                    <textarea class="input-conectados-title" rows="1" 
+                              placeholder="Título del bloque...">${act.title || ''}</textarea>
+                    <textarea class="input-conectados-text" rows="1" 
+                              placeholder="Texto del bloque...">${act.copy_linkedin || act.conectados_text || act.description || ''}</textarea>
+                </div>
+            </div>
         `;
 
         // Auto-save logic
@@ -126,6 +144,38 @@ export function renderConectados(container) {
                 conectados_title: titleInput.value, // Keep for backwards compatibility
                 conectados_text: textInput.value
             }, !silent);
+        };
+
+        // Image Upload logic
+        const imgArea = item.querySelector('.conectados-image-area');
+        const fileInput = item.querySelector('.input-newsletter-file');
+
+        imgArea.onclick = () => fileInput.click();
+        
+        fileInput.onchange = async (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                imgArea.style.opacity = '0.5';
+                try {
+                    const res = await fetch('/api/agenda/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.url) {
+                        updateActivity(act.id, { image_url: data.url }, false);
+                        imgArea.innerHTML = `<img src="${data.url}" class="newsletter-img-preview">`;
+                        imgArea.style.opacity = '1';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error al subir imagen');
+                    imgArea.style.opacity = '1';
+                }
+            }
         };
 
         const autoGrow = (el) => {
@@ -196,6 +246,44 @@ export function renderConectados(container) {
             is_custom: true,
             observations: 'FIXED_BLOCK'
         });
+    };
+
+    // Generate Newsletter
+    wrapper.querySelector('#btn-gen-newsletter').onclick = () => {
+        const html = generateNewsletterHTML(conectadosActivities);
+        
+        // Modal Preview
+        const modal = document.createElement('div');
+        modal.className = 'login-overlay'; // Reusing style for backdrop
+        modal.innerHTML = `
+            <div class="login-card" style="max-width: 800px; width: 90%; height: 90vh; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Vista Previa Newsletter</h3>
+                    <button id="close-newsletter" style="background: none; border: none; cursor: pointer;"><i data-lucide="x"></i></button>
+                </div>
+                <iframe id="newsletter-preview" style="flex: 1; border: 1px solid #eee; background: white;"></iframe>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <button id="copy-newsletter-html" class="btn-primary" style="flex: 1; background: #0742ab;">
+                        <i data-lucide="copy"></i> Copiar Código HTML
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const iframe = modal.querySelector('#newsletter-preview');
+        iframe.srcdoc = html;
+
+        modal.querySelector('#close-newsletter').onclick = () => modal.remove();
+        modal.querySelector('#copy-newsletter-html').onclick = () => {
+            navigator.clipboard.writeText(html);
+            const btn = modal.querySelector('#copy-newsletter-html');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check"></i> ¡Copiado!';
+            setTimeout(() => btn.innerHTML = originalHTML, 2000);
+        };
+        
+        if (window.lucide) window.lucide.createIcons();
     };
 
     if (window.lucide) window.lucide.createIcons();

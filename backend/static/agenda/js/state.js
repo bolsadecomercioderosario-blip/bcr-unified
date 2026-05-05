@@ -44,6 +44,7 @@ function sanitizeActivity(activity) {
         participants: activity.participants || '',
         story_type: activity.story_type || 'Video',
         is_custom: activity.is_custom || false,
+        image_url: activity.image_url || '',
         channels: Array.isArray(activity.channels) ? activity.channels : []
     };
 }

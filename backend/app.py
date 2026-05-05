@@ -243,6 +243,24 @@ No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final dire
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@agenda_api.post("/upload")
+async def upload_agenda_image(file: UploadFile = File(...)):
+    # Crear directorio si no existe
+    upload_dir = "static/uploads"
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+        
+    # Generar nombre único
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"newsletter_{uuid.uuid4()}{ext}"
+    file_path = os.path.join(upload_dir, filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Devolver URL pública (ajustar segun base_url si es necesario, pero relativo funciona en el mismo origen)
+    return {"url": f"/static/uploads/{filename}"}
+
 @agenda_api.post("/auth")
 def authenticate_agenda(payload: dict):
     password = payload.get("password")
