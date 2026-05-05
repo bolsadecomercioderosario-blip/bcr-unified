@@ -252,10 +252,10 @@ def create_activity(activity: agenda_models.ActivityCreate, db: Session = Depend
     db_activity = agenda_models.Activity(**activity.model_dump())
     
     # Intentar crear la carpeta en Drive si es una actividad normal y no tiene link
-    if not db_activity.is_custom and not db_activity.drive_santiago:
+    if not db_activity.is_custom and not db_activity.drive_bcr:
         link = create_activity_folder(db_activity.date, db_activity.title)
         if link:
-            db_activity.drive_santiago = link
+            db_activity.drive_bcr = link
             
     db.add(db_activity)
     db.commit()
