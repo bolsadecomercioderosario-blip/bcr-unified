@@ -8,6 +8,7 @@ import uuid
 from typing import Optional, List
 import openai
 
+import requests
 from utils.drive import CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE, create_activity_folder, delete_drive_folder
 from google_auth_oauthlib.flow import Flow
 
@@ -242,13 +243,37 @@ No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final dire
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def trigger_santiago_webhook(activity_id, title, date, drive_santiago):
+    """
+    Envía una notificación a Pipedream si hay un link de Santiago.
+    Se ejecuta en segundo plano para no bloquear la respuesta.
+    """
+    webhook_url = os.getenv("SANTIAGO_WEBHOOK_URL")
+    if not webhook_url or not drive_santiago:
+        return
+        
+    payload = {
+        "event": "santiago_link_ready",
+        "activity_id": activity_id,
+        "title": title,
+        "date": date,
+        "drive_santiago": drive_santiago,
+        "timestamp": os.getenv("RENDER_GIT_COMMIT", "manual") # Opcional: para tracking
+    }
+    
+    try:
+        requests.post(webhook_url, json=payload, timeout=5)
+        print(f"Webhook de Santiago disparado para: {title}")
+    except Exception as e:
+        print(f"Error al disparar webhook de Santiago: {e}")
+
 @agenda_api.get("/actividades", response_model=List[agenda_models.ActivityOut])
 def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
     activities = db.query(agenda_models.Activity).offset(skip).limit(limit).all()
     return activities
 
 @agenda_api.post("/actividades", response_model=agenda_models.ActivityOut)
-def create_activity(activity: agenda_models.ActivityCreate, db: Session = Depends(get_db)):
+def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_activity = agenda_models.Activity(**activity.model_dump())
     
     # Intentar crear la carpeta en Drive si es una actividad normal y no tiene link
@@ -260,20 +285,37 @@ def create_activity(activity: agenda_models.ActivityCreate, db: Session = Depend
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
+    
+    # Si tiene link de Santiago desde el inicio, disparar webhook
+    if db_activity.drive_santiago:
+        background_tasks.add_task(
+            trigger_santiago_webhook, 
+            db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
+        )
+        
     return db_activity
 
 @agenda_api.put("/actividades/{activity_id}", response_model=agenda_models.ActivityOut)
-def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, db: Session = Depends(get_db)):
+def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     
+    old_santiago = db_activity.drive_santiago
     update_data = activity.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_activity, key, value)
         
     db.commit()
     db.refresh(db_activity)
+    
+    # Si el link de Santiago se completó o cambió, disparar webhook
+    if db_activity.drive_santiago and db_activity.drive_santiago != old_santiago:
+        background_tasks.add_task(
+            trigger_santiago_webhook, 
+            db_activity.id, db_activity.title, db_activity.date, db_activity.drive_santiago
+        )
+        
     return db_activity
 
 @agenda_api.delete("/actividades/{activity_id}")
