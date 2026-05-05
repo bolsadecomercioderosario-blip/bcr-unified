@@ -8,6 +8,9 @@ import uuid
 from typing import Optional, List
 import openai
 
+from utils.drive import CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE, create_activity_folder
+from google_auth_oauthlib.flow import Flow
+
 # Imports desde la lógica unificada
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
@@ -247,6 +250,13 @@ def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_d
 @agenda_api.post("/actividades", response_model=agenda_models.ActivityOut)
 def create_activity(activity: agenda_models.ActivityCreate, db: Session = Depends(get_db)):
     db_activity = agenda_models.Activity(**activity.model_dump())
+    
+    # Intentar crear la carpeta en Drive si es una actividad normal y no tiene link
+    if not db_activity.is_custom and not db_activity.drive_santiago:
+        link = create_activity_folder(db_activity.date, db_activity.title)
+        if link:
+            db_activity.drive_santiago = link
+            
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
@@ -274,6 +284,50 @@ def delete_activity(activity_id: str, db: Session = Depends(get_db)):
     db.delete(db_activity)
     db.commit()
     return {"ok": True}
+
+oauth_state_store = {}
+
+@agenda_api.get("/drive/auth")
+def drive_auth():
+    if not os.path.exists(CLIENT_SECRETS_FILE):
+        return {"error": "client_secret.json no encontrado en el servidor."}
+        
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES)
+    flow.redirect_uri = 'http://localhost:8000/api/agenda/drive/callback'
+    
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+    
+    # Guardamos temporalmente el verificador en memoria (necesario para OAuth)
+    if hasattr(flow, 'code_verifier'):
+        oauth_state_store[state] = flow.code_verifier
+        
+    return RedirectResponse(url=authorization_url)
+
+@agenda_api.get("/drive/callback")
+def drive_callback(code: str, state: str = None):
+    if not os.path.exists(CLIENT_SECRETS_FILE):
+        return {"error": "client_secret.json no encontrado"}
+        
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
+    flow.redirect_uri = 'http://localhost:8000/api/agenda/drive/callback'
+    
+    # Restauramos el verificador
+    if state and state in oauth_state_store:
+        flow.code_verifier = oauth_state_store.pop(state)
+        
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    
+    with open(TOKEN_FILE, 'w') as token:
+        token.write(creds.to_json())
+        
+    return {"message": "✅ Autenticación exitosa. Se guardó token.json en el servidor. Ya podés cerrar esta pestaña."}
 
 # ---------------------------------------------------------
 # MONTAJE Y RUTAS ESTÁTICAS
