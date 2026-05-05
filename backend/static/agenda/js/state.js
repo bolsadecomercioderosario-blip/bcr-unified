@@ -77,7 +77,7 @@ export async function updateActivity(id, updates, shouldNotify = true) {
     const index = state.activities.findIndex(a => a.id === id);
     if (index !== -1) {
         // Optimistic update
-        const updatedActivity = { ...state.activities[index], ...sanitizeActivity(updates) };
+        const updatedActivity = sanitizeActivity({ ...state.activities[index], ...updates });
         state.activities[index] = updatedActivity;
         if (shouldNotify) notify();
 
