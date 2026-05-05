@@ -76,7 +76,19 @@ def create_activity_folder(date_iso, title):
             body=file_metadata,
             fields='id, webViewLink'
         ).execute()
-        return file.get('webViewLink')
+        
+        folder_id = file.get('id')
+        link = file.get('webViewLink')
+        
+        # Fallback si por alguna razón no viene el webViewLink
+        if not link and folder_id:
+            link = f"https://drive.google.com/drive/folders/{folder_id}"
+            
+        print(f"Carpeta creada exitosamente: {folder_id} - Link: {link}")
+        return link
     except HttpError as error:
-        print(f"An error occurred creating drive folder: {error}")
+        print(f"Error de Google API al crear carpeta: {error}")
+        return ""
+    except Exception as e:
+        print(f"Error inesperado al crear carpeta en Drive: {e}")
         return ""

@@ -261,7 +261,7 @@ export function renderActivityForm(container, preData = null) {
     copyToClipboard('btn-copy-li', txtLi);
 
     // Save logic
-    container.querySelector('#btn-save-activity').onclick = () => {
+    container.querySelector('#btn-save-activity').onclick = async () => {
         const formData = new FormData(form);
         
         // Use a more robust way to get all checked channels
@@ -287,13 +287,23 @@ export function renderActivityForm(container, preData = null) {
             story_type: formData.get('story_type')
         };
 
-        if (isNew) {
-            addActivity(data);
-        } else {
-            updateActivity(act.id, data);
+        const btnSave = container.querySelector('#btn-save-activity');
+        const originalText = btnSave.innerText;
+        btnSave.disabled = true;
+        btnSave.innerText = 'Guardando...';
+
+        try {
+            if (isNew) {
+                await addActivity(data);
+            } else {
+                await updateActivity(act.id, data);
+            }
+            window.closeActivitySheet();
+        } catch (error) {
+            alert('Error al guardar: ' + error.message);
+            btnSave.disabled = false;
+            btnSave.innerText = originalText;
         }
-        
-        window.closeActivitySheet();
     };
 
     if (!isNew) {
