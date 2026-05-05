@@ -20,9 +20,11 @@ from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 import agenda_models
+from migrate import migrate
 
-# Crear tablas
+# Crear tablas y ejecutar migraciones
 Base.metadata.create_all(bind=engine)
+migrate()
 
 app = FastAPI(title="BCR Servicios Unificados")
 
