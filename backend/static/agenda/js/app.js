@@ -36,6 +36,15 @@ function updateUI() {
     // Render current view
     viewContainer.innerHTML = '';
     
+    // Show/Hide search and history toggle only in 'list' view
+    const searchBox = document.querySelector('.search-box');
+    if (searchBox) {
+        searchBox.style.display = state.view === 'list' ? 'flex' : 'none';
+    }
+    if (btnTogglePast) {
+        btnTogglePast.style.display = state.view === 'list' ? 'flex' : 'none';
+    }
+
     switch (state.view) {
         case 'list':
             renderList(viewContainer);
