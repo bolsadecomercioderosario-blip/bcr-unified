@@ -136,9 +136,14 @@ export function renderActivityForm(container, preData = null) {
                         <div class="form-group">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy Instagram</label>
-                                <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
-                                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
-                                </button>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button type="button" id="btn-copy-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
+                                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
+                                    </button>
+                                    <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
+                                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
+                                    </button>
+                                </div>
                             </div>
                             <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_instagram}</textarea>
                         </div>
@@ -146,9 +151,14 @@ export function renderActivityForm(container, preData = null) {
                         <div class="form-group" style="margin-top: 1.5rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy LinkedIn / Conectados</label>
-                                <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
-                                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
-                                </button>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button type="button" id="btn-copy-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
+                                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
+                                    </button>
+                                    <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
+                                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
+                                    </button>
+                                </div>
                             </div>
                             <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_linkedin}</textarea>
                         </div>
@@ -234,6 +244,21 @@ export function renderActivityForm(container, preData = null) {
         btnGenLi.disabled = false;
         if (window.lucide) window.lucide.createIcons();
     };
+
+    const copyToClipboard = (btnId, inputEl) => {
+        const btn = container.querySelector('#' + btnId);
+        btn.onclick = () => {
+            if (!inputEl.value) return;
+            navigator.clipboard.writeText(inputEl.value);
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" style="width: 14px; height: 14px;"></i> Copiado';
+            if (window.lucide) window.lucide.createIcons();
+            setTimeout(() => { btn.innerHTML = orig; if (window.lucide) window.lucide.createIcons(); }, 2000);
+        };
+    };
+
+    copyToClipboard('btn-copy-ig', txtIg);
+    copyToClipboard('btn-copy-li', txtLi);
 
     // Save logic
     container.querySelector('#btn-save-activity').onclick = () => {

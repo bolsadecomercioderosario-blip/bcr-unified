@@ -71,9 +71,9 @@ export function renderConectados(container) {
                 <i data-lucide="trash-2" style="width: 14px;"></i>
             </button>
             <textarea class="input-conectados-title" rows="1" 
-                      placeholder="Título del bloque...">${act.conectados_title || act.title}</textarea>
+                      placeholder="Título del bloque...">${act.title || ''}</textarea>
             <textarea class="input-conectados-text" rows="1" 
-                      placeholder="Texto del bloque...">${act.conectados_text || act.copy_linkedin || ''}</textarea>
+                      placeholder="Texto del bloque...">${act.copy_linkedin || act.conectados_text || act.description || ''}</textarea>
         `;
 
         // Auto-save logic
@@ -92,7 +92,9 @@ export function renderConectados(container) {
 
         const saveChanges = (silent = true) => {
             updateActivity(act.id, {
-                conectados_title: titleInput.value,
+                title: titleInput.value,
+                copy_linkedin: textInput.value,
+                conectados_title: titleInput.value, // Keep for backwards compatibility
                 conectados_text: textInput.value
             }, !silent);
         };
@@ -144,6 +146,7 @@ export function renderConectados(container) {
     wrapper.querySelector('#btn-add-var-block').onclick = () => {
         addActivity({
             title: 'Bloque Variable',
+            copy_linkedin: 'Contenido específico de esta semana...',
             description: 'Contenido específico de esta semana...',
             channels: ['Conectados'],
             date: new Date().toISOString().split('T')[0],
@@ -156,6 +159,7 @@ export function renderConectados(container) {
     wrapper.querySelector('#btn-add-fixed-block').onclick = () => {
         addActivity({
             title: 'Bloque Fijo',
+            copy_linkedin: 'Sección permanente...',
             description: 'Sección permanente...',
             channels: ['Conectados'],
             date: '2099-12-31', // Far future so it doesn't mess with chronological sorting in other views if ever visible

@@ -204,31 +204,21 @@ Primer párrafo: Explicar qué ocurrió. Incluir a la Bolsa de Comercio de Rosar
 Segundo párrafo: Explicar el sentido del encuentro, temas abordados o marco institucional. Si no hay detalles suficientes, usar formulaciones generales institucionales (por ejemplo: fortalecimiento de vínculos, agenda de trabajo, articulación, intercambio)."""
     elif request.mode == 'li':
         system_prompt = """Sos redactor institucional de la Bolsa de Comercio de Rosario.
-Tu tarea es redactar un copy para LinkedIn a partir de la información disponible de una actividad.
+Tu tarea es redactar un copy para LinkedIn o el newsletter Conectados a partir de la información disponible de una actividad.
 
 ⚠️ REGLAS CLAVE
-Usar únicamente la información disponible.
-No inventar datos, cargos, ni agregar información no proporcionada.
-NO ESCRIBAS NINGÚN TÍTULO. El texto debe arrancar directamente con el primer párrafo de desarrollo (ej. "La Bolsa de Comercio de Rosario llevó a cabo...").
-Sigue la misma lógica narrativa y sobria que el copy de Instagram, pero con mayor desarrollo y extensión.
-Si se envían nombres de personas ("Autoridades Presentes"), DEBES agregarlos SIEMPRE en un párrafo separado al final del texto.
-La redacción de este párrafo final debe ser estrictamente sobria y enumerativa, comenzando con "Por la BCR, participaron...".
-Ejemplo estricto: "Por la BCR, participaron el Presidente Pablo Bortolato, el Secretario Miguel Simioni y el Director Ejecutivo Javier Cervio."
-NO agregues frases como "quienes aportaron sus perspectivas" ni adornos sobre su participación.
-
-📐 FORMATO DE SALIDA
-No incluir etiquetas ni explicaciones. El texto debe estar listo para publicar.
-Estructura:
-1. Párrafo de desarrollo principal (sin título previo).
-2. Párrafos adicionales de contexto si la información lo permite.
-3. Párrafo final enumerando a las autoridades presentes (si las hay).
+Usar únicamente la información disponible. No inventar datos ni cargos.
+ESCALA Y ESTRUCTURA:
+1. TÍTULO: Un título claro, formal y descriptivo al inicio (ej. "Primera Jornada de la Mesa de Legumbres de Santa Fe").
+2. PRIMER PÁRRAFO: Arrancar mencionando a la Bolsa de Comercio de Rosario como sede o protagonista, explicando de qué trata el encuentro. (ej. "La Bolsa de Comercio de Rosario fue sede de... un espacio de encuentro orientado a...").
+3. SEGUNDO PÁRRAFO: Desarrollar quiénes participaron (ej. referentes del ámbito público, privado y académico) y los temas tratados (producción, innovación, mercados, etc.) promoviendo el desarrollo del sector.
+4. PÁRRAFO FINAL (Autoridades): Si se envían nombres en "Autoridades Presentes", agregarlos SIEMPRE al final en un párrafo separado, con redacción estrictamente sobria y enumerativa: "Por la BCR, participaron...".
 
 ✍️ ESTILO
 Redacción en pasado.
-Tono institucional, profesional, enfocado en el fortalecimiento institucional.
-Sin citas textuales.
-Evitar adjetivos innecesarios o grandilocuentes.
-No usar emojis."""
+Tono institucional, profesional, narrativo y descriptivo.
+No usar emojis ni adjetivos grandilocuentes.
+No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final directamente."""
     else:
         raise HTTPException(status_code=400, detail="Modo inválido. Use 'ig' o 'li'.")
 
