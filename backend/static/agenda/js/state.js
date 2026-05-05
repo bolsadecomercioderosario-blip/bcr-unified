@@ -61,11 +61,20 @@ export async function addActivity(activity) {
 
     // Persist
     try {
-        await fetch('/api/agenda/actividades', {
+        const response = await fetch('/api/agenda/actividades', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newActivity)
         });
+        if (response.ok) {
+            const savedActivity = await response.json();
+            // Update the optimistic entry with data from the server (like the generated Drive link)
+            const index = state.activities.findIndex(a => a.id === newActivity.id);
+            if (index !== -1) {
+                state.activities[index] = { ...state.activities[index], ...savedActivity };
+                notify();
+            }
+        }
     } catch (e) {
         console.error("Failed to add activity to server", e);
     }
