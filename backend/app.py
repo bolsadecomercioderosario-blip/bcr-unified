@@ -388,6 +388,47 @@ def delete_activity(activity_id: str, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
+# ---------------------------------------------------------
+# EFEMÉRIDES Y ANIVERSARIOS
+# ---------------------------------------------------------
+@agenda_api.get("/efemerides", response_model=List[agenda_models.EfemerideOut])
+def list_efemerides(db: Session = Depends(get_db)):
+    return db.query(agenda_models.Efemeride).order_by(
+        agenda_models.Efemeride.mes, agenda_models.Efemeride.dia
+    ).all()
+
+
+@agenda_api.post("/efemerides", response_model=agenda_models.EfemerideOut)
+def create_efemeride(payload: agenda_models.EfemerideCreate, db: Session = Depends(get_db)):
+    db_ef = agenda_models.Efemeride(**payload.model_dump())
+    db.add(db_ef)
+    db.commit()
+    db.refresh(db_ef)
+    return db_ef
+
+
+@agenda_api.put("/efemerides/{ef_id}", response_model=agenda_models.EfemerideOut)
+def update_efemeride(ef_id: int, payload: agenda_models.EfemerideUpdate, db: Session = Depends(get_db)):
+    db_ef = db.query(agenda_models.Efemeride).filter(agenda_models.Efemeride.id == ef_id).first()
+    if not db_ef:
+        raise HTTPException(status_code=404, detail="Efeméride no encontrada")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(db_ef, key, value)
+    db.commit()
+    db.refresh(db_ef)
+    return db_ef
+
+
+@agenda_api.delete("/efemerides/{ef_id}")
+def delete_efemeride(ef_id: int, db: Session = Depends(get_db)):
+    db_ef = db.query(agenda_models.Efemeride).filter(agenda_models.Efemeride.id == ef_id).first()
+    if not db_ef:
+        raise HTTPException(status_code=404, detail="Efeméride no encontrada")
+    db.delete(db_ef)
+    db.commit()
+    return {"ok": True}
+
+
 oauth_state_store = {}
 
 @agenda_api.get("/drive/auth")

@@ -1,13 +1,16 @@
-import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities } from './state.js';
+import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities, loadEfemerides } from './state.js';
 import { renderList } from './components/List.js';
 import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
 import { renderActivityForm } from './components/ActivityForm.js';
+import { renderEfemeridesModal } from './components/EfemeridesModal.js';
 
 const viewContainer = document.getElementById('view-container');
 const btnNewActivity = document.getElementById('btn-new-activity');
 const btnTogglePast = document.getElementById('btn-toggle-past');
+const btnEfemerides = document.getElementById('btn-efemerides');
 const activitySheet = document.getElementById('activity-sheet');
+const efemeridesSheet = document.getElementById('efemerides-sheet');
 const globalSearch = document.getElementById('global-search');
 
 // Router/View Switcher
@@ -39,13 +42,16 @@ function updateUI() {
     // Render current view
     viewContainer.innerHTML = '';
     
-    // Show/Hide search and history toggle only in 'list' view
+    // Show/Hide search and history/efemerides controls only in 'list' view
     const searchBox = document.querySelector('.search-box');
     if (searchBox) {
         searchBox.style.display = state.view === 'list' ? 'flex' : 'none';
     }
     if (btnTogglePast) {
         btnTogglePast.style.display = state.view === 'list' ? 'flex' : 'none';
+    }
+    if (btnEfemerides) {
+        btnEfemerides.style.display = state.view === 'list' ? 'flex' : 'none';
     }
 
     switch (state.view) {
@@ -84,6 +90,34 @@ if (btnTogglePast) {
         toggleShowPast();
     });
 }
+
+if (btnEfemerides) {
+    btnEfemerides.addEventListener('click', () => {
+        openEfemeridesSheet();
+    });
+}
+
+function openEfemeridesSheet() {
+    efemeridesSheet.classList.remove('hidden');
+    renderEfemeridesModal(efemeridesSheet.querySelector('.sheet-content'));
+}
+
+export function closeEfemeridesSheet() {
+    efemeridesSheet.classList.add('hidden');
+}
+
+let isMouseDownOnEfOverlay = false;
+efemeridesSheet.addEventListener('mousedown', (e) => {
+    isMouseDownOnEfOverlay = (e.target === efemeridesSheet);
+});
+efemeridesSheet.addEventListener('mouseup', (e) => {
+    if (isMouseDownOnEfOverlay && e.target === efemeridesSheet) {
+        closeEfemeridesSheet();
+    }
+    isMouseDownOnEfOverlay = false;
+});
+
+window.closeEfemeridesSheet = closeEfemeridesSheet;
 
 globalSearch.addEventListener('input', (e) => {
     setSearchQuery(e.target.value);
@@ -166,11 +200,11 @@ async function tryLogin() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password })
         });
-        
+
         if (res.ok) {
             localStorage.setItem('agenda_auth', 'true');
             loginOverlay.classList.add('hidden');
-            loadActivities().then(updateUI);
+            Promise.all([loadActivities(), loadEfemerides()]).then(updateUI);
         } else {
             loginError.style.display = 'block';
             loginPassword.value = '';
@@ -198,11 +232,54 @@ state.activities = state.activities.map(a => {
 // Initial Render
 if (checkAuth()) {
     subscribe(updateUI);
-    loadActivities().then(() => {
+    Promise.all([loadActivities(), loadEfemerides()]).then(() => {
         updateUI();
+        startPolling();
     });
 } else {
     // Si no está autenticado, esperamos a que el usuario se loguee
     subscribe(updateUI);
 }
+
+// ---------------------------------------------------------
+// Polling para sincronización entre múltiples clientes.
+// Cada N segundos consultamos el server. Si nada cambió, no re-renderizamos
+// (loadActivities con silent: true). Si hay diff, se notifica y la UI se actualiza.
+// Salvaguardas:
+//  - No recargar si la pestaña está oculta (ahorra requests).
+//  - No recargar si el usuario está editando un input/textarea (preserva el cursor
+//    y evita pisar lo que está tipeando).
+//  - Refresh inmediato cuando la pestaña vuelve a estar visible.
+// ---------------------------------------------------------
+const POLLING_INTERVAL_MS = 20000;
+
+function isUserEditing() {
+    const active = document.activeElement;
+    if (!active) return false;
+    if (active.matches && active.matches('input, textarea, select')) return true;
+    return false;
+}
+
+function pollIfSafe() {
+    if (document.hidden) return;
+    if (isUserEditing()) return;
+    loadActivities({ silent: true });
+    loadEfemerides({ silent: true });
+}
+
+let pollingStarted = false;
+function startPolling() {
+    if (pollingStarted) return;
+    pollingStarted = true;
+    setInterval(pollIfSafe, POLLING_INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) pollIfSafe();
+    });
+}
+
+// Si el usuario se loguea después del initial render, arrancar polling al ocultarse
+// el overlay de login (se oculta sólo cuando la auth fue exitosa).
+new MutationObserver(() => {
+    if (loginOverlay.classList.contains('hidden')) startPolling();
+}).observe(loginOverlay, { attributes: true, attributeFilter: ['class'] });
 

@@ -434,6 +434,110 @@ body {
     opacity: 0.5;
 }
 
+/* Banner discreto de efemérides debajo del group-header */
+.efemerides-banner {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 0.5rem 0.85rem;
+    margin-bottom: 0.85rem;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    border-left: 3px solid var(--primary);
+    line-height: 1.5;
+}
+.efemerides-banner strong {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+/* Modal de gestión de efemérides */
+.ef-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.ef-modal-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+}
+.ef-modal-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.85rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+.ef-modal-toolbar select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    font-size: 0.85rem;
+    background: white;
+}
+.ef-modal-toolbar .ef-spacer { flex: 1; }
+.ef-modal-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0.75rem;
+}
+.ef-row {
+    display: grid;
+    grid-template-columns: 50px 110px 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+}
+.ef-row:hover { background: #f1f5f9; }
+.ef-row input,
+.ef-row select {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    font-size: 0.85rem;
+    background: transparent;
+    font-family: inherit;
+}
+.ef-row input:focus,
+.ef-row select:focus {
+    background: white;
+    border-color: var(--border);
+    outline: none;
+}
+.ef-row .ef-day {
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: center;
+}
+.ef-row .ef-actions {
+    display: inline-flex;
+    gap: 0.5rem;
+}
+.ef-row .ef-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+}
+.ef-row .ef-actions button:hover { color: var(--danger); }
+.ef-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
 /* Header de la vista Conectados (desktop) */
 .conectados-header-bar {
     display: flex;
@@ -451,6 +555,13 @@ body {
 
 /* Bottom tab bar mobile (oculto en desktop) */
 .mobile-bottom-tabs { display: none; }
+
+/* "Nueva Actividad" sólo aplica en la vista Agenda (list).
+   Se oculta en Conectados y Santi tanto en desktop como en mobile. */
+body[data-view="conectados"] #btn-new-activity,
+body[data-view="santi"] #btn-new-activity {
+    display: none;
+}
 
 .conectados-action-buttons {
     display: flex;
@@ -765,14 +876,8 @@ body {
         height: 20px !important;
     }
 
-    /* 7. Vista Conectados — ocultar elementos que no aplican en mobile */
-    body[data-view="conectados"] .logo {
-        display: none;
-    }
-    body[data-view="conectados"] #btn-new-activity {
-        display: none;
-    }
-    /* En Conectados la top-bar queda sin contenido útil → ocultarla entera */
+    /* 7. Vista Conectados — la top-bar queda sin contenido útil
+       (logo ya eliminado, btn-new-activity oculto globalmente) → ocultarla entera */
     body[data-view="conectados"] .top-bar {
         display: none;
     }

@@ -1,4 +1,4 @@
-import { state, updateActivity, deleteActivity } from '../state.js';
+import { state, updateActivity, deleteActivity, expandPastMonths } from '../state.js';
 
 export function renderList(container) {
     const today = new Date();
@@ -19,6 +19,11 @@ export function renderList(container) {
     const endOfNextWeek = new Date(endOfThisWeek);
     endOfNextWeek.setDate(endOfThisWeek.getDate() + 7);
     const endOfNextWeekISO = endOfNextWeek.toISOString().split('T')[0];
+
+    // Cutoff para pasadas: hoy menos N meses (donde N = state.pastMonthsVisible)
+    const cutoffPast = new Date(today);
+    cutoffPast.setMonth(today.getMonth() - state.pastMonthsVisible);
+    const cutoffPastISO = cutoffPast.toISOString().split('T')[0];
 
     const filteredActivities = state.activities.filter(a => {
         if (a.is_custom) return false;
@@ -42,9 +47,16 @@ export function renderList(container) {
         'MÁS ADELANTE': []
     };
 
+    // Contador de pasadas más viejas que el cutoff (para decidir si mostrar el botón "ver más")
+    let olderThanCutoffCount = 0;
+
     sortedActivities.forEach(act => {
         if (act.date < todayISO) {
-            groups['PASADAS'].push(act);
+            if (act.date >= cutoffPastISO) {
+                groups['PASADAS'].push(act);
+            } else {
+                olderThanCutoffCount += 1;
+            }
         } else if (act.date === todayISO) {
             groups['HOY'].push(act);
         } else if (act.date === tomorrowISO) {
@@ -57,6 +69,9 @@ export function renderList(container) {
             groups['MÁS ADELANTE'].push(act);
         }
     });
+
+    // Pasadas: ordenar de más reciente a más antigua (los demás grupos siguen ascendente)
+    groups['PASADAS'].reverse();
 
     const wrapper = document.createElement('div');
     wrapper.className = 'content-wrapper';
@@ -82,7 +97,44 @@ export function renderList(container) {
         `;
     };
 
-    const renderGroup = (title, items, showHeader) => {
+    // Helpers de efemérides
+    const efemeridesForDate = (date) => {
+        const m = date.getMonth() + 1;
+        const d = date.getDate();
+        return state.efemerides.filter(e => e.mes === m && e.dia === d);
+    };
+
+    const efemeridesForRange = (startDate, endDate) => {
+        const result = [];
+        const cur = new Date(startDate);
+        while (cur <= endDate) {
+            result.push(...efemeridesForDate(cur).map(e => ({ ...e, _date: new Date(cur) })));
+            cur.setDate(cur.getDate() + 1);
+        }
+        return result;
+    };
+
+    const renderEfBanner = (efs, includeDate = false) => {
+        if (efs.length === 0) return '';
+        let inner;
+        if (includeDate) {
+            const grouped = {};
+            efs.forEach(e => {
+                const d = e._date;
+                const key = `${d.getDate()}/${d.getMonth() + 1}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(`${e.tipo}: ${e.motivo}`);
+            });
+            inner = Object.keys(grouped)
+                .map(k => `<strong>${k}</strong> · ${grouped[k].join(' · ')}`)
+                .join(' &nbsp;|&nbsp; ');
+        } else {
+            inner = efs.map(e => `${e.tipo}: ${e.motivo}`).join(' · ');
+        }
+        return `<div class="efemerides-banner">${inner}</div>`;
+    };
+
+    const renderGroup = (title, items, showHeader, footerHtml = '', efBannerHtml = '') => {
         if (items.length === 0) return '';
         if (title === 'PASADAS' && !state.showPast) return '';
 
@@ -116,6 +168,7 @@ export function renderList(container) {
                     <span class="group-title">${title}</span>
                     <div class="group-line"></div>
                 </div>
+                ${efBannerHtml}
                 <table class="data-table">
                     ${colgroup}
                     ${showHeader ? thead : ''}
@@ -133,17 +186,20 @@ export function renderList(container) {
                                 <td class="td-responsible"><span class="badge-user">${act.responsible || '-'}</span></td>
                                 <td>${renderChannelNames(act.channels)}</td>
                                 <td style="text-align: center; white-space: nowrap;" onclick="event.stopPropagation()">
-                                    <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado" style="margin-right: 0.2rem;">
-                                        <i data-lucide="check-circle-2"></i>
-                                    </button>
-                                    <button class="btn-delete-activity" data-id="${act.id}" title="Eliminar actividad" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: inline-flex; vertical-align: middle;">
-                                        <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
-                                    </button>
+                                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                        <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado">
+                                            <i data-lucide="check-circle-2"></i>
+                                        </button>
+                                        <button class="btn-delete-activity" data-id="${act.id}" title="Eliminar actividad" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: inline-flex; align-items: center;">
+                                            <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
+                ${footerHtml}
             </div>
         `;
     };
@@ -153,7 +209,30 @@ export function renderList(container) {
     const groupOrder = ['HOY', 'MAÑANA', 'ESTA SEMANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE', 'PASADAS'];
 
     groupOrder.forEach(g => {
-        const groupHtml = renderGroup(g, groups[g], !headerShown);
+        let footerHtml = '';
+        if (g === 'PASADAS' && olderThanCutoffCount > 0) {
+            footerHtml = `
+                <div style="text-align: center; margin-top: 1rem;">
+                    <button class="btn-show-more-past" style="background: white; border: 1px solid var(--border); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+                        Ver mes anterior (${olderThanCutoffCount} más)
+                    </button>
+                </div>
+            `;
+        }
+
+        // Banner de efemérides solo para HOY / MAÑANA / ESTA SEMANA
+        let efBannerHtml = '';
+        if (g === 'HOY') {
+            efBannerHtml = renderEfBanner(efemeridesForDate(today), false);
+        } else if (g === 'MAÑANA') {
+            efBannerHtml = renderEfBanner(efemeridesForDate(tomorrow), false);
+        } else if (g === 'ESTA SEMANA') {
+            const start = new Date(tomorrow);
+            start.setDate(start.getDate() + 1);
+            efBannerHtml = renderEfBanner(efemeridesForRange(start, endOfThisWeek), true);
+        }
+
+        const groupHtml = renderGroup(g, groups[g], !headerShown, footerHtml, efBannerHtml);
         if (groupHtml) {
             html += groupHtml;
             headerShown = true;
@@ -186,6 +265,12 @@ export function renderList(container) {
             }
         };
     });
-    
+
+    // "Ver mes anterior" button listener (solo si está renderizado)
+    const btnMorePast = wrapper.querySelector('.btn-show-more-past');
+    if (btnMorePast) {
+        btnMorePast.onclick = () => expandPastMonths();
+    }
+
     container.appendChild(wrapper);
 }

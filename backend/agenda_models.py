@@ -91,3 +91,39 @@ class GenerateCopyRequest(BaseModel):
     description: Optional[str] = ""
     observations: Optional[str] = ""
     participants_enriched: Optional[str] = ""
+
+
+# Efemérides y Aniversarios (recurrentes anuales — sin año)
+class Efemeride(Base):
+    __tablename__ = "efemerides"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    mes = Column(Integer, nullable=False)
+    dia = Column(Integer, nullable=False)
+    tipo = Column(String, default="Efeméride")  # "Efeméride" | "Aniversario"
+    motivo = Column(String, nullable=False)
+
+
+class EfemerideBase(BaseModel):
+    mes: int
+    dia: int
+    tipo: str = "Efeméride"
+    motivo: str
+
+
+class EfemerideCreate(EfemerideBase):
+    pass
+
+
+class EfemerideUpdate(BaseModel):
+    mes: Optional[int] = None
+    dia: Optional[int] = None
+    tipo: Optional[str] = None
+    motivo: Optional[str] = None
+
+
+class EfemerideOut(EfemerideBase):
+    id: int
+
+    class Config:
+        from_attributes = True

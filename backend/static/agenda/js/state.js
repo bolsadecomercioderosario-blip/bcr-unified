@@ -1,24 +1,91 @@
 export const state = {
     view: 'list',
     showPast: false,
+    pastMonthsVisible: 1,
     activities: [],
+    efemerides: [],
     currentActivity: null,
     searchQuery: ''
 };
 
-// Cargar actividades desde el servidor
-export async function loadActivities() {
+// Cargar actividades desde el servidor.
+// Si `silent` es true, sólo notifica si hay cambios reales — útil para polling
+// para no re-renderizar la UI (y romper foco / drag) cuando nada cambió.
+export async function loadActivities({ silent = false } = {}) {
     try {
         const response = await fetch('/api/agenda/actividades');
         if (response.ok) {
-            state.activities = await response.json();
-            notify();
+            const incoming = await response.json();
+            const changed = JSON.stringify(state.activities) !== JSON.stringify(incoming);
+            state.activities = incoming;
+            if (!silent || changed) notify();
         } else {
             console.error('Error fetching activities');
         }
     } catch (error) {
         console.error('Network error loading activities:', error);
     }
+}
+
+// Cargar efemérides desde el servidor (misma lógica de silent / diff)
+export async function loadEfemerides({ silent = false } = {}) {
+    try {
+        const response = await fetch('/api/agenda/efemerides');
+        if (response.ok) {
+            const incoming = await response.json();
+            const changed = JSON.stringify(state.efemerides) !== JSON.stringify(incoming);
+            state.efemerides = incoming;
+            if (!silent || changed) notify();
+        } else {
+            console.error('Error fetching efemérides');
+        }
+    } catch (error) {
+        console.error('Network error loading efemérides:', error);
+    }
+}
+
+export async function addEfemeride(payload) {
+    try {
+        const res = await fetch('/api/agenda/efemerides', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            const created = await res.json();
+            state.efemerides.push(created);
+            state.efemerides.sort((a, b) => a.mes - b.mes || a.dia - b.dia);
+            notify();
+            return created;
+        }
+    } catch (e) { console.error("addEfemeride", e); }
+}
+
+export async function updateEfemeride(id, updates) {
+    try {
+        const res = await fetch(`/api/agenda/efemerides/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        if (res.ok) {
+            const updated = await res.json();
+            const idx = state.efemerides.findIndex(e => e.id === id);
+            if (idx !== -1) state.efemerides[idx] = updated;
+            state.efemerides.sort((a, b) => a.mes - b.mes || a.dia - b.dia);
+            notify();
+        }
+    } catch (e) { console.error("updateEfemeride", e); }
+}
+
+export async function deleteEfemeride(id) {
+    try {
+        const res = await fetch(`/api/agenda/efemerides/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            state.efemerides = state.efemerides.filter(e => e.id !== id);
+            notify();
+        }
+    } catch (e) { console.error("deleteEfemeride", e); }
 }
 
 export const listeners = [];
@@ -131,6 +198,15 @@ export function setSearchQuery(query) {
 
 export function toggleShowPast() {
     state.showPast = !state.showPast;
+    if (!state.showPast) {
+        // Reset al cerrar para que la próxima vez arranque mostrando solo 1 mes
+        state.pastMonthsVisible = 1;
+    }
+    notify();
+}
+
+export function expandPastMonths() {
+    state.pastMonthsVisible += 1;
     notify();
 }
 

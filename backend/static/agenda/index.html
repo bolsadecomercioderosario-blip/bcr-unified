@@ -40,10 +40,6 @@
         <main class="main-content">
             <header class="top-bar">
                 <div class="top-bar-left">
-                    <div class="logo">
-                        <i data-lucide="calendar-days"></i>
-                        <span>Comu BCR</span>
-                    </div>
                     <nav class="top-nav">
                         <button class="nav-item active" data-view="list">
                             <i data-lucide="list"></i>
@@ -69,7 +65,11 @@
                     <button id="btn-toggle-past" class="btn-icon" title="Ver/Ocultar Pasadas">
                         <i data-lucide="history"></i>
                     </button>
-                    
+
+                    <button id="btn-efemerides" class="btn-icon" title="Efemérides y Aniversarios">
+                        <i data-lucide="calendar-clock"></i>
+                    </button>
+
                     <button id="btn-new-activity" class="btn-primary">
                         <i data-lucide="plus"></i>
                         <span>Nueva Actividad</span>
@@ -86,6 +86,13 @@
         <div id="activity-sheet" class="sheet-overlay hidden">
             <div class="sheet-content">
                 <!-- Content injected by components/ActivityForm.js -->
+            </div>
+        </div>
+
+        <!-- Efemérides Modal -->
+        <div id="efemerides-sheet" class="sheet-overlay hidden">
+            <div class="sheet-content">
+                <!-- Content injected by components/EfemeridesModal.js -->
             </div>
         </div>
 
