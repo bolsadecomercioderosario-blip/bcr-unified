@@ -449,6 +449,9 @@ body {
 /* Mobile collapsed row (oculto en desktop) */
 .conectados-mobile-row { display: none; }
 
+/* Bottom tab bar mobile (oculto en desktop) */
+.mobile-bottom-tabs { display: none; }
+
 .conectados-action-buttons {
     display: flex;
     justify-content: flex-end;
@@ -769,6 +772,13 @@ body {
     body[data-view="conectados"] #btn-new-activity {
         display: none;
     }
+    /* En Conectados la top-bar queda sin contenido útil → ocultarla entera */
+    body[data-view="conectados"] .top-bar {
+        display: none;
+    }
+    body[data-view="conectados"] .view-container {
+        padding-top: 1.5rem;
+    }
 
     /* 8. Header de Conectados en mobile: stack vertical, sin "Generar Newsletter" */
     .conectados-header-bar {
@@ -801,6 +811,17 @@ body {
     }
     .view-container,
     .content-wrapper {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    /* Forzar a los grid items a respetar el ancho del grid
+       (sin esto su min-width: auto les deja crecer hasta el contenido) */
+    .conectados-grid {
+        width: 100%;
+        max-width: 100%;
+    }
+    .conectados-grid > .conectados-item {
+        min-width: 0;
         max-width: 100%;
     }
 }
