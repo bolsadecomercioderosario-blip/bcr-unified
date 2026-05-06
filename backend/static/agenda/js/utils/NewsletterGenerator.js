@@ -31,12 +31,8 @@ export function generateNewsletterHTML(activities) {
                         </div>
                     </div>
                     <div data-editorblocktype="Text">
-                        <h3 style="color: #000000; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; line-height: 1.2; margin: 0 0 10px 0; padding: 0;">
-                            ${title}
-                        </h3>
-                        <p style="color: #242424; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.4; margin: 0; text-align: left; white-space: pre-wrap;">
-                            ${text}
-                        </p>
+                        <h3 style="color: #000000; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; line-height: 1.2; margin: 0 0 10px 0; padding: 0;">${title}</h3>
+                        <p style="color: #242424; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.4; margin: 0; text-align: left; white-space: pre-wrap;">${text}</p>
                     </div>
                 </th>
             `;

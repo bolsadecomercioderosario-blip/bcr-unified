@@ -250,7 +250,20 @@ export function renderConectados(container) {
 
     // Generate Newsletter
     wrapper.querySelector('#btn-gen-newsletter').onclick = () => {
-        const html = generateNewsletterHTML(conectadosActivities);
+        // Obtenemos los datos actuales de la interfaz para que sea 100% real-time
+        const items = Array.from(listContainer.querySelectorAll('.conectados-item'));
+        const liveActivities = items.map(item => {
+            const id = item.dataset.id;
+            const originalAct = state.activities.find(a => a.id === id);
+            return {
+                ...originalAct,
+                title: item.querySelector('.input-conectados-title').value,
+                copy_linkedin: item.querySelector('.input-conectados-text').value,
+                image_url: originalAct ? originalAct.image_url : ''
+            };
+        });
+
+        const html = generateNewsletterHTML(liveActivities);
         
         // Modal Preview
         const modal = document.createElement('div');
