@@ -334,13 +334,19 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
     return db_activity
 
 @agenda_api.post("/actividades/{activity_id}/notify-santiago")
-def notify_santiago(activity_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def notify_santiago(activity_id: str, payload: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
         
-    if not db_activity.drive_santiago:
-        raise HTTPException(status_code=400, detail="No hay link de Santiago configurado")
+    link = payload.get("drive_santiago")
+    if not link:
+        raise HTTPException(status_code=400, detail="No se proporcionó el link de Santiago")
+        
+    # Actualizar el link en la base de datos por si no se guardó antes
+    db_activity.drive_santiago = link
+    db.commit()
+    db.refresh(db_activity)
         
     background_tasks.add_task(
         trigger_santiago_webhook, 

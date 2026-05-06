@@ -322,7 +322,11 @@ export function renderActivityForm(container, preData = null) {
                 btnWpp.innerHTML = '<span style="font-size: 0.7rem;">...</span>';
                 
                 try {
-                    const response = await fetch(`/api/agenda/actividades/${act.id}/notify-santiago`, { method: 'POST' });
+                    const response = await fetch(`/api/agenda/actividades/${act.id}/notify-santiago`, { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ drive_santiago: link })
+                    });
                     if (response.ok) {
                         alert('✅ ¡Aviso enviado al grupo de WhatsApp!');
                     } else {
