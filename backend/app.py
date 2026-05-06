@@ -28,6 +28,10 @@ migrate()
 
 app = FastAPI(title="BCR Servicios Unificados")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "version": "1.2.0"}
+
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,

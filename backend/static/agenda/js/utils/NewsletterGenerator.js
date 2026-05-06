@@ -96,13 +96,16 @@ export function generateNewsletterHTML(activities) {
                                                 <tbody>
                                                     <tr>
                                                         <th class="inner" style="min-width: 20px; padding: 10px; vertical-align: top; word-wrap: break-word; font-weight: normal;" role="presentation">
+                                                            <div data-editorblocktype="Text" style="margin: 10px;">
+                                                                <p style="text-align: center;"><span style="color: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 12px;">Si no puedes visualizar este mail haz <a href="{{ViewEmailInBrowserUrl_1}}">Click aquí</a></span></p>
+                                                            </div>
                                                             <div data-editorblocktype="Image" style="margin: 10px;">
                                                                 <div align="Center" class="imageWrapper">
                                                                     <img src="https://assets-sam.mkt.dynamics.com/ec3b6484-3b62-447e-90f8-d779a104643c/digitalassets/images/0824e0fc-f6d5-f011-8543-6045bd394a72?ts=639009885285643388" style="max-height: 100%; max-width: 100%; display: block;">
                                                                 </div>
                                                             </div>
                                                             <div data-editorblocktype="Text" style="margin: 10px;">
-                                                                <p style="text-align: center;"><span style="font-weight: bold; font-size: 17px; font-family: Arial, sans-serif;">Te contamos lo que pasó en la Bolsa de Comercio de Rosario</span></p>
+                                                                <p style="text-align: center;"><span style="font-weight: bold; font-size: 18px; font-family: Arial, sans-serif; color: #242424;">Te contamos lo que pasó en la Bolsa de Comercio de Rosario</span></p>
                                                             </div>
                                                         </th>
                                                     </tr>
