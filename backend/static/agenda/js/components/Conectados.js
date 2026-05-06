@@ -69,10 +69,17 @@ export function renderConectados(container) {
         item.dataset.id = act.id;
 
         item.innerHTML = `
+            <div class="conectados-mobile-row">
+                <div class="conectados-mobile-handle">
+                    <i data-lucide="grip-vertical"></i>
+                </div>
+                <div class="conectados-mobile-title">${(act.title || '').replace(/</g, '&lt;') || '<span style="color: var(--text-muted); font-weight: 400;">(sin título)</span>'}</div>
+                <i class="conectados-mobile-chevron" data-lucide="chevron-down"></i>
+            </div>
             <div class="drag-handle">
                 <i data-lucide="grip-vertical" style="width: 16px;"></i>
             </div>
-            <div style="display: flex; justify-content: flex-end; position: absolute; top: 0.5rem; right: 0.5rem; gap: 0.5rem; z-index: 10;">
+            <div class="conectados-action-buttons">
                 <button class="btn-gen-conectados" title="Generar texto con IA" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.2rem; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">
                     <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
                 </button>
@@ -183,14 +190,35 @@ export function renderConectados(container) {
             el.style.height = el.scrollHeight + 'px';
         };
 
+        const mobileTitle = item.querySelector('.conectados-mobile-title');
+        const mobileRow = item.querySelector('.conectados-mobile-row');
+
         titleInput.oninput = () => {
             autoGrow(titleInput);
+            // Sync el título visible en la fila colapsada mobile
+            if (mobileTitle) {
+                const v = titleInput.value.trim();
+                mobileTitle.textContent = v || '(sin título)';
+                mobileTitle.style.color = v ? '' : 'var(--text-muted)';
+                mobileTitle.style.fontWeight = v ? '' : '400';
+            }
             saveChanges(true);
         };
         textInput.oninput = () => {
             autoGrow(textInput);
             saveChanges(true);
         };
+
+        // Toggle expand/colapse en mobile (tap en la fila, ignorando el handle)
+        mobileRow.addEventListener('click', (e) => {
+            if (e.target.closest('.conectados-mobile-handle')) return;
+            item.classList.toggle('expanded');
+            // Recalcular auto-grow al abrir, ya que un textarea oculto reporta scrollHeight 0
+            if (item.classList.contains('expanded')) {
+                autoGrow(titleInput);
+                autoGrow(textInput);
+            }
+        });
 
         // Initial grow
         setTimeout(() => {
@@ -207,8 +235,12 @@ export function renderConectados(container) {
     // Initialize SortableJS
     if (window.Sortable) {
         window.Sortable.create(listContainer, {
-            handle: '.drag-handle',
+            handle: '.drag-handle, .conectados-mobile-handle',
             animation: 150,
+            // Long-press en touch para no confundir con scroll vertical
+            delay: 200,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
             onEnd: () => {
                 // Update order_index for all items
                 const items = listContainer.querySelectorAll('.conectados-item');
