@@ -13,7 +13,10 @@ const globalSearch = document.getElementById('global-search');
 // Router/View Switcher
 function updateUI() {
     const navItems = document.querySelectorAll('.nav-item');
-    
+
+    // Expose current view on <body> for view-conditional styles (e.g. mobile)
+    document.body.dataset.view = state.view;
+
     // Update Navigation Active State
     navItems.forEach(item => {
         if (item.dataset.view === state.view) {

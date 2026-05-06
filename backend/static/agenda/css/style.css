@@ -434,6 +434,18 @@ body {
     opacity: 0.5;
 }
 
+/* Header de la vista Conectados (desktop) */
+.conectados-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.conectados-header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 /* Mobile collapsed row (oculto en desktop) */
 .conectados-mobile-row { display: none; }
 
@@ -728,6 +740,68 @@ body {
     }
     .conectados-item.expanded .conectados-mobile-chevron {
         transform: rotate(180deg);
+    }
+
+    /* Action buttons (IA + borrar): cuando expanded, al final del bloque,
+       no superpuestos con el chevron */
+    .conectados-item.expanded .conectados-action-buttons {
+        position: static;
+        order: 99;
+        padding: 0.25rem 1rem 0;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+    .conectados-item.expanded .btn-delete-conectados,
+    .conectados-item.expanded .btn-gen-conectados {
+        opacity: 1 !important;
+        padding: 0.5rem !important;
+    }
+    .conectados-item.expanded .btn-delete-conectados i,
+    .conectados-item.expanded .btn-gen-conectados i {
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    /* 7. Vista Conectados — ocultar elementos que no aplican en mobile */
+    body[data-view="conectados"] .logo {
+        display: none;
+    }
+    body[data-view="conectados"] #btn-new-activity {
+        display: none;
+    }
+
+    /* 8. Header de Conectados en mobile: stack vertical, sin "Generar Newsletter" */
+    .conectados-header-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .conectados-header-bar h2 {
+        font-size: 1.1rem;
+    }
+    .conectados-header-actions {
+        width: 100%;
+    }
+    #btn-gen-newsletter {
+        display: none !important;
+    }
+    #btn-add-fixed-block,
+    #btn-add-var-block {
+        flex: 1;
+        width: auto !important;
+        padding: 0.6rem 0.5rem !important;
+        font-size: 0.85rem !important;
+        white-space: nowrap;
+    }
+
+    /* 9. Salvaguardas anti-overflow horizontal */
+    body {
+        overflow-x: hidden;
+    }
+    .view-container,
+    .content-wrapper {
+        max-width: 100%;
     }
 }
 

@@ -40,10 +40,10 @@ export function renderConectados(container) {
     }
 
     const header = document.createElement('div');
-    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;';
+    header.className = 'conectados-header-bar';
     header.innerHTML = `
         <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
-        <div style="display: flex; gap: 0.5rem;">
+        <div class="conectados-header-actions">
             <button id="btn-gen-newsletter" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0742ab;">
                 <i data-lucide="mail"></i> Generar Newsletter
             </button>
