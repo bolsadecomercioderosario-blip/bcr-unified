@@ -82,9 +82,33 @@ export function renderList(container) {
         `;
     };
 
-    const renderGroup = (title, items) => {
+    const renderGroup = (title, items, showHeader) => {
         if (items.length === 0) return '';
         if (title === 'PASADAS' && !state.showPast) return '';
+
+        const colgroup = `
+            <colgroup>
+                <col style="width: 120px;">
+                <col style="width: 75px;">
+                <col>
+                <col style="width: 130px;">
+                <col style="width: 200px;">
+                <col style="width: 90px;">
+            </colgroup>
+        `;
+
+        const thead = `
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Actividad</th>
+                    <th>Responsable</th>
+                    <th>Canales</th>
+                    <th style="text-align: center;">Acciones</th>
+                </tr>
+            </thead>
+        `;
 
         return `
             <div class="list-group">
@@ -93,16 +117,8 @@ export function renderList(container) {
                     <div class="group-line"></div>
                 </div>
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 120px;">Fecha</th>
-                            <th style="width: 75px;">Hora</th>
-                            <th>Actividad</th>
-                            <th style="width: 130px;">Responsable</th>
-                            <th style="width: 200px;">Canales</th>
-                            <th style="width: 90px; text-align: center;">Acciones</th>
-                        </tr>
-                    </thead>
+                    ${colgroup}
+                    ${showHeader ? thead : ''}
                     <tbody>
                         ${items.map(act => `
                             <tr class="${act.done ? 'tr-done' : ''}" onclick="window.openActivityDetail('${act.id}')">
@@ -133,10 +149,15 @@ export function renderList(container) {
     };
 
     let html = '';
+    let headerShown = false;
     const groupOrder = ['HOY', 'MAÑANA', 'ESTA SEMANA', 'PRÓXIMA SEMANA', 'MÁS ADELANTE', 'PASADAS'];
-    
+
     groupOrder.forEach(g => {
-        html += renderGroup(g, groups[g]);
+        const groupHtml = renderGroup(g, groups[g], !headerShown);
+        if (groupHtml) {
+            html += groupHtml;
+            headerShown = true;
+        }
     });
 
     if (html === '') {
