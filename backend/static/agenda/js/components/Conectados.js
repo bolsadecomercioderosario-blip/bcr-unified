@@ -2,6 +2,19 @@ import { state, updateActivity, addActivity, deleteActivity, suggestJournalistic
 import { generateLICopy } from '../utils/ai-engine.js';
 import { generateNewsletterHTML } from '../utils/NewsletterGenerator.js';
 
+// Debounce util: agrupa llamadas para que el server reciba un PUT cada AUTOSAVE_MS
+// en lugar de uno por cada keystroke. Cada actividad tiene su propio timer.
+const AUTOSAVE_MS = 800;
+const saveTimers = new Map();
+
+function debounceSave(actId, fn) {
+    if (saveTimers.has(actId)) clearTimeout(saveTimers.get(actId));
+    saveTimers.set(actId, setTimeout(() => {
+        fn();
+        saveTimers.delete(actId);
+    }, AUTOSAVE_MS));
+}
+
 function isCurrentNewsletterWeek(dateStr) {
     if (!dateStr) return false;
     const actDate = new Date(dateStr + "T00:00:00");
@@ -136,7 +149,7 @@ export function renderConectados(container) {
             if (copy) {
                 textInput.value = copy;
                 autoGrow(textInput);
-                saveChanges(true);
+                saveChangesNow(true); // Guardar inmediato — el usuario espera el resultado
             }
             
             btnGen.innerHTML = '<i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>';
@@ -144,13 +157,17 @@ export function renderConectados(container) {
             if (window.lucide) window.lucide.createIcons();
         };
 
-        const saveChanges = (silent = true) => {
+        const saveChangesNow = (silent = true) => {
             updateActivity(act.id, {
                 title: titleInput.value,
                 copy_linkedin: textInput.value,
                 conectados_title: titleInput.value, // Keep for backwards compatibility
                 conectados_text: textInput.value
             }, !silent);
+        };
+        const saveChanges = (silent = true) => {
+            // Auto-save con debounce: agrupa cambios sucesivos en un solo PUT
+            debounceSave(act.id, () => saveChangesNow(silent));
         };
 
         // Image Upload logic

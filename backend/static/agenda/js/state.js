@@ -8,6 +8,46 @@ export const state = {
     searchQuery: ''
 };
 
+// ---------------------------------------------------------
+// Save status indicator: contador global de PUT/POST/DELETE en vuelo.
+// Cualquier mutación pasa por trackedFetch() para que el toast refleje el estado.
+// ---------------------------------------------------------
+let pendingSaves = 0;
+let savedTimer = null;
+
+function setSaveStatus(status) {
+    const el = document.getElementById('save-status');
+    if (!el) return;
+    el.dataset.status = status;
+    el.classList.toggle('visible', status !== 'idle');
+    if (savedTimer) {
+        clearTimeout(savedTimer);
+        savedTimer = null;
+    }
+    if (status === 'saved') {
+        savedTimer = setTimeout(() => setSaveStatus('idle'), 1500);
+    } else if (status === 'error') {
+        savedTimer = setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+}
+
+async function trackedFetch(url, options) {
+    pendingSaves++;
+    setSaveStatus('saving');
+    try {
+        const res = await fetch(url, options);
+        pendingSaves = Math.max(0, pendingSaves - 1);
+        if (pendingSaves === 0) {
+            setSaveStatus(res.ok ? 'saved' : 'error');
+        }
+        return res;
+    } catch (e) {
+        pendingSaves = Math.max(0, pendingSaves - 1);
+        if (pendingSaves === 0) setSaveStatus('error');
+        throw e;
+    }
+}
+
 // Cargar actividades desde el servidor.
 // Si `silent` es true, sólo notifica si hay cambios reales — útil para polling
 // para no re-renderizar la UI (y romper foco / drag) cuando nada cambió.
@@ -46,7 +86,7 @@ export async function loadEfemerides({ silent = false } = {}) {
 
 export async function addEfemeride(payload) {
     try {
-        const res = await fetch('/api/agenda/efemerides', {
+        const res = await trackedFetch('/api/agenda/efemerides', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -63,7 +103,7 @@ export async function addEfemeride(payload) {
 
 export async function updateEfemeride(id, updates) {
     try {
-        const res = await fetch(`/api/agenda/efemerides/${id}`, {
+        const res = await trackedFetch(`/api/agenda/efemerides/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -80,7 +120,7 @@ export async function updateEfemeride(id, updates) {
 
 export async function deleteEfemeride(id) {
     try {
-        const res = await fetch(`/api/agenda/efemerides/${id}`, { method: 'DELETE' });
+        const res = await trackedFetch(`/api/agenda/efemerides/${id}`, { method: 'DELETE' });
         if (res.ok) {
             state.efemerides = state.efemerides.filter(e => e.id !== id);
             notify();
@@ -129,7 +169,7 @@ export async function addActivity(activity) {
 
     // Persist
     try {
-        const response = await fetch('/api/agenda/actividades', {
+        const response = await trackedFetch('/api/agenda/actividades', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newActivity)
@@ -146,7 +186,7 @@ export async function addActivity(activity) {
     } catch (e) {
         console.error("Failed to add activity to server", e);
     }
-    
+
     return newActivity;
 }
 
@@ -160,7 +200,7 @@ export async function updateActivity(id, updates, shouldNotify = true) {
 
         // Persist
         try {
-            await fetch(`/api/agenda/actividades/${id}`, {
+            await trackedFetch(`/api/agenda/actividades/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
@@ -178,7 +218,7 @@ export async function deleteActivity(id) {
 
     // Persist
     try {
-        await fetch(`/api/agenda/actividades/${id}`, {
+        await trackedFetch(`/api/agenda/actividades/${id}`, {
             method: 'DELETE'
         });
     } catch (e) {

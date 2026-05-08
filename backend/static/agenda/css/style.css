@@ -434,6 +434,34 @@ body {
     opacity: 0.5;
 }
 
+/* Save status toast (Guardando… / Guardado / Error) */
+.save-status {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+    z-index: 1000;
+    color: var(--text-muted);
+}
+.save-status.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.save-status > span { display: none; }
+.save-status[data-status="saving"] .save-saving { display: inline; color: var(--text-muted); }
+.save-status[data-status="saved"]  .save-saved  { display: inline; color: var(--secondary); }
+.save-status[data-status="error"]  .save-error  { display: inline; color: var(--danger); }
+
 /* Banner discreto de efemérides debajo del group-header */
 .efemerides-banner {
     font-size: 0.78rem;
@@ -908,6 +936,12 @@ body[data-view="santi"] #btn-new-activity {
         padding: 0.6rem 0.5rem !important;
         font-size: 0.85rem !important;
         white-space: nowrap;
+    }
+
+    /* Save status toast en mobile: arriba de la tab bar */
+    .save-status {
+        bottom: calc(60px + 0.75rem);
+        right: 0.75rem;
     }
 
     /* 9. Salvaguardas anti-overflow horizontal */

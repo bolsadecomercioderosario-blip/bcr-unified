@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 import os
 import shutil
 import uuid
@@ -51,6 +51,38 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # Estado global simple para el video de lluvias
 video_status = {"ready": False, "error": None, "url": None}
+
+
+# ---------------------------------------------------------
+# CACHE-BUSTING para assets estáticos
+# ---------------------------------------------------------
+# RENDER_GIT_COMMIT lo expone Render automáticamente; en local cae a 'dev'.
+# Truncado a 7 chars para que sea legible.
+APP_VERSION = os.environ.get("RENDER_GIT_COMMIT", "dev")[:7]
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles que pide al browser revalidar siempre.
+    El browser usa If-Modified-Since y el server responde 304 si no cambió,
+    evitando que CSS/JS queden cacheados stale después de un deploy."""
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
+
+# Cache en memoria del HTML de agenda — leído una vez al primer request.
+_AGENDA_HTML_TEMPLATE = None
+
+
+def get_agenda_html():
+    global _AGENDA_HTML_TEMPLATE
+    if _AGENDA_HTML_TEMPLATE is None:
+        path = os.path.join(STATIC_DIR, "agenda", "index.html")
+        with open(path, "r", encoding="utf-8") as f:
+            _AGENDA_HTML_TEMPLATE = f.read()
+    return _AGENDA_HTML_TEMPLATE.replace("__VERSION__", APP_VERSION)
 
 # ---------------------------------------------------------
 # LLUVIAS API ROUTER
@@ -308,13 +340,11 @@ def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_d
 @agenda_api.post("/actividades", response_model=agenda_models.ActivityOut)
 def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_activity = agenda_models.Activity(**activity.model_dump())
-    
+
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
-        
-    return db_activity
-        
+
     return db_activity
 
 @agenda_api.put("/actividades/{activity_id}", response_model=agenda_models.ActivityOut)
@@ -480,13 +510,25 @@ app.include_router(lluvias_api)
 app.include_router(social_api)
 app.include_router(agenda_api)
 
-# Archivos estáticos (Mapas, videos generados)
+# Archivos estáticos generados por la app (uploads, mapas, videos).
+# Pueden cachearse libremente — los nombres incluyen UUIDs/timestamps, son inmutables.
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Frontends (Cada uno en su subruta)
-app.mount("/lluvias", StaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=True), name="lluvias_ui")
-app.mount("/social", StaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=True), name="social_ui")
-app.mount("/agenda", StaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=True), name="agenda_ui")
+# Endpoint custom para Agenda: inyecta la versión en los <link>/<script> para
+# que el browser fetchee el JS/CSS nuevo después de cada deploy.
+@app.get("/agenda")
+@app.get("/agenda/")
+async def agenda_index():
+    return HTMLResponse(
+        content=get_agenda_html(),
+        headers={"Cache-Control": "no-cache, must-revalidate"}
+    )
+
+# Frontends. NoCacheStaticFiles fuerza al browser a revalidar (304 si no cambió).
+# Para /agenda, html=False porque el endpoint de arriba sirve el index con versión.
+app.mount("/lluvias", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=True), name="lluvias_ui")
+app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=True), name="social_ui")
+app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
 
 @app.get("/")
 async def root():
