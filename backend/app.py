@@ -12,6 +12,28 @@ import requests
 from utils.drive import CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE, create_activity_folder, delete_drive_folder
 from google_auth_oauthlib.flow import Flow
 
+# Cloudinary (CDN para imágenes del newsletter). Sólo se activa si las
+# tres env vars están presentes; si faltan, los uploads caen al storage
+# local — útil para desarrollo y como fallback si el servicio falla.
+import cloudinary
+import cloudinary.uploader
+
+CLOUDINARY_ENABLED = all([
+    os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    os.environ.get("CLOUDINARY_API_KEY"),
+    os.environ.get("CLOUDINARY_API_SECRET"),
+])
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.environ.get("CLOUDINARY_API_KEY"),
+        api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+        secure=True,
+    )
+    print("Cloudinary configurado: los uploads de newsletter van al CDN.")
+else:
+    print("Cloudinary no configurado — los uploads se guardan localmente.")
+
 # Imports desde la lógica unificada
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
@@ -283,20 +305,35 @@ No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final dire
 
 @agenda_api.post("/upload")
 async def upload_agenda_image(file: UploadFile = File(...)):
-    # Crear directorio si no existe
-    upload_dir = "static/uploads"
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
-        
-    # Generar nombre único
+    # 1) Intento primario: Cloudinary (CDN). El email enviado por el CRM va a
+    #    pedir las imágenes desde res.cloudinary.com — estable y rápido.
+    if CLOUDINARY_ENABLED:
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="bcr-newsletter",
+                resource_type="image",
+            )
+            secure_url = result.get("secure_url")
+            if secure_url:
+                return {"url": secure_url}
+            # Si el SDK no devolvió secure_url, registramos y caemos al fallback.
+            print(f"Cloudinary no devolvió secure_url. Respuesta: {result}")
+        except Exception as e:
+            print(f"Error subiendo a Cloudinary, fallback a local: {e}")
+            # Rebobinar el stream para poder leerlo de nuevo desde el fallback.
+            try:
+                file.file.seek(0)
+            except Exception:
+                pass
+
+    # 2) Fallback: storage local (UPLOADS_DIR es absoluto, no depende del CWD).
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
     ext = os.path.splitext(file.filename)[1]
     filename = f"newsletter_{uuid.uuid4()}{ext}"
-    file_path = os.path.join(upload_dir, filename)
-    
+    file_path = os.path.join(UPLOADS_DIR, filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
-    # Devolver URL pública (ajustar segun base_url si es necesario, pero relativo funciona en el mismo origen)
     return {"url": f"/static/uploads/{filename}"}
 
 @agenda_api.post("/auth")
