@@ -516,7 +516,13 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Endpoint custom para Agenda: inyecta la versión en los <link>/<script> para
 # que el browser fetchee el JS/CSS nuevo después de cada deploy.
+# IMPORTANTE: el HTML usa paths relativos (css/style.css), por lo que la URL
+# debe terminar en "/" para que el browser los resuelva contra /agenda/. Si el
+# usuario llega a /agenda sin slash, redirigimos para que /agenda/ sirva el HTML.
 @app.get("/agenda")
+async def agenda_redirect():
+    return RedirectResponse(url="/agenda/", status_code=307)
+
 @app.get("/agenda/")
 async def agenda_index():
     return HTMLResponse(
