@@ -5,6 +5,47 @@ const btnGenerar = $('#btn-generar');
 const errorMsg = $('#error-msg');
 const previewSection = $('#preview-section');
 
+// Helpers para regenerar la portada cuando se editan los títulos
+const REGEN_DEBOUNCE_MS = 500;
+let regenTimer = null;
+let lastPortadaUrl = null;
+
+async function regeneratePortada() {
+    const titulos = [
+        $('#titulo-portada-1').value.trim(),
+        $('#titulo-portada-2').value.trim(),
+    ].filter(Boolean);
+    if (titulos.length === 0) return;
+
+    const wrapper = document.querySelector('.portada-wrapper');
+    wrapper.classList.add('regenerating');
+
+    try {
+        const r = await fetch('/api/semana-datos/preview-portada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ titulos, copetes: [] }),
+        });
+        if (!r.ok) return;
+        const blob = await r.blob();
+        // Revocar el URL anterior para no acumular blobs en memoria
+        if (lastPortadaUrl) URL.revokeObjectURL(lastPortadaUrl);
+        lastPortadaUrl = URL.createObjectURL(blob);
+        $('#portada-preview').src = lastPortadaUrl;
+        $('#btn-download-portada').href = lastPortadaUrl;
+    } finally {
+        wrapper.classList.remove('regenerating');
+    }
+}
+
+function scheduleRegenerate() {
+    if (regenTimer) clearTimeout(regenTimer);
+    regenTimer = setTimeout(regeneratePortada, REGEN_DEBOUNCE_MS);
+}
+
+$('#titulo-portada-1').addEventListener('input', scheduleRegenerate);
+$('#titulo-portada-2').addEventListener('input', scheduleRegenerate);
+
 function showError(msg) {
     errorMsg.textContent = msg;
     errorMsg.classList.remove('hidden');
@@ -49,21 +90,22 @@ btnGenerar.addEventListener('click', async () => {
         const titulos = informes.map((i) => i.titulo);
         const copetes = informes.map((i) => i.copete);
 
-        // 2) Portada (PNG)
-        const portadaRes = await fetch('/api/semana-datos/preview-portada', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ titulos, copetes }),
-        });
-        if (!portadaRes.ok) {
-            throw new Error('Error al generar la portada');
+        // 2) Pre-llenar los inputs editables de la portada con los títulos
+        //    scrapeados. El usuario puede acortarlos si entran muy chicos.
+        $('#titulo-portada-1').value = titulos[0] || '';
+        if (titulos[1]) {
+            $('#titulo-portada-2').value = titulos[1];
+            $('#titulo-portada-2-wrapper').classList.remove('hidden');
+        } else {
+            $('#titulo-portada-2').value = '';
+            $('#titulo-portada-2-wrapper').classList.add('hidden');
         }
-        const blob = await portadaRes.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        $('#portada-preview').src = blobUrl;
-        $('#btn-download-portada').href = blobUrl;
 
-        // 3) Título + descripción
+        // 3) Portada inicial (usando los títulos pre-llenados)
+        await regeneratePortada();
+
+        // 4) Título YouTube + descripción (no se regeneran al editar la portada;
+        //    el usuario puede modificarlos manualmente).
         const metaRes = await fetch('/api/semana-datos/preview-metadata', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

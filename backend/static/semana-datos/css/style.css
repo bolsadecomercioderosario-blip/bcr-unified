@@ -167,11 +167,34 @@ main {
     font-size: 0.85rem;
 }
 
+.titulos-edit {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 1rem 1.25rem 1.25rem;
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+.titulos-edit h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+.titulos-edit .hint {
+    margin-bottom: 1rem;
+}
+.titulos-edit .url-input { margin-bottom: 0.6rem; }
+.titulos-edit .url-input:last-child { margin-bottom: 0; }
+
+.portada-wrapper.regenerating img {
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
 .preview-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 2rem;
-    margin-top: 1.25rem;
 }
 
 .preview-portada h3,
