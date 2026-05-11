@@ -1,7 +1,8 @@
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse, Response
+from pydantic import BaseModel
 import os
 import shutil
 import uuid
@@ -94,17 +95,23 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
-# Cache en memoria del HTML de agenda — leído una vez al primer request.
-_AGENDA_HTML_TEMPLATE = None
+# Cache en memoria de los HTML de cada módulo — se leen una sola vez por proceso
+# y se devuelven con __VERSION__ reemplazado por el commit hash de Render.
+_HTML_TEMPLATES: dict = {}
 
 
-def get_agenda_html():
-    global _AGENDA_HTML_TEMPLATE
-    if _AGENDA_HTML_TEMPLATE is None:
-        path = os.path.join(STATIC_DIR, "agenda", "index.html")
+def get_module_html(module: str) -> str:
+    """Lee y cachea el index.html de un módulo (ej. 'agenda', 'semana-datos').
+    Reemplaza __VERSION__ por APP_VERSION para cache-busting de assets."""
+    if module not in _HTML_TEMPLATES:
+        path = os.path.join(STATIC_DIR, module, "index.html")
         with open(path, "r", encoding="utf-8") as f:
-            _AGENDA_HTML_TEMPLATE = f.read()
-    return _AGENDA_HTML_TEMPLATE.replace("__VERSION__", APP_VERSION)
+            _HTML_TEMPLATES[module] = f.read()
+    return _HTML_TEMPLATES[module].replace("__VERSION__", APP_VERSION)
+
+
+def get_agenda_html():  # backwards-compat con código existente
+    return get_module_html("agenda")
 
 # ---------------------------------------------------------
 # LLUVIAS API ROUTER
@@ -541,11 +548,68 @@ def drive_callback(code: str, state: str = None):
     return {"message": "✅ Autenticación exitosa. Se guardó token.json en el servidor. Ya podés cerrar esta pestaña."}
 
 # ---------------------------------------------------------
+# SEMANA EN DATOS — publicación del programa semanal (M1: preview)
+# ---------------------------------------------------------
+from utils.informes import fetch_informe, InformeNotFound
+from utils.semana_datos import generate_portada_yt, build_title, build_description
+
+semana_datos_api = APIRouter(prefix="/api/semana-datos")
+
+
+class ScrapeRequest(BaseModel):
+    urls: List[str]
+
+
+class PreviewRequest(BaseModel):
+    titulos: List[str]
+    copetes: List[str] = []
+
+
+@semana_datos_api.post("/scrape")
+def scrape_informes(req: ScrapeRequest):
+    """Scrapea 1 o 2 URLs de informes y devuelve título + copete de cada uno."""
+    urls = [u.strip() for u in req.urls if u and u.strip()]
+    if not 1 <= len(urls) <= 2:
+        raise HTTPException(status_code=400, detail="Se esperan 1 o 2 URLs")
+
+    informes = []
+    for url in urls:
+        try:
+            informes.append(fetch_informe(url))
+        except InformeNotFound as e:
+            raise HTTPException(status_code=400, detail=f"{url}: {e}")
+    return {"informes": informes}
+
+
+@semana_datos_api.post("/preview-portada")
+def preview_portada(req: PreviewRequest):
+    """Genera la portada de YouTube (PNG) con los títulos dados."""
+    titulos = [t.strip() for t in req.titulos if t and t.strip()]
+    if not 1 <= len(titulos) <= 2:
+        raise HTTPException(status_code=400, detail="Se esperan 1 o 2 títulos")
+    try:
+        png = generate_portada_yt(titulos)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar portada: {e}")
+    return Response(content=png, media_type="image/png")
+
+
+@semana_datos_api.post("/preview-metadata")
+def preview_metadata(req: PreviewRequest):
+    """Devuelve título y descripción finales (lo que iría como metadata a YouTube)."""
+    return {
+        "titulo": build_title(req.titulos),
+        "descripcion": build_description(req.copetes),
+    }
+
+
+# ---------------------------------------------------------
 # MONTAJE Y RUTAS ESTÁTICAS
 # ---------------------------------------------------------
 app.include_router(lluvias_api)
 app.include_router(social_api)
 app.include_router(agenda_api)
+app.include_router(semana_datos_api)
 
 # Archivos estáticos generados por la app (uploads, mapas, videos).
 # Pueden cachearse libremente — los nombres incluyen UUIDs/timestamps, son inmutables.
@@ -567,11 +631,24 @@ async def agenda_index():
         headers={"Cache-Control": "no-cache, must-revalidate"}
     )
 
+# Semana en Datos — mismo patrón: endpoint custom para inyectar versión + mount sin html.
+@app.get("/semana-datos")
+async def semana_datos_redirect():
+    return RedirectResponse(url="/semana-datos/", status_code=307)
+
+@app.get("/semana-datos/")
+async def semana_datos_index():
+    return HTMLResponse(
+        content=get_module_html("semana-datos"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
 # Frontends. NoCacheStaticFiles fuerza al browser a revalidar (304 si no cambió).
-# Para /agenda, html=False porque el endpoint de arriba sirve el index con versión.
+# Para /agenda y /semana-datos, html=False porque sus endpoints custom sirven el index.
 app.mount("/lluvias", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=True), name="lluvias_ui")
 app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=True), name="social_ui")
 app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
+app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 
 @app.get("/")
 async def root():

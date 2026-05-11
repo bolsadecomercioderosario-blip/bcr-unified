@@ -22,6 +22,7 @@
             --accent-rain: #38bdf8;
             --accent-social: #f472b6;
             --accent-agenda: #a78bfa;
+            --accent-data: #34d399;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -101,8 +102,8 @@
 
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
             margin-top: 1rem;
         }
 
@@ -147,10 +148,12 @@
         .tool-card.rain::before { background: var(--accent-rain); }
         .tool-card.social::before { background: var(--accent-social); }
         .tool-card.agenda::before { background: var(--accent-agenda); }
+        .tool-card.data::before { background: var(--accent-data); }
 
         .tool-card.rain:hover { border-color: rgba(56, 189, 248, 0.3); }
         .tool-card.social:hover { border-color: rgba(244, 114, 182, 0.3); }
         .tool-card.agenda:hover { border-color: rgba(167, 139, 250, 0.3); }
+        .tool-card.data:hover { border-color: rgba(52, 211, 153, 0.3); }
 
         .tool-icon {
             width: 56px;
@@ -170,6 +173,7 @@
         .tool-card.rain .tool-icon { background: rgba(56, 189, 248, 0.15); }
         .tool-card.social .tool-icon { background: rgba(244, 114, 182, 0.15); }
         .tool-card.agenda .tool-icon { background: rgba(167, 139, 250, 0.15); }
+        .tool-card.data .tool-icon { background: rgba(52, 211, 153, 0.15); }
 
         .tool-card h3 {
             font-size: 1.15rem;
@@ -195,6 +199,7 @@
         .tool-card.rain .tool-badge { background: rgba(56, 189, 248, 0.12); color: var(--accent-rain); }
         .tool-card.social .tool-badge { background: rgba(244, 114, 182, 0.12); color: var(--accent-social); }
         .tool-card.agenda .tool-badge { background: rgba(167, 139, 250, 0.12); color: var(--accent-agenda); }
+        .tool-card.data .tool-badge { background: rgba(52, 211, 153, 0.12); color: var(--accent-data); }
 
         .footer-text {
             margin-top: 3rem;
@@ -212,6 +217,7 @@
         .tool-card:nth-child(1) { animation-delay: 0.1s; }
         .tool-card:nth-child(2) { animation-delay: 0.2s; }
         .tool-card:nth-child(3) { animation-delay: 0.3s; }
+        .tool-card:nth-child(4) { animation-delay: 0.4s; }
 
         @keyframes cardIn {
             to { opacity: 1; transform: translateY(0); }
@@ -252,6 +258,11 @@
             <a href="/agenda" class="tool-card agenda" id="tool-agenda">
                 <div class="tool-icon">📋</div>
                 <h3>Agenda</h3>
+            </a>
+
+            <a href="/semana-datos" class="tool-card data" id="tool-semana-datos">
+                <div class="tool-icon">📊</div>
+                <h3>La Semana en Datos</h3>
             </a>
         </div>
 

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Semana en Datos | BCR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="top-bar">
+            <a href="/" class="back-link">
+                <i data-lucide="arrow-left"></i>
+                <span>Hub</span>
+            </a>
+            <div class="title-block">
+                <h1>La Semana en Datos</h1>
+                <p>Generador de portada y descripción para YouTube</p>
+            </div>
+        </header>
+
+        <main>
+            <section class="form-card">
+                <h2>Informes de esta semana</h2>
+                <p class="hint">Pegá las URLs de los informes que se mencionan en el programa. Pueden ser uno o dos.</p>
+
+                <div class="url-input">
+                    <label for="url-1">Informe 1</label>
+                    <input type="url" id="url-1" placeholder="https://www.bcr.com.ar/es/mercados/investigacion-y-desarrollo/informativo-semanal/...">
+                </div>
+                <div class="url-input">
+                    <label for="url-2">Informe 2 <span class="optional">(opcional)</span></label>
+                    <input type="url" id="url-2" placeholder="https://www.bcr.com.ar/es/...">
+                </div>
+
+                <button id="btn-generar" class="btn-primary">
+                    <i data-lucide="sparkles"></i>
+                    <span>Generar preview</span>
+                </button>
+
+                <div id="error-msg" class="error-msg hidden"></div>
+            </section>
+
+            <section id="preview-section" class="preview-card hidden">
+                <h2>Preview</h2>
+
+                <div class="preview-grid">
+                    <div class="preview-portada">
+                        <h3>Portada YouTube</h3>
+                        <div class="portada-wrapper">
+                            <img id="portada-preview" src="" alt="Portada generada">
+                        </div>
+                        <a id="btn-download-portada" class="btn-secondary" download="portada-yt.png">
+                            <i data-lucide="download"></i>
+                            <span>Descargar PNG</span>
+                        </a>
+                    </div>
+
+                    <div class="preview-text">
+                        <div class="field-group">
+                            <label>
+                                Título
+                                <button class="btn-copy" data-target="titulo-output" title="Copiar">
+                                    <i data-lucide="copy"></i>
+                                </button>
+                            </label>
+                            <textarea id="titulo-output" rows="2"></textarea>
+                        </div>
+
+                        <div class="field-group">
+                            <label>
+                                Descripción
+                                <button class="btn-copy" data-target="descripcion-output" title="Copiar">
+                                    <i data-lucide="copy"></i>
+                                </button>
+                            </label>
+                            <textarea id="descripcion-output" rows="22"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/app.js?v=__VERSION__"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+    </script>
+</body>
+</html>
