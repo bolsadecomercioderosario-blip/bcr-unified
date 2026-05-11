@@ -552,6 +552,12 @@ def drive_callback(code: str, state: str = None):
 # ---------------------------------------------------------
 from utils.informes import fetch_informe, InformeNotFound
 from utils.semana_datos import generate_portada_yt, build_title, build_description
+from utils.youtube_upload import (
+    extract_drive_file_id,
+    get_drive_file_metadata,
+    upload_program_to_youtube,
+    SEMANA_DATOS_PLAYLIST_ID,
+)
 
 semana_datos_api = APIRouter(prefix="/api/semana-datos")
 
@@ -601,6 +607,83 @@ def preview_metadata(req: PreviewRequest):
         "titulo": build_title(req.titulos),
         "descripcion": build_description(req.copetes),
     }
+
+
+class DriveCheckRequest(BaseModel):
+    drive_url: str
+
+
+@semana_datos_api.post("/drive-check")
+def drive_check(req: DriveCheckRequest):
+    """Valida que la URL/ID de Drive sea legible por la app y que el archivo
+    sea un video. Útil para el frontend antes de disparar el upload."""
+    file_id = extract_drive_file_id(req.drive_url)
+    if not file_id:
+        raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
+    try:
+        meta = get_drive_file_metadata(file_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {e}")
+    mime = meta.get("mimeType", "")
+    if not mime.startswith("video/"):
+        raise HTTPException(status_code=400, detail=f"El archivo no es un video (mime: {mime})")
+    size = int(meta.get("size") or 0)
+    return {
+        "file_id": file_id,
+        "name": meta.get("name"),
+        "mime": mime,
+        "size_mb": round(size / (1024 * 1024), 1) if size else None,
+    }
+
+
+class UploadRequest(BaseModel):
+    drive_url: str
+    titulos_portada: List[str]  # títulos para la portada (pueden estar editados)
+    titulo_youtube: str           # título para el video
+    descripcion: str              # descripción completa
+
+
+@semana_datos_api.post("/upload-youtube")
+def upload_youtube(req: UploadRequest):
+    """Descarga el video de Drive, lo sube a YouTube con la portada generada
+    al momento (usando titulos_portada) y lo agrega a la playlist del ciclo."""
+    file_id = extract_drive_file_id(req.drive_url)
+    if not file_id:
+        raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
+
+    titulos_portada = [t.strip() for t in req.titulos_portada if t and t.strip()]
+    if not 1 <= len(titulos_portada) <= 2:
+        raise HTTPException(status_code=400, detail="Se esperan 1 o 2 títulos para la portada")
+    if not req.titulo_youtube.strip():
+        raise HTTPException(status_code=400, detail="Falta el título de YouTube")
+    if not req.descripcion.strip():
+        raise HTTPException(status_code=400, detail="Falta la descripción")
+
+    # Generamos la portada AL MOMENTO del upload con los títulos actuales
+    # (no confiamos en el estado del frontend — el server es la fuente de verdad).
+    try:
+        portada_png = generate_portada_yt(titulos_portada)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar la portada: {e}")
+
+    # Upload — esto puede demorar varios minutos (descarga + upload).
+    # Sincrónico por ahora; en una mejora futura podríamos hacerlo en background
+    # con un job ID + polling de estado.
+    try:
+        result = upload_program_to_youtube(
+            drive_file_id=file_id,
+            title=req.titulo_youtube.strip(),
+            description=req.descripcion.strip(),
+            thumbnail_bytes=portada_png,
+            privacy="public",
+            playlist_id=SEMANA_DATOS_PLAYLIST_ID,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en el upload a YouTube: {e}")
+
+    return result
 
 
 # ---------------------------------------------------------

@@ -6,7 +6,12 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ['https://www.googleapis.com/auth/drive']
+SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    # YouTube: subir videos, setear thumbnail, agregar a playlists
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube',
+]
 PARENT_FOLDER_ID = '1C9NICdm1iQN82kEEF04tRZQuxTAoN0kA'
 
 # Render places secret files in /etc/secrets or the app root

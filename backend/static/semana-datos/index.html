@@ -36,6 +36,11 @@
                     <label for="url-2">Informe 2 <span class="optional">(opcional)</span></label>
                     <input type="url" id="url-2" placeholder="https://www.bcr.com.ar/es/...">
                 </div>
+                <div class="url-input">
+                    <label for="url-drive">Link de Drive del programa <span class="optional">(opcional ahora, requerido para subir a YouTube)</span></label>
+                    <input type="url" id="url-drive" placeholder="https://drive.google.com/file/d/.../view">
+                    <div id="drive-status" class="drive-status hidden"></div>
+                </div>
 
                 <button id="btn-generar" class="btn-primary">
                     <i data-lucide="sparkles"></i>
@@ -94,6 +99,19 @@
                             <textarea id="descripcion-output" rows="22"></textarea>
                         </div>
                     </div>
+                </div>
+
+                <div class="upload-section">
+                    <h3>Publicar en YouTube</h3>
+                    <p class="hint">
+                        Antes de publicar, asegurate de tener el <strong>Link de Drive</strong> del programa
+                        pegado arriba. El video se va a subir al canal de la BCR como <strong>público</strong> y se agrega a la playlist "La Semana en Datos".
+                    </p>
+                    <button id="btn-upload" class="btn-primary btn-upload" disabled>
+                        <i data-lucide="upload-cloud"></i>
+                        <span>Subir a YouTube</span>
+                    </button>
+                    <div id="upload-status" class="upload-status hidden"></div>
                 </div>
             </section>
         </main>

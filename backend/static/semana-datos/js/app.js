@@ -121,6 +121,7 @@ btnGenerar.addEventListener('click', async () => {
         // Mostrar la sección de preview
         previewSection.classList.remove('hidden');
         previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        updateUploadButton();
     } catch (e) {
         console.error(e);
         showError(e.message || 'Error inesperado');
@@ -165,3 +166,144 @@ style.textContent = `
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 `;
 document.head.appendChild(style);
+
+
+// -------------------------------------------------------------------------
+// Validación de Drive en tiempo real (al pegar/escribir la URL)
+// -------------------------------------------------------------------------
+const driveInput = $('#url-drive');
+const driveStatus = $('#drive-status');
+const btnUpload = $('#btn-upload');
+
+let driveValid = false;
+let driveCheckTimer = null;
+
+function setDriveStatus(kind, html) {
+    driveStatus.className = `drive-status ${kind}`;
+    driveStatus.innerHTML = html;
+    driveStatus.classList.remove('hidden');
+}
+
+function hideDriveStatus() {
+    driveStatus.classList.add('hidden');
+}
+
+async function checkDrive() {
+    const url = driveInput.value.trim();
+    if (!url) {
+        hideDriveStatus();
+        driveValid = false;
+        updateUploadButton();
+        return;
+    }
+    setDriveStatus('checking', 'Verificando archivo en Drive…');
+    try {
+        const res = await fetch('/api/semana-datos/drive-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drive_url: url }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            driveValid = false;
+            setDriveStatus('error', data.detail || 'No pude leer ese archivo');
+        } else {
+            driveValid = true;
+            const sizeText = data.size_mb ? ` · ${data.size_mb} MB` : '';
+            setDriveStatus('ok', `OK: <strong>${data.name}</strong>${sizeText}`);
+        }
+    } catch (e) {
+        driveValid = false;
+        setDriveStatus('error', 'Error de conexión al verificar Drive');
+    } finally {
+        updateUploadButton();
+    }
+}
+
+driveInput.addEventListener('input', () => {
+    driveValid = false;
+    updateUploadButton();
+    if (driveCheckTimer) clearTimeout(driveCheckTimer);
+    driveCheckTimer = setTimeout(checkDrive, 600);
+});
+
+
+// -------------------------------------------------------------------------
+// Botón "Subir a YouTube"
+// -------------------------------------------------------------------------
+const uploadStatus = $('#upload-status');
+
+function updateUploadButton() {
+    // Habilitado solo si: hay preview generado + drive válido
+    const previewReady = !previewSection.classList.contains('hidden');
+    btnUpload.disabled = !(previewReady && driveValid);
+}
+
+function setUploadStatus(kind, html) {
+    uploadStatus.className = `upload-status ${kind}`;
+    uploadStatus.innerHTML = html;
+    uploadStatus.classList.remove('hidden');
+}
+
+btnUpload.addEventListener('click', async () => {
+    if (btnUpload.disabled) return;
+
+    const titulos_portada = [
+        $('#titulo-portada-1').value.trim(),
+        $('#titulo-portada-2').value.trim(),
+    ].filter(Boolean);
+    const titulo_youtube = $('#titulo-output').value.trim();
+    const descripcion = $('#descripcion-output').value.trim();
+    const drive_url = driveInput.value.trim();
+
+    if (!titulo_youtube || !descripcion || !drive_url || titulos_portada.length === 0) {
+        setUploadStatus('error', 'Faltan datos para subir el video.');
+        return;
+    }
+
+    if (!confirm('Vas a subir el video al canal de YouTube de la BCR como PÚBLICO. ¿Continuar?')) {
+        return;
+    }
+
+    btnUpload.disabled = true;
+    const originalContent = btnUpload.innerHTML;
+    btnUpload.innerHTML = '<i data-lucide="loader" class="spin"></i> <span>Subiendo…</span>';
+    lucide.createIcons();
+
+    setUploadStatus(
+        'uploading',
+        'Subiendo a YouTube. <strong>Esto puede tardar varios minutos</strong> dependiendo del tamaño del video. No cierres la pestaña.'
+    );
+
+    try {
+        const res = await fetch('/api/semana-datos/upload-youtube', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                drive_url,
+                titulos_portada,
+                titulo_youtube,
+                descripcion,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || 'Error en el upload');
+        }
+        const playlistInfo = data.playlist_added
+            ? 'Agregado a la playlist <em>La Semana en Datos</em>.'
+            : '<strong>Atención:</strong> no se pudo agregar a la playlist automáticamente. Agregalo a mano en YouTube.';
+        setUploadStatus(
+            'success',
+            `✅ Video subido correctamente. ${playlistInfo}<br><br>
+             <a href="${data.url}" target="_blank" rel="noopener">Ver en YouTube →</a>`
+        );
+    } catch (e) {
+        console.error(e);
+        setUploadStatus('error', `❌ Falló el upload: ${e.message || e}`);
+    } finally {
+        btnUpload.innerHTML = originalContent;
+        lucide.createIcons();
+        updateUploadButton();
+    }
+});
