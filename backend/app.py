@@ -575,35 +575,45 @@ def delete_efemeride(ef_id: int, db: Session = Depends(get_db)):
 
 oauth_state_store = {}
 
+def _oauth_redirect_uri() -> str:
+    """OAuth redirect URI: en producción se setea OAUTH_REDIRECT_URI con la URL
+    de Render; en dev cae al localhost histórico. Cualquier URI usado tiene que
+    estar registrado en Google Cloud Console → Credentials."""
+    return os.environ.get(
+        "OAUTH_REDIRECT_URI",
+        "http://localhost:8000/api/agenda/drive/callback",
+    )
+
+
 @agenda_api.get("/drive/auth")
 def drive_auth():
     if not os.path.exists(CLIENT_SECRETS_FILE):
         return {"error": "client_secret.json no encontrado en el servidor."}
-        
+
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE, scopes=SCOPES)
-    flow.redirect_uri = 'http://localhost:8000/api/agenda/drive/callback'
-    
+    flow.redirect_uri = _oauth_redirect_uri()
+
     authorization_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
         prompt='consent'
     )
-    
+
     # Guardamos temporalmente el verificador en memoria (necesario para OAuth)
     if hasattr(flow, 'code_verifier'):
         oauth_state_store[state] = flow.code_verifier
-        
+
     return RedirectResponse(url=authorization_url)
 
 @agenda_api.get("/drive/callback")
 def drive_callback(code: str, state: str = None):
     if not os.path.exists(CLIENT_SECRETS_FILE):
         return {"error": "client_secret.json no encontrado"}
-        
+
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
-    flow.redirect_uri = 'http://localhost:8000/api/agenda/drive/callback'
+    flow.redirect_uri = _oauth_redirect_uri()
     
     # Restauramos el verificador
     if state and state in oauth_state_store:
