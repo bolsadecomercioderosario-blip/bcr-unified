@@ -66,9 +66,11 @@ def main():
     print()
 
     flow = InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
-    # Abre el browser y escucha en un puerto local
+    # Puerto fijo para que el redirect_uri sea predecible (http://localhost:8080/).
+    # Si el Client ID es de tipo "Web application", agregá ese URI a
+    # "Authorized redirect URIs" en Google Cloud Console.
     creds = flow.run_local_server(
-        port=0,
+        port=8080,
         prompt="consent",  # fuerza el consent screen para garantizar refresh_token
         access_type="offline",
     )

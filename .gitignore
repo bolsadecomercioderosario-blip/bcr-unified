@@ -10,3 +10,15 @@ backend/static/social/*.pdf
 backend/static/social/*.jpg
 backend/client_secret.json
 backend/token.json
+
+# SQLite local (en producción se usa Render Disk; el archivo local nunca debe
+# committearse para no pisar accidentalmente la DB de producción al hacer pull)
+backend/agenda.db
+backend/agenda.db-journal
+backend/agenda.db-wal
+backend/agenda.db-shm
+
+# Logs/artefactos transientes que aparecen al correr la app local
+.pip-install.log
+.server.log
+.claude/
