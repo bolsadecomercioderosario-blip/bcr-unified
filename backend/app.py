@@ -173,50 +173,49 @@ class PublicarTwitterRequest(BaseModel):
     imagen_url: Optional[str] = None  # /static/uploads/... o URL absoluta
 
 
-@lluvias_api.post("/publicar-twitter")
-def publicar_lluvias_twitter(req: PublicarTwitterRequest):
-    """Publica el reporte de lluvias en @BolsaRosario con el texto y la
-    imagen del mapa. El texto se publica tal cual lo manda el frontend
-    (editable por el usuario en la UI)."""
+def _resolve_image_to_local_path(image_url: str) -> tuple[str, Optional[str]]:
+    """Resuelve una URL de imagen a un path local listo para subir a X.
+    Acepta /static/uploads/..., /static/..., y URLs absolutas http(s).
+    Devuelve (path, tempfile_to_cleanup_or_None)."""
+    url = image_url.strip()
+    if url.startswith("/static/uploads/"):
+        path = os.path.join(UPLOADS_DIR, url[len("/static/uploads/"):])
+        return path, None
+    if url.startswith("/static/"):
+        path = os.path.join(STATIC_DIR, url[len("/static/"):])
+        return path, None
+    if url.startswith("http"):
+        import tempfile, requests as _rq
+        try:
+            r = _rq.get(url, timeout=30)
+            r.raise_for_status()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"No se pudo descargar la imagen: {e}")
+        suffix = os.path.splitext(url.split("?")[0])[1] or ".jpg"
+        f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        f.write(r.content)
+        f.close()
+        return f.name, f.name
+    raise HTTPException(status_code=400, detail=f"URL de imagen no soportada: {url}")
+
+
+def _publish_to_twitter(texto: str, imagen_url: Optional[str]) -> dict:
+    """Helper compartido — sirve para Lluvias y Comunicados."""
     from utils.twitter import post_tweet, TwitterNotConfigured
 
-    text = (req.texto or "").strip()
+    text = (texto or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="El texto está vacío")
 
-    # Resolver el path local de la imagen del mapa. Aceptamos URLs relativas
-    # tipo /static/uploads/mapa.jpg (el caso normal) o URLs absolutas (las
-    # descargamos a un tempfile).
     image_path = None
     tmp_to_remove = None
-    if req.imagen_url:
-        url = req.imagen_url.strip()
-        if url.startswith("/static/uploads/"):
-            image_path = os.path.join(UPLOADS_DIR, url[len("/static/uploads/"):])
-        elif url.startswith("/static/"):
-            # cualquier otro asset estático
-            image_path = os.path.join(STATIC_DIR, url[len("/static/"):])
-        elif url.startswith("http"):
-            import tempfile, requests as _rq
-            try:
-                r = _rq.get(url, timeout=30)
-                r.raise_for_status()
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"No se pudo descargar la imagen: {e}")
-            suffix = os.path.splitext(url.split("?")[0])[1] or ".jpg"
-            f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            f.write(r.content)
-            f.close()
-            image_path = f.name
-            tmp_to_remove = image_path
-        else:
-            raise HTTPException(status_code=400, detail=f"URL de imagen no soportada: {url}")
-
+    if imagen_url:
+        image_path, tmp_to_remove = _resolve_image_to_local_path(imagen_url)
         if not os.path.exists(image_path):
             raise HTTPException(status_code=400, detail=f"No se encontró la imagen: {image_path}")
 
     try:
-        result = post_tweet(text=text, image_path=image_path)
+        return post_tweet(text=text, image_path=image_path)
     except TwitterNotConfigured as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
@@ -226,7 +225,11 @@ def publicar_lluvias_twitter(req: PublicarTwitterRequest):
             try: os.remove(tmp_to_remove)
             except Exception: pass
 
-    return result
+
+@lluvias_api.post("/publicar-twitter")
+def publicar_lluvias_twitter(req: PublicarTwitterRequest):
+    """Publica el reporte de lluvias en @BolsaRosario con la imagen del mapa."""
+    return _publish_to_twitter(req.texto, req.imagen_url)
 
 # ---------------------------------------------------------
 # SOCIAL API ROUTER
@@ -290,6 +293,12 @@ async def descargar(filename: str, name: str):
     if os.path.exists(file_path):
         return FileResponse(path=file_path, filename=name, media_type='image/jpeg')
     return {"error": "Archivo no encontrado"}
+
+
+@social_api.post("/publicar-twitter")
+def publicar_social_twitter(req: PublicarTwitterRequest):
+    """Publica el comunicado en @BolsaRosario con la imagen (thumbnail del PDF)."""
+    return _publish_to_twitter(req.texto, req.imagen_url)
 
 # ---------------------------------------------------------
 # AGENDA API ROUTER

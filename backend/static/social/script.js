@@ -119,6 +119,65 @@ document.getElementById('copyXBtn').addEventListener('click', () => {
     }, 2000);
 });
 
+
+// Handler para Publicar en X
+document.getElementById('publishXBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('publishXBtn');
+    const statusBox = document.getElementById('publishStatus');
+    const texto = document.getElementById('twitterText').value.trim();
+    const imgEl = document.getElementById('comunicadoImg');
+    const imagen_url = (imgEl && imgEl.src) ? new URL(imgEl.src).pathname : null;
+
+    if (!texto) {
+        showSocialStatus('error', 'No hay texto para publicar.');
+        return;
+    }
+
+    const confirmed = confirm(
+        'Vas a publicar este tweet en la cuenta @BolsaRosario AHORA.\n\n' +
+        'El tweet va con la imagen del comunicado adjunta.\n\n' +
+        '¿Continuar?'
+    );
+    if (!confirmed) return;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Publicando…';
+    showSocialStatus('uploading', 'Subiendo imagen y publicando en X… No cierres la pestaña.');
+
+    try {
+        const res = await fetch('/api/social/publicar-twitter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto, imagen_url })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || `HTTP ${res.status}`);
+        }
+        showSocialStatus('success',
+            `✅ Tweet publicado. <a href="${data.url}" target="_blank" rel="noopener" style="color: #1da1f2; font-weight: 600;">Verlo en X →</a>`
+        );
+    } catch (e) {
+        console.error(e);
+        showSocialStatus('error', `❌ ${e.message || 'Error inesperado'}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+});
+
+function showSocialStatus(kind, html) {
+    const box = document.getElementById('publishStatus');
+    const styles = {
+        uploading: 'background: #fff4e6; border: 1px solid #ffd99c; color: #7a4500;',
+        success:   'background: #e7f7ec; border: 1px solid #a5dfb6; color: #186829;',
+        error:     'background: #fdecea; border: 1px solid #f5b0a8; color: #8a1a10;',
+    };
+    box.style.cssText = `margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 0.85rem; display: block; ${styles[kind] || ''}`;
+    box.innerHTML = html;
+}
+
 // Ajuste dinámico de grid al redimensionar (opcional para robustez)
 window.addEventListener('resize', () => {
     const results = document.getElementById('results');

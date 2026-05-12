@@ -206,8 +206,13 @@
             <div class="card">
                 <h3>X (Twitter)</h3>
                 <textarea id="twitterText" placeholder="Texto para el post de X..."></textarea>
-                <button id="copyXBtn" class="btn-copy">Copiar Post para X</button>
-                
+                <p class="hint" style="font-size: 0.8rem; color: #666; margin: 6px 0 10px 0;">Editá el texto si necesitás. Al publicar va con la imagen del comunicado.</p>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                    <button id="copyXBtn" class="btn-copy" style="margin-top: 0; flex: 1;">Copiar texto</button>
+                    <button id="publishXBtn" class="btn-publish-x" style="margin-top: 0; flex: 1; background: #1da1f2; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">📤 Publicar en X</button>
+                </div>
+                <div id="publishStatus" class="publish-status" style="display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 0.85rem;"></div>
+
                 <h3 style="margin-top: 2rem;">Post JPG</h3>
                 <img id="comunicadoImg" src="" alt="Comunicado" class="res-img">
                 <a id="downloadComunicadoBtn" href="#" class="btn-link">Descargar comunicado.jpg</a>
