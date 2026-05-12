@@ -690,61 +690,101 @@ class EditClipRequest(BaseModel):
     drive_url: str
 
 
-@semana_datos_api.post("/edit-clip")
-def edit_clip_endpoint(req: EditClipRequest):
-    """Toma un link de Drive con un recorte mp4 (16:9), lo compone sobre el
-    fondo vertical con subtítulos automáticos y devuelve la URL del mp4 procesado."""
-    file_id = extract_drive_file_id(req.drive_url)
-    if not file_id:
-        raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
+# Job tracking en memoria para la edición de recortes.
+# Si el proceso de Render reinicia, los jobs se pierden — aceptable para una
+# tarea on-demand que se dispara desde el frontend y se pollea de inmediato.
+import threading
+import time as _time
 
-    # Validar que sea un video antes de descargar
+_clip_jobs: dict = {}
+
+
+def _run_edit_clip(job_id: str, drive_url: str):
+    """Procesa el recorte en background. Actualiza _clip_jobs[job_id]."""
+    job = _clip_jobs[job_id]
+    input_path = None
     try:
+        job["stage"] = "Validando archivo en Drive…"
+
+        file_id = extract_drive_file_id(drive_url)
+        if not file_id:
+            raise ValueError("No pude extraer un ID de Drive de esa URL")
+
         meta = get_drive_file_metadata(file_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {e}")
-    if not (meta.get("mimeType") or "").startswith("video/"):
-        raise HTTPException(status_code=400, detail=f"El archivo no es un video (mime: {meta.get('mimeType')})")
+        if not (meta.get("mimeType") or "").startswith("video/"):
+            raise ValueError(f"El archivo no es un video (mime: {meta.get('mimeType')})")
+        job["drive_file_name"] = meta.get("name")
 
-    # Descargar el recorte a un temp file dentro de UPLOADS_DIR
-    input_path = os.path.join(UPLOADS_DIR, f"clip_in_{uuid.uuid4()}.mp4")
-    try:
+        job["stage"] = "Descargando recorte de Drive…"
         from utils.youtube_upload import download_drive_file
+        input_path = os.path.join(UPLOADS_DIR, f"clip_in_{job_id}.mp4")
         download_drive_file(file_id, input_path)
-    except Exception as e:
-        try:
-            os.remove(input_path)
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=f"No se pudo descargar el recorte de Drive: {e}")
 
-    # Output va a UPLOADS_DIR para que se sirva via /static/uploads/<nombre>
-    output_filename = f"reel_{uuid.uuid4()}.mp4"
-    output_path = os.path.join(UPLOADS_DIR, output_filename)
+        output_filename = f"reel_{job_id}.mp4"
+        output_path = os.path.join(UPLOADS_DIR, output_filename)
 
-    try:
+        job["stage"] = "Transcribiendo audio y componiendo video…"
         from utils.clip_editor import edit_clip
         result = edit_clip(input_path, output_path)
-    except Exception as e:
-        try:
-            os.remove(output_path)
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=f"Error al editar el recorte: {e}")
-    finally:
-        # Borrar siempre el input temporal descargado
-        try:
-            os.remove(input_path)
-        except Exception:
-            pass
 
-    return {
-        "url": f"/static/uploads/{output_filename}",
-        "filename": output_filename,
-        "duration": result.get("duration"),
-        "subtitle_count": result.get("subtitle_count"),
-        "drive_file_name": meta.get("name"),
+        job.update({
+            "status": "done",
+            "stage": "Listo",
+            "url": f"/static/uploads/{output_filename}",
+            "filename": output_filename,
+            "duration": result.get("duration"),
+            "subtitle_count": result.get("subtitle_count"),
+            "finished_at": _time.time(),
+        })
+    except Exception as e:
+        import traceback
+        print(f"[edit-clip job={job_id}] ERROR: {e}\n{traceback.format_exc()}")
+        job.update({
+            "status": "error",
+            "error": str(e),
+            "finished_at": _time.time(),
+        })
+    finally:
+        if input_path:
+            try:
+                os.remove(input_path)
+            except Exception:
+                pass
+
+
+def _gc_old_jobs(ttl_seconds: int = 3600):
+    """Borra entradas viejas para no acumular memoria."""
+    cutoff = _time.time() - ttl_seconds
+    for jid in list(_clip_jobs.keys()):
+        started = _clip_jobs[jid].get("started_at", 0)
+        if started and started < cutoff:
+            _clip_jobs.pop(jid, None)
+
+
+@semana_datos_api.post("/edit-clip")
+def edit_clip_endpoint(req: EditClipRequest):
+    """Arranca el procesamiento del recorte en background y devuelve un job_id.
+    El cliente debe hacer polling a /edit-clip/status/{job_id} para conocer el resultado.
+    """
+    _gc_old_jobs()
+    job_id = uuid.uuid4().hex
+    _clip_jobs[job_id] = {
+        "status": "processing",
+        "stage": "Iniciando…",
+        "started_at": _time.time(),
     }
+    t = threading.Thread(target=_run_edit_clip, args=(job_id, req.drive_url), daemon=True)
+    t.start()
+    return {"job_id": job_id, "status": "processing"}
+
+
+@semana_datos_api.get("/edit-clip/status/{job_id}")
+def edit_clip_status(job_id: str):
+    """Devuelve el estado del job. Mientras processing, incluye el stage actual."""
+    job = _clip_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado o expirado")
+    return job
 
 
 # ---------------------------------------------------------

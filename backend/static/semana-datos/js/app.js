@@ -313,6 +313,40 @@ clipDriveInput.addEventListener('input', () => {
     clipDriveTimer = setTimeout(checkClipDrive, 600);
 });
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function pollEditClipJob(jobId) {
+    const POLL_INTERVAL_MS = 4000;
+    const TIMEOUT_MS = 15 * 60 * 1000; // 15 min de techo absoluto
+    const start = Date.now();
+    while (Date.now() - start < TIMEOUT_MS) {
+        await sleep(POLL_INTERVAL_MS);
+        let res, data;
+        try {
+            res = await fetch(`/api/semana-datos/edit-clip/status/${jobId}`);
+            data = await res.json();
+        } catch (e) {
+            // Errores transitorios de red: log y reintento
+            console.warn('polling transient error', e);
+            continue;
+        }
+        if (!res.ok) {
+            throw new Error(data && data.detail ? data.detail : 'Job perdido (server reiniciado?)');
+        }
+        const elapsed = Math.round((Date.now() - start) / 1000);
+        if (data.status === 'processing') {
+            setClipStatus(
+                'uploading',
+                `Procesando el recorte (${elapsed}s)… <strong>${data.stage || ''}</strong><br>No cierres la pestaña.`
+            );
+            continue;
+        }
+        if (data.status === 'done') return data;
+        if (data.status === 'error') throw new Error(data.error || 'Error desconocido');
+    }
+    throw new Error('Timeout: el procesamiento tardó más de 15 minutos.');
+}
+
 btnEditClip.addEventListener('click', async () => {
     const drive_url = clipDriveInput.value.trim();
     if (!drive_url || !clipDriveValid) return;
@@ -324,19 +358,25 @@ btnEditClip.addEventListener('click', async () => {
     clipResult.classList.add('hidden');
     setClipStatus(
         'uploading',
-        'Procesando el recorte. <strong>Esto puede tardar 1–3 minutos</strong> (descarga de Drive + transcripción con IA + composición + render). No cierres la pestaña.'
+        'Iniciando procesamiento del recorte…'
     );
 
     try {
+        // 1) Arranca el job
         const res = await fetch('/api/semana-datos/edit-clip', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ drive_url }),
         });
-        const data = await res.json();
         if (!res.ok) {
-            throw new Error(data.detail || 'Falló el procesamiento');
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || 'No se pudo iniciar el job');
         }
+        const { job_id } = await res.json();
+
+        // 2) Polling hasta done o error
+        const data = await pollEditClipJob(job_id);
+
         setClipStatus(
             'success',
             `✅ Recorte procesado (${Math.round(data.duration || 0)}s · ${data.subtitle_count || 0} subtítulos). Reproducí abajo para revisar y descargá el mp4.`
