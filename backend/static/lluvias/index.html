@@ -28,8 +28,13 @@
                         <h3>Opciones para X</h3>
                         <span class="badge">Texto</span>
                     </div>
-                    <textarea id="textoResultado" readonly></textarea>
-                    <button id="copiarBtn" class="btn-copy">Copiar texto para X</button>
+                    <textarea id="textoResultado"></textarea>
+                    <p class="hint">Editá el texto si necesitás. Al publicar, va con la imagen del mapa adjunta.</p>
+                    <div class="actions-row">
+                        <button id="copiarBtn" class="btn-copy">Copiar texto</button>
+                        <button id="publicarBtn" class="btn-publish">📤 Publicar en X</button>
+                    </div>
+                    <div id="publishStatus" class="publish-status hidden"></div>
                 </div>
 
                 <!-- Bloque Mapa -->

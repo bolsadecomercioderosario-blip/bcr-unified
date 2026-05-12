@@ -153,19 +153,80 @@ def video_generation_task(top_5, map_path):
         timestamp = int(time.time())
         filename = f"historia_lluvias_{timestamp}.mp4"
         output_path = os.path.join(UPLOADS_DIR, filename)
-        
+
         # Limpiar videos antiguos
         for f in os.listdir(UPLOADS_DIR):
             if f.startswith("historia_lluvias_") and f.endswith(".mp4"):
                 try: os.remove(os.path.join(UPLOADS_DIR, f))
                 except: pass
-            
+
         create_animated_video_from_data(top_5, map_path, output_mp4=output_path)
         video_status["url"] = f"/static/uploads/{filename}"
         video_status["ready"] = True
     except Exception as e:
         print(f"Error en tarea de video: {e}")
         video_status["error"] = str(e)
+
+
+class PublicarTwitterRequest(BaseModel):
+    texto: str
+    imagen_url: Optional[str] = None  # /static/uploads/... o URL absoluta
+
+
+@lluvias_api.post("/publicar-twitter")
+def publicar_lluvias_twitter(req: PublicarTwitterRequest):
+    """Publica el reporte de lluvias en @BolsaRosario con el texto y la
+    imagen del mapa. El texto se publica tal cual lo manda el frontend
+    (editable por el usuario en la UI)."""
+    from utils.twitter import post_tweet, TwitterNotConfigured
+
+    text = (req.texto or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="El texto está vacío")
+
+    # Resolver el path local de la imagen del mapa. Aceptamos URLs relativas
+    # tipo /static/uploads/mapa.jpg (el caso normal) o URLs absolutas (las
+    # descargamos a un tempfile).
+    image_path = None
+    tmp_to_remove = None
+    if req.imagen_url:
+        url = req.imagen_url.strip()
+        if url.startswith("/static/uploads/"):
+            image_path = os.path.join(UPLOADS_DIR, url[len("/static/uploads/"):])
+        elif url.startswith("/static/"):
+            # cualquier otro asset estático
+            image_path = os.path.join(STATIC_DIR, url[len("/static/"):])
+        elif url.startswith("http"):
+            import tempfile, requests as _rq
+            try:
+                r = _rq.get(url, timeout=30)
+                r.raise_for_status()
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"No se pudo descargar la imagen: {e}")
+            suffix = os.path.splitext(url.split("?")[0])[1] or ".jpg"
+            f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+            f.write(r.content)
+            f.close()
+            image_path = f.name
+            tmp_to_remove = image_path
+        else:
+            raise HTTPException(status_code=400, detail=f"URL de imagen no soportada: {url}")
+
+        if not os.path.exists(image_path):
+            raise HTTPException(status_code=400, detail=f"No se encontró la imagen: {image_path}")
+
+    try:
+        result = post_tweet(text=text, image_path=image_path)
+    except TwitterNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"X rechazó el tweet: {e}")
+    finally:
+        if tmp_to_remove:
+            try: os.remove(tmp_to_remove)
+            except Exception: pass
+
+    return result
 
 # ---------------------------------------------------------
 # SOCIAL API ROUTER

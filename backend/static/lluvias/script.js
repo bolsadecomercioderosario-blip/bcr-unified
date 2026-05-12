@@ -94,9 +94,64 @@ document.getElementById('copiarBtn').addEventListener('click', () => {
     const textarea = document.getElementById('textoResultado');
     textarea.select();
     navigator.clipboard.writeText(textarea.value);
-    
+
     const copyBtn = document.getElementById('copiarBtn');
     const originalText = copyBtn.textContent;
     copyBtn.textContent = '✅ ¡Copiado!';
     setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
 });
+
+
+// Publicar en X (Twitter)
+document.getElementById('publicarBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('publicarBtn');
+    const statusBox = document.getElementById('publishStatus');
+    const texto = document.getElementById('textoResultado').value.trim();
+    const imgEl = document.getElementById('imagenMapa');
+    const imagen_url = (imgEl && imgEl.src) ? new URL(imgEl.src).pathname : null;
+
+    if (!texto) {
+        showStatus('error', 'No hay texto para publicar.');
+        return;
+    }
+
+    const confirmed = confirm(
+        'Vas a publicar este tweet en la cuenta @BolsaRosario AHORA.\n\n' +
+        'El tweet va con la imagen del mapa adjunta.\n\n' +
+        '¿Continuar?'
+    );
+    if (!confirmed) return;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Publicando…';
+    showStatus('uploading', 'Subiendo imagen y publicando en X… No cierres la pestaña.');
+
+    try {
+        const res = await fetch(`${API_BASE}/publicar-twitter`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto, imagen_url })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || `HTTP ${res.status}`);
+        }
+        showStatus('success',
+            `✅ Tweet publicado. <a href="${data.url}" target="_blank" rel="noopener">Verlo en X →</a>`
+        );
+    } catch (e) {
+        console.error(e);
+        showStatus('error', `❌ ${e.message || 'Error inesperado'}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+});
+
+function showStatus(kind, html) {
+    const box = document.getElementById('publishStatus');
+    box.className = `publish-status ${kind}`;
+    box.innerHTML = html;
+    box.classList.remove('hidden');
+}

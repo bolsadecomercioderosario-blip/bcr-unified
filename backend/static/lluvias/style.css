@@ -148,6 +148,63 @@ textarea {
 .btn-copy { background: #e1e8ed; color: #1c1e21; }
 .btn-download { background: #27ae60; color: white; margin-top: 10px; }
 
+.hint {
+    font-size: 0.8rem;
+    color: #65676b;
+    margin: 6px 0 10px 0;
+}
+.actions-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+.actions-row .btn-copy,
+.actions-row .btn-publish {
+    margin-top: 0;
+    flex: 1;
+}
+.btn-publish {
+    display: block;
+    padding: 12px;
+    text-align: center;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: var(--accent);
+    color: white;
+    transition: background 0.2s;
+}
+.btn-publish:hover:not(:disabled) { background: #1a91da; }
+.btn-publish:disabled { background: #b5d8eb; cursor: not-allowed; }
+
+.publish-status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+.publish-status.uploading {
+    background: #fff4e6;
+    border: 1px solid #ffd99c;
+    color: #7a4500;
+}
+.publish-status.success {
+    background: #e7f7ec;
+    border: 1px solid #a5dfb6;
+    color: #186829;
+}
+.publish-status.success a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+}
+.publish-status.error {
+    background: #fdecea;
+    border: 1px solid #f5b0a8;
+    color: #8a1a10;
+}
+
 /* Video Section */
 .video-card {
     text-align: center;
