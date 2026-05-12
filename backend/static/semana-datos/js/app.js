@@ -9,6 +9,7 @@ const previewSection = $('#preview-section');
 const REGEN_DEBOUNCE_MS = 500;
 let regenTimer = null;
 let lastPortadaUrl = null;
+const lastReelUrls = [null, null];  // por índice (0 = informe 1, 1 = informe 2)
 
 async function regeneratePortada() {
     const titulos = [
@@ -28,7 +29,6 @@ async function regeneratePortada() {
         });
         if (!r.ok) return;
         const blob = await r.blob();
-        // Revocar el URL anterior para no acumular blobs en memoria
         if (lastPortadaUrl) URL.revokeObjectURL(lastPortadaUrl);
         lastPortadaUrl = URL.createObjectURL(blob);
         $('#portada-preview').src = lastPortadaUrl;
@@ -38,9 +38,54 @@ async function regeneratePortada() {
     }
 }
 
+async function regenerateReel(idx) {
+    // idx = 0 → informe 1, idx = 1 → informe 2
+    const titulo = $(`#titulo-portada-${idx + 1}`).value.trim();
+    const item = $(`#reel-item-${idx + 1}`);
+    if (!titulo) {
+        item.classList.add('hidden');
+        if (lastReelUrls[idx]) {
+            URL.revokeObjectURL(lastReelUrls[idx]);
+            lastReelUrls[idx] = null;
+        }
+        return;
+    }
+
+    const wrapper = item.querySelector('.reel-wrapper');
+    wrapper.classList.add('regenerating');
+
+    try {
+        const r = await fetch('/api/semana-datos/preview-portada-reel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ titulo }),
+        });
+        if (!r.ok) return;
+        const blob = await r.blob();
+        if (lastReelUrls[idx]) URL.revokeObjectURL(lastReelUrls[idx]);
+        lastReelUrls[idx] = URL.createObjectURL(blob);
+        $(`#portada-reel-${idx + 1}`).src = lastReelUrls[idx];
+        const dl = $(`#btn-download-reel-${idx + 1}`);
+        dl.href = lastReelUrls[idx];
+        dl.download = `portada-reel-${idx + 1}.png`;
+        item.classList.remove('hidden');
+    } finally {
+        wrapper.classList.remove('regenerating');
+    }
+}
+
+async function regenerateAllCovers() {
+    // En paralelo: portada YT + reel 1 + reel 2 (si corresponde)
+    await Promise.all([
+        regeneratePortada(),
+        regenerateReel(0),
+        regenerateReel(1),
+    ]);
+}
+
 function scheduleRegenerate() {
     if (regenTimer) clearTimeout(regenTimer);
-    regenTimer = setTimeout(regeneratePortada, REGEN_DEBOUNCE_MS);
+    regenTimer = setTimeout(regenerateAllCovers, REGEN_DEBOUNCE_MS);
 }
 
 $('#titulo-portada-1').addEventListener('input', scheduleRegenerate);
@@ -101,8 +146,8 @@ btnGenerar.addEventListener('click', async () => {
             $('#titulo-portada-2-wrapper').classList.add('hidden');
         }
 
-        // 3) Portada inicial (usando los títulos pre-llenados)
-        await regeneratePortada();
+        // 3) Generar portadas (YT + Reels) en paralelo, basadas en los títulos pre-llenados
+        await regenerateAllCovers();
 
         // 4) Título YouTube + descripción (no se regeneran al editar la portada;
         //    el usuario puede modificarlos manualmente).

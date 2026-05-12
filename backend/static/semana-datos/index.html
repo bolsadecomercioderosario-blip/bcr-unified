@@ -76,6 +76,29 @@
                             <i data-lucide="download"></i>
                             <span>Descargar PNG</span>
                         </a>
+
+                        <h3 style="margin-top: 1.5rem;">Portadas Reel</h3>
+                        <p class="hint">Una por informe. Se generan en base a los mismos títulos editables de arriba.</p>
+                        <div class="reels-grid">
+                            <div class="reel-item" id="reel-item-1">
+                                <div class="reel-wrapper">
+                                    <img id="portada-reel-1" src="" alt="Portada Reel 1">
+                                </div>
+                                <a id="btn-download-reel-1" class="btn-secondary" download="portada-reel-1.png">
+                                    <i data-lucide="download"></i>
+                                    <span>Descargar</span>
+                                </a>
+                            </div>
+                            <div class="reel-item hidden" id="reel-item-2">
+                                <div class="reel-wrapper">
+                                    <img id="portada-reel-2" src="" alt="Portada Reel 2">
+                                </div>
+                                <a id="btn-download-reel-2" class="btn-secondary" download="portada-reel-2.png">
+                                    <i data-lucide="download"></i>
+                                    <span>Descargar</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="preview-text">
@@ -115,7 +138,9 @@
                 </div>
             </section>
 
-            <section id="clip-editor-section" class="preview-card">
+            <!-- Editor de recortes: oculto por ahora (OOM en Render free tier).
+                 El backend y el código siguen ahí, sólo deshabilitada la UI. -->
+            <section id="clip-editor-section" class="preview-card hidden">
                 <h2>Editor de recortes</h2>
                 <p class="hint">
                     Pegá el link de Drive del recorte 16:9. La app lo descarga, lo coloca sobre

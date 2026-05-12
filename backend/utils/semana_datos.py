@@ -19,6 +19,7 @@ ASSETS_DIR = os.path.join(BACKEND_DIR, "assets", "semana-datos")
 
 FONT_PATH = os.path.join(ASSETS_DIR, "IBMPlexSans-Bold.ttf")
 PORTADA_YT_BASE = os.path.join(ASSETS_DIR, "portada-yt-base.png")
+PORTADA_REEL_BASE = os.path.join(ASSETS_DIR, "portada-reel-base.png")
 
 # Layout 1920x1080: "La semana en datos" ocupa hasta y≈130, el logo BCR empieza
 # en y≈980. Dejamos el bloque de títulos entre esos hitos con un margen lateral
@@ -34,6 +35,15 @@ TITLE_MAX_FONT_TWO = 78  # Cuando hay 2 informes, arrancamos un poco más chico
 TITLE_MIN_FONT = 44
 LINE_SPACING = 1.12
 BLOCK_GAP = 50  # Espacio vertical entre informe 1 y 2 cuando son dos
+
+# Portada Reel 9:16 (900x1600). Un solo título centrado vertical, alineado
+# a la izquierda. La base ya tiene "La semana en datos" arriba + logo BCR abajo.
+REEL_TITLE_AREA_LEFT = 60
+REEL_TITLE_AREA_TOP = 400
+REEL_TITLE_AREA_RIGHT = 840
+REEL_TITLE_AREA_BOTTOM = 1180
+REEL_TITLE_MAX_FONT = 110
+REEL_TITLE_MIN_FONT = 55
 
 
 # Texto institucional fijo que va al pie de cada descripción de YouTube
@@ -139,6 +149,33 @@ def generate_portada_yt(titulos: List[str]) -> bytes:
 
         _draw_lines(draw, lines1, font1, TITLE_AREA_LEFT, y1)
         _draw_lines(draw, lines2, font2, TITLE_AREA_LEFT, y2)
+
+    buf = BytesIO()
+    base.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def generate_portada_reel(titulo: str) -> bytes:
+    """Genera una portada vertical 9:16 (900x1600) para un Reel/Story.
+    El título va centrado verticalmente, alineado a la izquierda, en blanco.
+    Se genera UNA portada por informe (1 si el ciclo tiene 1 informe, 2 si hay 2)."""
+    titulo = (titulo or "").strip()
+    if not titulo:
+        raise ValueError("Se espera un título no vacío")
+
+    base = Image.open(PORTADA_REEL_BASE).convert("RGB")
+    draw = ImageDraw.Draw(base)
+
+    block_width = REEL_TITLE_AREA_RIGHT - REEL_TITLE_AREA_LEFT
+    block_height = REEL_TITLE_AREA_BOTTOM - REEL_TITLE_AREA_TOP
+
+    lines, font = _fit_text(
+        titulo, block_width, block_height,
+        start_size=REEL_TITLE_MAX_FONT, min_size=REEL_TITLE_MIN_FONT,
+    )
+    total = _line_height(font) * len(lines)
+    y = REEL_TITLE_AREA_TOP + (block_height - total) / 2
+    _draw_lines(draw, lines, font, REEL_TITLE_AREA_LEFT, y)
 
     buf = BytesIO()
     base.save(buf, format="PNG", optimize=True)

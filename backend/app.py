@@ -551,7 +551,7 @@ def drive_callback(code: str, state: str = None):
 # SEMANA EN DATOS — publicación del programa semanal (M1: preview)
 # ---------------------------------------------------------
 from utils.informes import fetch_informe, InformeNotFound
-from utils.semana_datos import generate_portada_yt, build_title, build_description
+from utils.semana_datos import generate_portada_yt, generate_portada_reel, build_title, build_description
 from utils.youtube_upload import (
     extract_drive_file_id,
     get_drive_file_metadata,
@@ -597,6 +597,24 @@ def preview_portada(req: PreviewRequest):
         png = generate_portada_yt(titulos)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al generar portada: {e}")
+    return Response(content=png, media_type="image/png")
+
+
+class ReelRequest(BaseModel):
+    titulo: str
+
+
+@semana_datos_api.post("/preview-portada-reel")
+def preview_portada_reel(req: ReelRequest):
+    """Genera UNA portada vertical (Reel/Story) para un informe. Se llama una
+    vez por informe (frontend hace 1 o 2 requests según cuántos haya)."""
+    titulo = (req.titulo or "").strip()
+    if not titulo:
+        raise HTTPException(status_code=400, detail="Falta el título")
+    try:
+        png = generate_portada_reel(titulo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar portada Reel: {e}")
     return Response(content=png, media_type="image/png")
 
 
