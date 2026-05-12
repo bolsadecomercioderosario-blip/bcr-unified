@@ -44,8 +44,14 @@ export function renderActivityForm(container, preData = null) {
                             <input type="date" name="date" value="${act.date}" required>
                         </div>
                         <div class="form-group">
-                            <label>Hora</label>
-                            <input type="time" name="time" value="${act.time}" required>
+                            <label style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                                <span>Hora</span>
+                                <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
+                                    <input type="checkbox" id="time-tbd" ${act.time === 'A definir' ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                                    A definir
+                                </label>
+                            </label>
+                            <input type="time" name="time" value="${act.time === 'A definir' ? '09:00' : act.time}" ${act.time === 'A definir' ? 'disabled style="opacity: 0.4;"' : ''}>
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 1rem;">
@@ -193,6 +199,17 @@ export function renderActivityForm(container, preData = null) {
     const groupExt = container.querySelector('#group-external');
     const groupSant = container.querySelector('#group-santiago');
     const channelChecks = container.querySelectorAll('input[name="channels"]');
+
+    // Toggle "A definir" para la hora — deshabilita el input time y al guardar
+    // se manda time = "A definir" como string.
+    const timeTbd = container.querySelector('#time-tbd');
+    const timeInput = container.querySelector('input[name="time"]');
+    if (timeTbd && timeInput) {
+        timeTbd.addEventListener('change', () => {
+            timeInput.disabled = timeTbd.checked;
+            timeInput.style.opacity = timeTbd.checked ? '0.4' : '1';
+        });
+    }
 
     const updateVisibility = () => {
         // Responsible Externo
@@ -356,7 +373,7 @@ export function renderActivityForm(container, preData = null) {
 
         const data = {
             date: formData.get('date'),
-            time: formData.get('time'),
+            time: (timeTbd && timeTbd.checked) ? 'A definir' : formData.get('time'),
             title: formData.get('title'),
             description: formData.get('description'),
             location: formData.get('location'),

@@ -35,7 +35,12 @@ export function renderList(container) {
 
     const sortedActivities = filteredActivities.sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return a.time.localeCompare(b.time);
+        // Actividades sin hora ("A definir") van al final del día.
+        const aTbd = (a.time === 'A definir');
+        const bTbd = (b.time === 'A definir');
+        if (aTbd && !bTbd) return 1;
+        if (bTbd && !aTbd) return -1;
+        return (a.time || '').localeCompare(b.time || '');
     });
 
     const groups = {
@@ -178,7 +183,7 @@ export function renderList(container) {
                                 <td style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">
                                     ${formatFullDate(act.date)}
                                 </td>
-                                <td style="font-weight: 500; font-variant-numeric: tabular-nums;">${act.time}</td>
+                                <td style="font-weight: 500; ${act.time === 'A definir' ? 'font-size: 0.78rem; color: var(--text-muted); font-style: italic;' : 'font-variant-numeric: tabular-nums;'}">${act.time}</td>
                                 <td>
                                     <div style="font-weight: 600;">${act.title}</div>
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">${act.description.substring(0, 80)}${act.description.length > 80 ? '...' : ''}</div>
