@@ -245,6 +245,82 @@ function setUploadStatus(kind, html) {
     uploadStatus.classList.remove('hidden');
 }
 
+// -------------------------------------------------------------------------
+// Editor de recortes (overlay sobre fondo + subtítulos automáticos)
+// -------------------------------------------------------------------------
+const clipFileInput = $('#clip-file');
+const clipDropLabel = document.querySelector('.clip-drop');
+const clipFileInfo = $('#clip-file-info');
+const btnEditClip = $('#btn-edit-clip');
+const clipStatus = $('#clip-status');
+const clipResult = $('#clip-result');
+const clipResultVideo = $('#clip-result-video');
+const btnDownloadClip = $('#btn-download-clip');
+
+function setClipStatus(kind, html) {
+    clipStatus.className = `upload-status ${kind}`;
+    clipStatus.innerHTML = html;
+    clipStatus.classList.remove('hidden');
+}
+function hideClipStatus() { clipStatus.classList.add('hidden'); }
+
+clipFileInput.addEventListener('change', () => {
+    const f = clipFileInput.files[0];
+    if (!f) {
+        btnEditClip.disabled = true;
+        clipDropLabel.classList.remove('has-file');
+        clipFileInfo.textContent = 'Hasta ~100 MB · idealmente 40-60 seg';
+        return;
+    }
+    const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+    clipFileInfo.textContent = `${f.name} · ${sizeMb} MB`;
+    clipDropLabel.classList.add('has-file');
+    btnEditClip.disabled = false;
+});
+
+btnEditClip.addEventListener('click', async () => {
+    const f = clipFileInput.files[0];
+    if (!f) return;
+
+    btnEditClip.disabled = true;
+    const originalContent = btnEditClip.innerHTML;
+    btnEditClip.innerHTML = '<i data-lucide="loader" class="spin"></i> <span>Procesando…</span>';
+    lucide.createIcons();
+    clipResult.classList.add('hidden');
+    setClipStatus(
+        'uploading',
+        'Procesando el recorte. <strong>Esto puede tardar 1–3 minutos</strong> según la duración del video (incluye transcripción con IA + composición + render). No cierres la pestaña.'
+    );
+
+    try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await fetch('/api/semana-datos/edit-clip', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || 'Falló el procesamiento');
+        }
+        setClipStatus(
+            'success',
+            `✅ Recorte procesado (${Math.round(data.duration || 0)}s · ${data.subtitle_count || 0} subtítulos). Reproducí abajo para revisar y descargá el mp4.`
+        );
+        clipResultVideo.src = data.url;
+        btnDownloadClip.href = data.url;
+        btnDownloadClip.download = data.filename || 'reel.mp4';
+        clipResult.classList.remove('hidden');
+        clipResult.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+        console.error(e);
+        setClipStatus('error', `❌ ${e.message || 'Error inesperado'}`);
+    } finally {
+        btnEditClip.innerHTML = originalContent;
+        lucide.createIcons();
+        // Si quedó error o nuevo file pendiente, se reactiva el botón en el change handler
+        btnEditClip.disabled = false;
+    }
+});
+
+
 btnUpload.addEventListener('click', async () => {
     if (btnUpload.disabled) return;
 

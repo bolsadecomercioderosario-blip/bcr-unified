@@ -686,6 +686,51 @@ def upload_youtube(req: UploadRequest):
     return result
 
 
+@semana_datos_api.post("/edit-clip")
+def edit_clip_endpoint(file: UploadFile = File(...)):
+    """Toma un recorte mp4 (16:9), lo compone sobre el fondo vertical con
+    subtítulos automáticos y devuelve la URL del mp4 procesado."""
+    fname = (file.filename or "").lower()
+    if not fname.endswith((".mp4", ".mov", ".m4v")):
+        raise HTTPException(status_code=400, detail="Formato no soportado. Subí un .mp4 (o .mov/.m4v).")
+
+    # Guardar el input en un temp file
+    input_path = os.path.join(UPLOADS_DIR, f"clip_in_{uuid.uuid4()}.mp4")
+    try:
+        with open(input_path, "wb") as buf:
+            shutil.copyfileobj(file.file, buf)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar el archivo: {e}")
+
+    # Output va a UPLOADS_DIR para que se sirva via /static/uploads/<nombre>
+    output_filename = f"reel_{uuid.uuid4()}.mp4"
+    output_path = os.path.join(UPLOADS_DIR, output_filename)
+
+    try:
+        from utils.clip_editor import edit_clip
+        meta = edit_clip(input_path, output_path)
+    except Exception as e:
+        # Si falló el procesamiento, intentamos limpiar el output parcial
+        try:
+            os.remove(output_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Error al editar el recorte: {e}")
+    finally:
+        # Borrar siempre el input temporal
+        try:
+            os.remove(input_path)
+        except Exception:
+            pass
+
+    return {
+        "url": f"/static/uploads/{output_filename}",
+        "filename": output_filename,
+        "duration": meta.get("duration"),
+        "subtitle_count": meta.get("subtitle_count"),
+    }
+
+
 # ---------------------------------------------------------
 # MONTAJE Y RUTAS ESTÁTICAS
 # ---------------------------------------------------------

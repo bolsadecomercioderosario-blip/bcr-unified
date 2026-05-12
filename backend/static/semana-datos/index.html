@@ -114,6 +114,40 @@
                     <div id="upload-status" class="upload-status hidden"></div>
                 </div>
             </section>
+
+            <section id="clip-editor-section" class="preview-card">
+                <h2>Editor de recortes</h2>
+                <p class="hint">
+                    Subí un recorte 16:9 del programa. La app lo coloca sobre el fondo vertical
+                    de "La Semana en Datos", le agrega subtítulos automáticos en español y te
+                    devuelve el mp4 listo para subir a Instagram Reels o YouTube Shorts.
+                </p>
+
+                <div class="clip-uploader">
+                    <input type="file" id="clip-file" accept="video/mp4,video/quicktime,video/x-m4v" hidden>
+                    <label for="clip-file" class="clip-drop">
+                        <i data-lucide="film"></i>
+                        <span class="clip-drop-text">Seleccionar recorte (.mp4)</span>
+                        <span class="clip-drop-hint" id="clip-file-info">Hasta ~100 MB · idealmente 40-60 seg</span>
+                    </label>
+
+                    <button id="btn-edit-clip" class="btn-primary btn-edit-clip" disabled>
+                        <i data-lucide="sparkles"></i>
+                        <span>Procesar recorte</span>
+                    </button>
+                </div>
+
+                <div id="clip-status" class="upload-status hidden"></div>
+
+                <div id="clip-result" class="clip-result hidden">
+                    <h3>Recorte procesado</h3>
+                    <video id="clip-result-video" controls playsinline></video>
+                    <a id="btn-download-clip" class="btn-secondary" download="reel.mp4">
+                        <i data-lucide="download"></i>
+                        <span>Descargar mp4</span>
+                    </a>
+                </div>
+            </section>
         </main>
     </div>
 
