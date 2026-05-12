@@ -69,45 +69,37 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # ---------------------------------------------------------
-# Endpoints custom para los frontends que usan cache-busting con __VERSION__.
-# El HTML se sirve desde un endpoint propio (no por StaticFiles) para inyectar
-# el commit hash. Tienen que redirigir desde /modulo a /modulo/ para que las
-# URLs relativas del HTML se resuelvan bien.
+# Endpoints custom para los frontends — sirven el HTML con __VERSION__
+# reemplazado por el commit hash (cache-busting). Cada módulo necesita un
+# redirect de /modulo a /modulo/ para que las URLs relativas del HTML se
+# resuelvan contra el directorio.
 # ---------------------------------------------------------
-@app.get("/agenda")
-async def agenda_redirect():
-    return RedirectResponse(url="/agenda/", status_code=307)
+def _make_html_handlers(module: str):
+    """Genera el par (redirect, index) para un módulo dado."""
+    async def redirect():
+        return RedirectResponse(url=f"/{module}/", status_code=307)
+
+    async def index():
+        return HTMLResponse(
+            content=get_module_html(module),
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
+    return redirect, index
 
 
-@app.get("/agenda/")
-async def agenda_index():
-    return HTMLResponse(
-        content=get_module_html("agenda"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
-@app.get("/semana-datos")
-async def semana_datos_redirect():
-    return RedirectResponse(url="/semana-datos/", status_code=307)
-
-
-@app.get("/semana-datos/")
-async def semana_datos_index():
-    return HTMLResponse(
-        content=get_module_html("semana-datos"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
+for _mod in ("lluvias", "social", "agenda", "semana-datos"):
+    _redir, _idx = _make_html_handlers(_mod)
+    app.get(f"/{_mod}")(_redir)
+    app.get(f"/{_mod}/")(_idx)
 
 
 # ---------------------------------------------------------
 # Frontends estáticos. NoCacheStaticFiles fuerza al browser a revalidar.
-# Para /agenda y /semana-datos, html=False porque sus endpoints custom sirven
-# el index.html con __VERSION__ inyectada. Para /lluvias y /social todavía no
-# tienen ese sistema, así que html=True.
+# html=False en todos porque los endpoints de arriba sirven el index.html
+# con __VERSION__ inyectada.
 # ---------------------------------------------------------
-app.mount("/lluvias", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=True), name="lluvias_ui")
-app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=True), name="social_ui")
+app.mount("/lluvias", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "lluvias"), html=False), name="lluvias_ui")
+app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "social"), html=False), name="social_ui")
 app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 
