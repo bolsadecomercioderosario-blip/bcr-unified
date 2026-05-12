@@ -5,16 +5,18 @@ const btnGenerar = $('#btn-generar');
 const errorMsg = $('#error-msg');
 const previewSection = $('#preview-section');
 
-// Helpers para regenerar la portada cuando se editan los títulos
+// Regeneración de portadas. Cada tipo de portada tiene sus propios títulos
+// editables (YT vs Reel) y su propio timer/debounce para no spamear el server.
 const REGEN_DEBOUNCE_MS = 500;
-let regenTimer = null;
+let timerYT = null;
+const timerReel = [null, null];
 let lastPortadaUrl = null;
-const lastReelUrls = [null, null];  // por índice (0 = informe 1, 1 = informe 2)
+const lastReelUrls = [null, null];
 
 async function regeneratePortada() {
     const titulos = [
-        $('#titulo-portada-1').value.trim(),
-        $('#titulo-portada-2').value.trim(),
+        $('#titulo-yt-1').value.trim(),
+        $('#titulo-yt-2').value.trim(),
     ].filter(Boolean);
     if (titulos.length === 0) return;
 
@@ -40,7 +42,7 @@ async function regeneratePortada() {
 
 async function regenerateReel(idx) {
     // idx = 0 → informe 1, idx = 1 → informe 2
-    const titulo = $(`#titulo-portada-${idx + 1}`).value.trim();
+    const titulo = $(`#titulo-reel-${idx + 1}`).value.trim();
     const item = $(`#reel-item-${idx + 1}`);
     if (!titulo) {
         item.classList.add('hidden');
@@ -75,7 +77,6 @@ async function regenerateReel(idx) {
 }
 
 async function regenerateAllCovers() {
-    // En paralelo: portada YT + reel 1 + reel 2 (si corresponde)
     await Promise.all([
         regeneratePortada(),
         regenerateReel(0),
@@ -83,13 +84,20 @@ async function regenerateAllCovers() {
     ]);
 }
 
-function scheduleRegenerate() {
-    if (regenTimer) clearTimeout(regenTimer);
-    regenTimer = setTimeout(regenerateAllCovers, REGEN_DEBOUNCE_MS);
+function scheduleRegenYT() {
+    if (timerYT) clearTimeout(timerYT);
+    timerYT = setTimeout(regeneratePortada, REGEN_DEBOUNCE_MS);
 }
 
-$('#titulo-portada-1').addEventListener('input', scheduleRegenerate);
-$('#titulo-portada-2').addEventListener('input', scheduleRegenerate);
+function scheduleRegenReel(idx) {
+    if (timerReel[idx]) clearTimeout(timerReel[idx]);
+    timerReel[idx] = setTimeout(() => regenerateReel(idx), REGEN_DEBOUNCE_MS);
+}
+
+$('#titulo-yt-1').addEventListener('input', scheduleRegenYT);
+$('#titulo-yt-2').addEventListener('input', scheduleRegenYT);
+$('#titulo-reel-1').addEventListener('input', () => scheduleRegenReel(0));
+$('#titulo-reel-2').addEventListener('input', () => scheduleRegenReel(1));
 
 function showError(msg) {
     errorMsg.textContent = msg;
@@ -135,15 +143,19 @@ btnGenerar.addEventListener('click', async () => {
         const titulos = informes.map((i) => i.titulo);
         const copetes = informes.map((i) => i.copete);
 
-        // 2) Pre-llenar los inputs editables de la portada con los títulos
-        //    scrapeados. El usuario puede acortarlos si entran muy chicos.
-        $('#titulo-portada-1').value = titulos[0] || '';
+        // 2) Pre-llenar los inputs editables con los títulos scrapeados.
+        //    Cada informe tiene dos campos (YT y Reel) que arrancan iguales;
+        //    el usuario puede acortar el de Reel si lo necesita.
+        $('#titulo-yt-1').value = titulos[0] || '';
+        $('#titulo-reel-1').value = titulos[0] || '';
         if (titulos[1]) {
-            $('#titulo-portada-2').value = titulos[1];
-            $('#titulo-portada-2-wrapper').classList.remove('hidden');
+            $('#titulo-yt-2').value = titulos[1];
+            $('#titulo-reel-2').value = titulos[1];
+            $('#titulo-section-2').classList.remove('hidden');
         } else {
-            $('#titulo-portada-2').value = '';
-            $('#titulo-portada-2-wrapper').classList.add('hidden');
+            $('#titulo-yt-2').value = '';
+            $('#titulo-reel-2').value = '';
+            $('#titulo-section-2').classList.add('hidden');
         }
 
         // 3) Generar portadas (YT + Reels) en paralelo, basadas en los títulos pre-llenados

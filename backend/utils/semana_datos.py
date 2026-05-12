@@ -130,7 +130,10 @@ def generate_portada_yt(titulos: List[str]) -> bytes:
         y = TITLE_AREA_TOP + (block_height - total) / 2
         _draw_lines(draw, lines, font, TITLE_AREA_LEFT, y)
     else:
-        # 2 informes: dividimos el área en dos mitades con un gap
+        # 2 informes: cada uno tiene como techo una mitad del área, pero los
+        # pegamos al centro (1er título termina justo arriba del gap, 2do
+        # empieza justo abajo). Así ambos quedan visualmente centrados en
+        # vez de uno pegado al header y otro pegado al logo.
         half_h = (block_height - BLOCK_GAP) / 2
         lines1, font1 = _fit_text(
             titulos[0], block_width, half_h,
@@ -144,8 +147,9 @@ def generate_portada_yt(titulos: List[str]) -> bytes:
         h1 = _line_height(font1) * len(lines1)
         h2 = _line_height(font2) * len(lines2)
 
-        y1 = TITLE_AREA_TOP + (half_h - h1) / 2
-        y2 = TITLE_AREA_TOP + half_h + BLOCK_GAP + (half_h - h2) / 2
+        center_y = TITLE_AREA_TOP + block_height / 2
+        y1 = center_y - BLOCK_GAP / 2 - h1
+        y2 = center_y + BLOCK_GAP / 2
 
         _draw_lines(draw, lines1, font1, TITLE_AREA_LEFT, y1)
         _draw_lines(draw, lines2, font2, TITLE_AREA_LEFT, y2)
