@@ -110,6 +110,24 @@ body {
     gap: 0.25rem;
 }
 
+.btn-hub {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: white;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-right: 0.75rem;
+}
+.btn-hub:hover { background: #f1f5f9; color: var(--text); }
+.btn-hub i { width: 16px; height: 16px; }
+
 .nav-item {
     display: flex;
     align-items: center;
