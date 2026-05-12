@@ -12,9 +12,11 @@ Toma un recorte 16:9 + un fondo 9:16 + audio del recorte:
 """
 import math
 import os
+import subprocess
 import tempfile
 from typing import List, Optional
 
+import imageio_ffmpeg
 import openai
 from moviepy import concatenate_videoclips
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -27,6 +29,15 @@ ASSETS_DIR = os.path.join(BACKEND_DIR, "assets", "semana-datos")
 
 FONDO_REEL = os.path.join(ASSETS_DIR, "fondo-reel.mp4")
 FONT_PATH = os.path.join(ASSETS_DIR, "IBMPlexSans-Bold.ttf")
+
+# Resolución máxima de procesamiento (altura). Render free tier tiene 512 MB
+# de RAM — moviepy puede explotar fácil cargando frames 4K/1080p, así que
+# pre-procesamos a 720p (suficiente para Reels/Shorts).
+MAX_PROCESSING_HEIGHT = 720
+
+# Binario de ffmpeg que viene con imageio_ffmpeg (siempre disponible donde
+# moviepy esté disponible — no depende de PATH del sistema).
+FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
 # Composición visual — ratios relativos al fondo (independiente de la resolución
 # exacta del mp4 de fondo). Se pueden ajustar si el output queda corrido.
@@ -158,48 +169,84 @@ def _loop_to_duration(clip, target_duration: float):
     return concatenate_videoclips([clip] * n).subclipped(0, target_duration)
 
 
+def _downscale_with_ffmpeg(input_path: str, output_path: str, max_height: int) -> None:
+    """Re-encodea el video a max_height (no upscalea si ya es menor).
+    Streaming via ffmpeg → cero peak de memoria, mucho más eficiente que
+    cargar el video completo en moviepy/numpy."""
+    cmd = [
+        FFMPEG_EXE, "-y", "-i", input_path,
+        "-vf", f"scale=-2:'min(ih,{max_height})'",  # mantiene aspect ratio, no upscalea
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # ffmpeg printea info en stderr; nos quedamos con la cola por si falla
+        tail = (proc.stderr or "")[-800:]
+        raise RuntimeError(f"ffmpeg downscale falló: {tail}")
+
+
 def edit_clip(input_path: str, output_path: str) -> dict:
     """Combina el recorte input con el fondo y los subtítulos. Escribe el
-    video resultante en output_path. Devuelve metadata básica del output."""
+    video resultante en output_path. Devuelve metadata básica del output.
+
+    Pre-procesa el clip y el fondo con ffmpeg a MAX_PROCESSING_HEIGHT antes
+    de cargarlos a moviepy, para que el peak de memoria sea predecible
+    incluso con un input 4K. Sin esto, Render free tier (512 MB) hace OOM.
+    """
     if not os.path.exists(FONDO_REEL):
         raise RuntimeError(f"No se encontró el fondo en {FONDO_REEL}")
 
-    bg = VideoFileClip(FONDO_REEL)
-    clip = VideoFileClip(input_path)
+    # 1) Pre-procesar el recorte: bajar a max 720p de alto.
+    preprocessed_clip = input_path + ".720.mp4"
+    _downscale_with_ffmpeg(input_path, preprocessed_clip, MAX_PROCESSING_HEIGHT)
 
+    # 2) Pre-procesar el fondo de la misma manera (se cachea en /tmp porque es fijo).
+    bg_processed = os.path.join(tempfile.gettempdir(), f"fondo-reel-{MAX_PROCESSING_HEIGHT}.mp4")
+    if not os.path.exists(bg_processed):
+        _downscale_with_ffmpeg(FONDO_REEL, bg_processed, MAX_PROCESSING_HEIGHT)
+
+    bg = None
+    clip = None
     try:
+        bg = VideoFileClip(bg_processed)
+        clip = VideoFileClip(preprocessed_clip)
+
         target_duration = clip.duration
 
-        # 1) Resize del recorte al ancho relativo
+        # Resize del recorte al ancho relativo
         target_width = int(bg.w * CLIP_WIDTH_RATIO)
         clip_resized = clip.resized(width=target_width)
 
-        # 2) Posicionar el recorte
+        # Posicionar el recorte
         clip_x = (bg.w - clip_resized.w) // 2
         clip_y = int(bg.h * CLIP_TOP_RATIO)
         clip_placed = clip_resized.with_position((clip_x, clip_y))
 
-        # 3) Loopear/recortar el fondo a la duración del clip
+        # Loopear/recortar el fondo a la duración del clip
         bg_fit = _loop_to_duration(bg, target_duration)
 
-        # 4) Subtítulos
-        segments = transcribe(input_path)
+        # Subtítulos (transcribimos el clip preprocesado — el audio es idéntico)
+        segments = transcribe(preprocessed_clip)
         subtitle_clips = _build_subtitle_clips(segments, bg.size, target_duration)
 
-        # 5) Componer
+        # Componer
         final = CompositeVideoClip(
             [bg_fit, clip_placed] + subtitle_clips,
             size=bg.size,
         ).with_duration(target_duration).with_audio(clip.audio)
 
-        # 6) Escribir
+        # Escribir — parámetros conservadores en memoria/CPU
         final.write_videofile(
             output_path,
             codec="libx264",
             audio_codec="aac",
-            preset="medium",
-            fps=30,
-            threads=4,
+            preset="veryfast",   # menos memoria que medium, sigue siendo aceptable
+            fps=24,              # 24 fps alcanza para Reels, ahorra ~20% CPU/RAM
+            threads=2,           # menos threads → menor pico de RAM
             logger=None,
         )
 
@@ -209,11 +256,13 @@ def edit_clip(input_path: str, output_path: str) -> dict:
             "size": list(bg.size),
         }
     finally:
+        for c in (clip, bg):
+            try:
+                if c is not None:
+                    c.close()
+            except Exception:
+                pass
         try:
-            clip.close()
-        except Exception:
-            pass
-        try:
-            bg.close()
+            os.remove(preprocessed_clip)
         except Exception:
             pass
