@@ -1,4 +1,5 @@
 import { state, updateActivity, deleteActivity, expandPastMonths } from '../state.js';
+import { RECORDATORIOS } from '../data/recordatorios.js';
 
 export function renderList(container) {
     const today = new Date();
@@ -102,39 +103,60 @@ export function renderList(container) {
         `;
     };
 
-    // Helpers de efemérides
+    // Helpers de efemérides (recurrentes anuales, sin año)
     const efemeridesForDate = (date) => {
         const m = date.getMonth() + 1;
         const d = date.getDate();
         return state.efemerides.filter(e => e.mes === m && e.dia === d);
     };
 
-    const efemeridesForRange = (startDate, endDate) => {
+    // Helpers de recordatorios (fecha exacta YYYY-MM-DD, hardcodeados)
+    const recordatoriosForDate = (date) => {
+        const iso = date.toISOString().split('T')[0];
+        return RECORDATORIOS.filter(r => r.fecha === iso);
+    };
+
+    // Unifica efemérides + recordatorios en un formato común para el render.
+    // Estructura: { label: "Aniversario: BCR" | "Informe GEA Mensual", _date?: Date }
+    const itemsForDate = (date) => {
+        const items = [];
+        for (const e of efemeridesForDate(date)) {
+            items.push({ label: `${e.tipo}: ${e.motivo}` });
+        }
+        for (const r of recordatoriosForDate(date)) {
+            items.push({ label: r.titulo });
+        }
+        return items;
+    };
+
+    const itemsForRange = (startDate, endDate) => {
         const result = [];
         const cur = new Date(startDate);
         while (cur <= endDate) {
-            result.push(...efemeridesForDate(cur).map(e => ({ ...e, _date: new Date(cur) })));
+            for (const it of itemsForDate(cur)) {
+                result.push({ ...it, _date: new Date(cur) });
+            }
             cur.setDate(cur.getDate() + 1);
         }
         return result;
     };
 
-    const renderEfBanner = (efs, includeDate = false) => {
-        if (efs.length === 0) return '';
+    const renderEfBanner = (items, includeDate = false) => {
+        if (!items || items.length === 0) return '';
         let inner;
         if (includeDate) {
             const grouped = {};
-            efs.forEach(e => {
-                const d = e._date;
+            items.forEach(it => {
+                const d = it._date;
                 const key = `${d.getDate()}/${d.getMonth() + 1}`;
                 if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(`${e.tipo}: ${e.motivo}`);
+                grouped[key].push(it.label);
             });
             inner = Object.keys(grouped)
                 .map(k => `<strong>${k}</strong> · ${grouped[k].join(' · ')}`)
                 .join(' &nbsp;|&nbsp; ');
         } else {
-            inner = efs.map(e => `${e.tipo}: ${e.motivo}`).join(' · ');
+            inner = items.map(it => it.label).join(' · ');
         }
         return `<div class="efemerides-banner">${inner}</div>`;
     };
@@ -225,16 +247,16 @@ export function renderList(container) {
             `;
         }
 
-        // Banner de efemérides solo para HOY / MAÑANA / ESTA SEMANA
+        // Banner de efemérides + recordatorios para HOY / MAÑANA / ESTA SEMANA
         let efBannerHtml = '';
         if (g === 'HOY') {
-            efBannerHtml = renderEfBanner(efemeridesForDate(today), false);
+            efBannerHtml = renderEfBanner(itemsForDate(today), false);
         } else if (g === 'MAÑANA') {
-            efBannerHtml = renderEfBanner(efemeridesForDate(tomorrow), false);
+            efBannerHtml = renderEfBanner(itemsForDate(tomorrow), false);
         } else if (g === 'ESTA SEMANA') {
             const start = new Date(tomorrow);
             start.setDate(start.getDate() + 1);
-            efBannerHtml = renderEfBanner(efemeridesForRange(start, endOfThisWeek), true);
+            efBannerHtml = renderEfBanner(itemsForRange(start, endOfThisWeek), true);
         }
 
         const groupHtml = renderGroup(g, groups[g], !headerShown, footerHtml, efBannerHtml);
