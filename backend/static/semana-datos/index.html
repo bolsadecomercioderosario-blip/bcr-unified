@@ -118,24 +118,21 @@
             <section id="clip-editor-section" class="preview-card">
                 <h2>Editor de recortes</h2>
                 <p class="hint">
-                    Subí un recorte 16:9 del programa. La app lo coloca sobre el fondo vertical
-                    de "La Semana en Datos", le agrega subtítulos automáticos en español y te
-                    devuelve el mp4 listo para subir a Instagram Reels o YouTube Shorts.
+                    Pegá el link de Drive del recorte 16:9. La app lo descarga, lo coloca sobre
+                    el fondo vertical de "La Semana en Datos", le agrega subtítulos automáticos
+                    en español y te devuelve el mp4 listo para subir a Reels o Shorts.
                 </p>
 
-                <div class="clip-uploader">
-                    <input type="file" id="clip-file" accept="video/mp4,video/quicktime,video/x-m4v" hidden>
-                    <label for="clip-file" class="clip-drop">
-                        <i data-lucide="film"></i>
-                        <span class="clip-drop-text">Seleccionar recorte (.mp4)</span>
-                        <span class="clip-drop-hint" id="clip-file-info">Hasta ~100 MB · idealmente 40-60 seg</span>
-                    </label>
-
-                    <button id="btn-edit-clip" class="btn-primary btn-edit-clip" disabled>
-                        <i data-lucide="sparkles"></i>
-                        <span>Procesar recorte</span>
-                    </button>
+                <div class="url-input">
+                    <label for="clip-drive-url">Link de Drive del recorte</label>
+                    <input type="url" id="clip-drive-url" placeholder="https://drive.google.com/file/d/.../view">
+                    <div id="clip-drive-status" class="drive-status hidden"></div>
                 </div>
+
+                <button id="btn-edit-clip" class="btn-primary btn-edit-clip" disabled>
+                    <i data-lucide="sparkles"></i>
+                    <span>Procesar recorte</span>
+                </button>
 
                 <div id="clip-status" class="upload-status hidden"></div>
 

@@ -246,41 +246,76 @@ function setUploadStatus(kind, html) {
 }
 
 // -------------------------------------------------------------------------
-// Editor de recortes (overlay sobre fondo + subtítulos automáticos)
+// Editor de recortes (Drive → overlay sobre fondo + subtítulos automáticos)
 // -------------------------------------------------------------------------
-const clipFileInput = $('#clip-file');
-const clipDropLabel = document.querySelector('.clip-drop');
-const clipFileInfo = $('#clip-file-info');
+const clipDriveInput = $('#clip-drive-url');
+const clipDriveStatus = $('#clip-drive-status');
 const btnEditClip = $('#btn-edit-clip');
 const clipStatus = $('#clip-status');
 const clipResult = $('#clip-result');
 const clipResultVideo = $('#clip-result-video');
 const btnDownloadClip = $('#btn-download-clip');
 
+let clipDriveValid = false;
+let clipDriveTimer = null;
+
 function setClipStatus(kind, html) {
     clipStatus.className = `upload-status ${kind}`;
     clipStatus.innerHTML = html;
     clipStatus.classList.remove('hidden');
 }
-function hideClipStatus() { clipStatus.classList.add('hidden'); }
+function setClipDriveStatus(kind, html) {
+    clipDriveStatus.className = `drive-status ${kind}`;
+    clipDriveStatus.innerHTML = html;
+    clipDriveStatus.classList.remove('hidden');
+}
 
-clipFileInput.addEventListener('change', () => {
-    const f = clipFileInput.files[0];
-    if (!f) {
-        btnEditClip.disabled = true;
-        clipDropLabel.classList.remove('has-file');
-        clipFileInfo.textContent = 'Hasta ~100 MB · idealmente 40-60 seg';
+function updateEditClipButton() {
+    btnEditClip.disabled = !clipDriveValid;
+}
+
+async function checkClipDrive() {
+    const url = clipDriveInput.value.trim();
+    if (!url) {
+        clipDriveStatus.classList.add('hidden');
+        clipDriveValid = false;
+        updateEditClipButton();
         return;
     }
-    const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
-    clipFileInfo.textContent = `${f.name} · ${sizeMb} MB`;
-    clipDropLabel.classList.add('has-file');
-    btnEditClip.disabled = false;
+    setClipDriveStatus('checking', 'Verificando archivo en Drive…');
+    try {
+        const res = await fetch('/api/semana-datos/drive-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drive_url: url }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            clipDriveValid = false;
+            setClipDriveStatus('error', data.detail || 'No pude leer ese archivo');
+        } else {
+            clipDriveValid = true;
+            const sizeText = data.size_mb ? ` · ${data.size_mb} MB` : '';
+            setClipDriveStatus('ok', `OK: <strong>${data.name}</strong>${sizeText}`);
+        }
+    } catch (e) {
+        clipDriveValid = false;
+        setClipDriveStatus('error', 'Error de conexión al verificar Drive');
+    } finally {
+        updateEditClipButton();
+    }
+}
+
+clipDriveInput.addEventListener('input', () => {
+    clipDriveValid = false;
+    updateEditClipButton();
+    if (clipDriveTimer) clearTimeout(clipDriveTimer);
+    clipDriveTimer = setTimeout(checkClipDrive, 600);
 });
 
 btnEditClip.addEventListener('click', async () => {
-    const f = clipFileInput.files[0];
-    if (!f) return;
+    const drive_url = clipDriveInput.value.trim();
+    if (!drive_url || !clipDriveValid) return;
 
     btnEditClip.disabled = true;
     const originalContent = btnEditClip.innerHTML;
@@ -289,13 +324,15 @@ btnEditClip.addEventListener('click', async () => {
     clipResult.classList.add('hidden');
     setClipStatus(
         'uploading',
-        'Procesando el recorte. <strong>Esto puede tardar 1–3 minutos</strong> según la duración del video (incluye transcripción con IA + composición + render). No cierres la pestaña.'
+        'Procesando el recorte. <strong>Esto puede tardar 1–3 minutos</strong> (descarga de Drive + transcripción con IA + composición + render). No cierres la pestaña.'
     );
 
     try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await fetch('/api/semana-datos/edit-clip', { method: 'POST', body: fd });
+        const res = await fetch('/api/semana-datos/edit-clip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drive_url }),
+        });
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.detail || 'Falló el procesamiento');
@@ -315,8 +352,7 @@ btnEditClip.addEventListener('click', async () => {
     } finally {
         btnEditClip.innerHTML = originalContent;
         lucide.createIcons();
-        // Si quedó error o nuevo file pendiente, se reactiva el botón en el change handler
-        btnEditClip.disabled = false;
+        updateEditClipButton();
     }
 });
 

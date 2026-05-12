@@ -686,21 +686,37 @@ def upload_youtube(req: UploadRequest):
     return result
 
 
-@semana_datos_api.post("/edit-clip")
-def edit_clip_endpoint(file: UploadFile = File(...)):
-    """Toma un recorte mp4 (16:9), lo compone sobre el fondo vertical con
-    subtítulos automáticos y devuelve la URL del mp4 procesado."""
-    fname = (file.filename or "").lower()
-    if not fname.endswith((".mp4", ".mov", ".m4v")):
-        raise HTTPException(status_code=400, detail="Formato no soportado. Subí un .mp4 (o .mov/.m4v).")
+class EditClipRequest(BaseModel):
+    drive_url: str
 
-    # Guardar el input en un temp file
+
+@semana_datos_api.post("/edit-clip")
+def edit_clip_endpoint(req: EditClipRequest):
+    """Toma un link de Drive con un recorte mp4 (16:9), lo compone sobre el
+    fondo vertical con subtítulos automáticos y devuelve la URL del mp4 procesado."""
+    file_id = extract_drive_file_id(req.drive_url)
+    if not file_id:
+        raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
+
+    # Validar que sea un video antes de descargar
+    try:
+        meta = get_drive_file_metadata(file_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {e}")
+    if not (meta.get("mimeType") or "").startswith("video/"):
+        raise HTTPException(status_code=400, detail=f"El archivo no es un video (mime: {meta.get('mimeType')})")
+
+    # Descargar el recorte a un temp file dentro de UPLOADS_DIR
     input_path = os.path.join(UPLOADS_DIR, f"clip_in_{uuid.uuid4()}.mp4")
     try:
-        with open(input_path, "wb") as buf:
-            shutil.copyfileobj(file.file, buf)
+        from utils.youtube_upload import download_drive_file
+        download_drive_file(file_id, input_path)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No se pudo guardar el archivo: {e}")
+        try:
+            os.remove(input_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"No se pudo descargar el recorte de Drive: {e}")
 
     # Output va a UPLOADS_DIR para que se sirva via /static/uploads/<nombre>
     output_filename = f"reel_{uuid.uuid4()}.mp4"
@@ -708,16 +724,15 @@ def edit_clip_endpoint(file: UploadFile = File(...)):
 
     try:
         from utils.clip_editor import edit_clip
-        meta = edit_clip(input_path, output_path)
+        result = edit_clip(input_path, output_path)
     except Exception as e:
-        # Si falló el procesamiento, intentamos limpiar el output parcial
         try:
             os.remove(output_path)
         except Exception:
             pass
         raise HTTPException(status_code=500, detail=f"Error al editar el recorte: {e}")
     finally:
-        # Borrar siempre el input temporal
+        # Borrar siempre el input temporal descargado
         try:
             os.remove(input_path)
         except Exception:
@@ -726,8 +741,9 @@ def edit_clip_endpoint(file: UploadFile = File(...)):
     return {
         "url": f"/static/uploads/{output_filename}",
         "filename": output_filename,
-        "duration": meta.get("duration"),
-        "subtitle_count": meta.get("subtitle_count"),
+        "duration": result.get("duration"),
+        "subtitle_count": result.get("subtitle_count"),
+        "drive_file_name": meta.get("name"),
     }
 
 
