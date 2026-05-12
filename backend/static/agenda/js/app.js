@@ -178,68 +178,23 @@ if (logo) {
     logo.appendChild(badge);
 }
 
-// Auth Logic
-const loginOverlay = document.getElementById('login-overlay');
-const loginPassword = document.getElementById('login-password');
-const btnLogin = document.getElementById('btn-login');
-const loginError = document.getElementById('login-error');
-
-function checkAuth() {
-    if (localStorage.getItem('agenda_auth') === 'true') {
-        loginOverlay.classList.add('hidden');
-        return true;
-    }
-    return false;
-}
-
-async function tryLogin() {
-    const password = loginPassword.value;
-    try {
-        const res = await fetch('/api/agenda/auth', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
-        });
-
-        if (res.ok) {
-            localStorage.setItem('agenda_auth', 'true');
-            loginOverlay.classList.add('hidden');
-            Promise.all([loadActivities(), loadEfemerides()]).then(updateUI);
-        } else {
-            loginError.style.display = 'block';
-            loginPassword.value = '';
-        }
-    } catch (e) {
-        console.error(e);
-        alert('Error al conectar con el servidor');
-    }
-}
-
-if (btnLogin) {
-    btnLogin.onclick = tryLogin;
-    loginPassword.onkeydown = (e) => { if (e.key === 'Enter') tryLogin(); };
-}
+// Auth: el login lo maneja /static/auth.js de forma centralizada.
+// Si no hay token, auth.js muestra su overlay y bloquea la página.
+// Cuando se loguea, hace location.reload() y este código corre con token válido.
 
 // Initial Cleanup
-state.activities = state.activities.map(a => {
-    return {
-        ...a,
-        location: (a.location === 'undefined' || !a.location) ? '' : a.location,
-        observations: (a.observations === 'undefined' || !a.observations) ? '' : a.observations
-    };
-});
+state.activities = state.activities.map(a => ({
+    ...a,
+    location: (a.location === 'undefined' || !a.location) ? '' : a.location,
+    observations: (a.observations === 'undefined' || !a.observations) ? '' : a.observations,
+}));
 
 // Initial Render
-if (checkAuth()) {
-    subscribe(updateUI);
-    Promise.all([loadActivities(), loadEfemerides()]).then(() => {
-        updateUI();
-        startPolling();
-    });
-} else {
-    // Si no está autenticado, esperamos a que el usuario se loguee
-    subscribe(updateUI);
-}
+subscribe(updateUI);
+Promise.all([loadActivities(), loadEfemerides()]).then(() => {
+    updateUI();
+    startPolling();
+});
 
 // ---------------------------------------------------------
 // Polling para sincronización entre múltiples clientes.
@@ -277,9 +232,6 @@ function startPolling() {
     });
 }
 
-// Si el usuario se loguea después del initial render, arrancar polling al ocultarse
-// el overlay de login (se oculta sólo cuando la auth fue exitosa).
-new MutationObserver(() => {
-    if (loginOverlay.classList.contains('hidden')) startPolling();
-}).observe(loginOverlay, { attributes: true, attributeFilter: ['class'] });
+// El polling ya arranca en el bloque "Initial Render" de arriba — auth.js
+// maneja el login centralizado, así que no hace falta observar el overlay.
 

@@ -6,15 +6,16 @@ import os
 import shutil
 import uuid
 
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
+from auth import require_auth
 from config import UPLOADS_DIR, ASSETS_DIR
 from common import PublicarTwitterRequest, publish_to_twitter
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
 
 
-router = APIRouter(prefix="/api/social")
+router = APIRouter(prefix="/api/social", dependencies=[Depends(require_auth)])
 
 
 @router.post("/pre-procesar")

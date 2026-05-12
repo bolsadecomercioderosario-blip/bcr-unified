@@ -9,10 +9,11 @@ import time
 import uuid
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from auth import require_auth
 from config import UPLOADS_DIR
 from utils.informes import fetch_informe, InformeNotFound
 from utils.semana_datos import (
@@ -25,7 +26,7 @@ from utils.youtube_upload import (
 )
 
 
-router = APIRouter(prefix="/api/semana-datos")
+router = APIRouter(prefix="/api/semana-datos", dependencies=[Depends(require_auth)])
 
 
 # ---------------------------------------------------------

@@ -5,14 +5,15 @@ animado) y publica el tweet en @BolsaRosario.
 import os
 import time
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends
 
+from auth import require_auth
 from config import UPLOADS_DIR
 from common import PublicarTwitterRequest, publish_to_twitter
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 
 
-router = APIRouter(prefix="/api/lluvias")
+router = APIRouter(prefix="/api/lluvias", dependencies=[Depends(require_auth)])
 
 # Estado global del video animado para esta instancia del worker.
 # Se reinicia con el proceso — aceptable porque cada generación es on-demand.

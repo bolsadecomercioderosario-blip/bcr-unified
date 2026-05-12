@@ -10,11 +10,12 @@ semana_datos/) y expone un APIRouter. Este archivo solo:
 """
 import os
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from auth import SESSION_TOKEN, require_auth, verify_password
 from config import STATIC_DIR, NoCacheStaticFiles, get_module_html
 from database import Base, engine
 from migrate import migrate
@@ -42,6 +43,21 @@ app = FastAPI(title="BCR Servicios Unificados")
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": "1.3.0"}
+
+
+# ---------------------------------------------------------
+# Autenticación (público — POST /api/auth/login; GET /api/auth/check requiere token)
+# ---------------------------------------------------------
+@app.post("/api/auth/login")
+async def auth_login(payload: dict):
+    if verify_password(payload.get("password")):
+        return {"token": SESSION_TOKEN}
+    raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+
+@app.get("/api/auth/check")
+async def auth_check(_: bool = Depends(require_auth)):
+    return {"ok": True}
 
 
 app.add_middleware(

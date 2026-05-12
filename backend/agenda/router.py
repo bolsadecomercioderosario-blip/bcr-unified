@@ -18,6 +18,7 @@ from google_auth_oauthlib.flow import Flow
 from sqlalchemy.orm import Session
 
 import agenda_models
+from auth import require_auth
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
 from utils.drive import (
@@ -26,7 +27,7 @@ from utils.drive import (
 )
 
 
-router = APIRouter(prefix="/api/agenda")
+router = APIRouter(prefix="/api/agenda", dependencies=[Depends(require_auth)])
 
 
 # ---------------------------------------------------------
@@ -138,18 +139,6 @@ async def upload_agenda_image(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"url": f"/static/uploads/{filename}"}
-
-
-# ---------------------------------------------------------
-# Auth simple del módulo Agenda (password compartido)
-# ---------------------------------------------------------
-@router.post("/auth")
-def authenticate_agenda(payload: dict):
-    password = payload.get("password")
-    correct_password = os.getenv("AGENDA_PASSWORD", "bcr2024")
-    if password == correct_password:
-        return {"ok": True}
-    raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
 
 # ---------------------------------------------------------
