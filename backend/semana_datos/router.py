@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from auth import require_auth
 from config import UPLOADS_DIR
+from common import require_external_integrations
 from utils.informes import fetch_informe, InformeNotFound
 from utils.semana_datos import (
     generate_portada_yt, generate_portada_reel,
@@ -105,6 +106,7 @@ class DriveCheckRequest(BaseModel):
 
 @router.post("/drive-check")
 def drive_check(req: DriveCheckRequest):
+    require_external_integrations()
     file_id = extract_drive_file_id(req.drive_url)
     if not file_id:
         raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
@@ -138,6 +140,7 @@ class UploadRequest(BaseModel):
 def upload_youtube(req: UploadRequest):
     """Descarga el video de Drive, lo sube a YouTube con la portada generada
     al momento (usando titulos_portada) y lo agrega a la playlist del ciclo."""
+    require_external_integrations()
     file_id = extract_drive_file_id(req.drive_url)
     if not file_id:
         raise HTTPException(status_code=400, detail="No pude extraer un ID de Drive de esa URL")
@@ -246,6 +249,7 @@ def _gc_old_jobs(ttl_seconds: int = 3600):
 
 @router.post("/edit-clip")
 def edit_clip_endpoint(req: EditClipRequest):
+    require_external_integrations()
     _gc_old_jobs()
     job_id = uuid.uuid4().hex
     _clip_jobs[job_id] = {

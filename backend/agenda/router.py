@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 import agenda_models
 from auth import require_auth
+from common import require_external_integrations
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
 from utils.drive import (
@@ -199,6 +200,7 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
 
 @router.post("/actividades/{activity_id}/notify-santiago")
 def notify_santiago(activity_id: str, payload: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    require_external_integrations()
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -220,6 +222,7 @@ def notify_santiago(activity_id: str, payload: dict, background_tasks: Backgroun
 
 @router.post("/actividades/{activity_id}/create-folder")
 def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
+    require_external_integrations()
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -311,6 +314,7 @@ def _oauth_redirect_uri() -> str:
 
 @router.get("/drive/auth")
 def drive_auth():
+    require_external_integrations()
     if not os.path.exists(CLIENT_SECRETS_FILE):
         return {"error": "client_secret.json no encontrado en el servidor."}
 
@@ -331,6 +335,7 @@ def drive_auth():
 
 @router.get("/drive/callback")
 def drive_callback(code: str, state: str = None):
+    require_external_integrations()
     if not os.path.exists(CLIENT_SECRETS_FILE):
         return {"error": "client_secret.json no encontrado"}
 

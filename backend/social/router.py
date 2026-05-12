@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 from auth import require_auth
 from config import UPLOADS_DIR, ASSETS_DIR
-from common import PublicarTwitterRequest, publish_to_twitter
+from common import PublicarTwitterRequest, publish_to_twitter, require_external_integrations
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
 
 
@@ -82,4 +82,5 @@ async def descargar(filename: str, name: str):
 @router.post("/publicar-twitter")
 def publicar_social_twitter(req: PublicarTwitterRequest):
     """Publica el comunicado en @BolsaRosario con la imagen (thumbnail del PDF)."""
+    require_external_integrations()
     return publish_to_twitter(req.texto, req.imagen_url)

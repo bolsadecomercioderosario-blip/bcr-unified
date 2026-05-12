@@ -25,6 +25,16 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 APP_VERSION = os.environ.get("RENDER_GIT_COMMIT", "dev")[:7]
 
 
+# Feature flag de integraciones externas (X/Twitter, YouTube, Drive write,
+# webhook Santiago/UltraMSG). Cuando está en false, los endpoints relevantes
+# devuelven 503 con un mensaje claro; la UI sigue intacta. Para reactivar,
+# setear EXTERNAL_INTEGRATIONS_ENABLED=true en Render.
+EXTERNAL_INTEGRATIONS_ENABLED = (
+    os.environ.get("EXTERNAL_INTEGRATIONS_ENABLED", "false").lower()
+    in ("true", "1", "yes", "on")
+)
+
+
 # ---------------------------------------------------------------------------
 # Cloudinary (CDN para imágenes del newsletter Conectados).
 # Sólo se activa si las tres env vars están presentes; si faltan, los uploads

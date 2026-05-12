@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 
 from auth import require_auth
 from config import UPLOADS_DIR
-from common import PublicarTwitterRequest, publish_to_twitter
+from common import PublicarTwitterRequest, publish_to_twitter, require_external_integrations
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 
 
@@ -74,4 +74,5 @@ def get_video_status_endpoint():
 @router.post("/publicar-twitter")
 def publicar_lluvias_twitter(req: PublicarTwitterRequest):
     """Publica el reporte de lluvias en @BolsaRosario con la imagen del mapa."""
+    require_external_integrations()
     return publish_to_twitter(req.texto, req.imagen_url)

@@ -8,7 +8,24 @@ from typing import Optional
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from config import STATIC_DIR, UPLOADS_DIR
+from config import STATIC_DIR, UPLOADS_DIR, EXTERNAL_INTEGRATIONS_ENABLED
+
+
+def require_external_integrations():
+    """Bloquea endpoints que hablan con servicios externos (X, YouTube, Drive,
+    webhooks). Se activa con la env var EXTERNAL_INTEGRATIONS_ENABLED=true.
+    Mientras esté desactivado, la UI sigue intacta pero el backend responde
+    503 con un mensaje claro — útil para cerrar 'puertas abiertas' hasta tener
+    un entorno más seguro."""
+    if not EXTERNAL_INTEGRATIONS_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Las integraciones externas (X/Twitter, YouTube, Google Drive, "
+                "webhooks) están temporalmente deshabilitadas por seguridad. "
+                "Contactá al admin para reactivarlas."
+            ),
+        )
 
 
 class PublicarTwitterRequest(BaseModel):
