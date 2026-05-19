@@ -255,54 +255,63 @@ function openConectadosEditor(act) {
     const overlay = document.createElement('div');
     overlay.className = 'login-overlay conectados-editor-overlay';
     overlay.innerHTML = `
-        <div class="login-card conectados-editor-card" style="max-width: 720px; width: 92%; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
-            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; display: inline-flex; align-items: center; gap: 0.5rem;">
-                    <i data-lucide="pencil" style="width: 18px; height: 18px;"></i>
-                    Editar bloque
-                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; background: ${BLOCK_BADGE[kind].bg}; color: ${BLOCK_BADGE[kind].color}; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-left: 0.25rem;">
-                        ${BLOCK_BADGE[kind].icon} ${BLOCK_BADGE[kind].label}
-                    </span>
-                </h3>
-                <button id="btn-editor-close" style="background: none; border: none; cursor: pointer; color: var(--text-muted);"><i data-lucide="x"></i></button>
+        <div class="login-card conectados-editor-card" style="max-width: 760px; width: 92%; height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+
+            <!-- Header minimalista: solo badge del tipo + cerrar -->
+            <div class="editor-toprow" style="padding: 0.65rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+                <span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.65rem; background: ${BLOCK_BADGE[kind].bg}; color: ${BLOCK_BADGE[kind].color}; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">
+                    ${BLOCK_BADGE[kind].icon} ${BLOCK_BADGE[kind].label}
+                </span>
+                <button id="btn-editor-close" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0.25rem; line-height: 0;" title="Cerrar"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
             </div>
 
-            <div style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
-                <div>
-                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem;">Imagen del bloque</label>
-                    <div id="editor-image-area" style="border: 2px dashed var(--border); border-radius: 0.75rem; padding: ${act.image_url ? '0.5rem' : '1.5rem'}; background: #fafafa; text-align: center; cursor: pointer; min-height: 120px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.5rem; position: relative;">
-                        ${act.image_url
-                            ? `<img id="editor-image-preview" src="${act.image_url}" style="max-width: 100%; max-height: 220px; border-radius: 0.5rem; display: block;">`
-                            : `<i data-lucide="image-up" style="width: 28px; height: 28px; color: var(--text-muted);"></i>
-                               <span style="color: var(--text-muted); font-size: 0.85rem;">Click para subir una imagen</span>`
-                        }
-                        <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
+            <!-- Cuerpo: imagen-strip + título inline + textarea que llena el resto -->
+            <div style="flex: 1; padding: 0.85rem 1.1rem 0.5rem; display: flex; flex-direction: column; gap: 0.65rem; min-height: 0;">
+
+                <!-- Strip de imagen (sin label, sin caja gigante) -->
+                <div id="editor-image-strip" style="display: flex; align-items: center; gap: 0.65rem; min-height: 56px;">
+                    <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
+                    ${act.image_url ? `
+                        <img id="editor-image-thumb" src="${act.image_url}" style="width: 90px; height: 60px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0;">
+                        <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar imagen
+                        </button>
+                        <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    ` : `
+                        <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.55rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                            <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen del bloque
+                        </button>
+                    `}
+                </div>
+
+                <!-- Título sin label, tipografía grande -->
+                <input id="editor-title" type="text"
+                    value="${(act.title || '').replace(/"/g, '&quot;')}"
+                    placeholder="Título del bloque"
+                    style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.05rem; font-weight: 600;">
+
+                <!-- Botón IA flotando arriba del textarea (sólo en bloques de actividad) -->
+                ${isActivity ? `
+                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem;">
+                        <span id="editor-ai-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                        <button id="editor-ai" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar con IA
+                        </button>
                     </div>
-                    ${act.image_url ? '<button id="editor-image-remove" style="margin-top: 0.5rem; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem;">✕ Quitar imagen</button>' : ''}
-                </div>
+                ` : ''}
 
-                <div>
-                    <label for="editor-title" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem;">Título</label>
-                    <input id="editor-title" type="text" value="${(act.title || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem;">
-                </div>
-
-                <div>
-                    <label for="editor-body" style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem;">
-                        <span>Texto del bloque</span>
-                        ${isActivity ? `
-                            <button id="editor-ai" type="button" style="background: var(--primary); color: white; border: none; padding: 0.35rem 0.7rem; border-radius: 0.4rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar con IA
-                            </button>
-                        ` : ''}
-                    </label>
-                    <textarea id="editor-body" rows="9" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.9rem; resize: vertical; line-height: 1.5;">${blockBodyText(act)}</textarea>
-                    ${isActivity ? '<div id="editor-ai-status" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;"></div>' : ''}
-                </div>
+                <!-- Textarea: protagonista, llena el espacio que sobra -->
+                <textarea id="editor-body"
+                    placeholder="Texto del bloque…"
+                    style="flex: 1; width: 100%; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.55; resize: none; font-family: inherit; min-height: 0;">${blockBodyText(act)}</textarea>
             </div>
 
-            <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: #fafafa;">
-                <button id="btn-editor-cancel" style="background: white; border: 1px solid var(--border); padding: 0.6rem 1.2rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
-                <button id="btn-editor-save" class="btn-primary" style="width: auto; padding: 0.6rem 1.5rem; background: var(--primary);">Guardar</button>
+            <!-- Footer fijo -->
+            <div style="padding: 0.75rem 1.1rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.6rem; background: #fafafa;">
+                <button id="btn-editor-cancel" style="background: white; border: 1px solid var(--border); padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
+                <button id="btn-editor-save" class="btn-primary" style="width: auto; padding: 0.55rem 1.4rem; background: var(--primary);">Guardar</button>
             </div>
         </div>
     `;
@@ -314,75 +323,74 @@ function openConectadosEditor(act) {
 
     const inputTitle = overlay.querySelector('#editor-title');
     const inputBody = overlay.querySelector('#editor-body');
-    const imageArea = overlay.querySelector('#editor-image-area');
+    const strip = overlay.querySelector('#editor-image-strip');
     const imageInput = overlay.querySelector('#editor-image-input');
-    const removeBtn = overlay.querySelector('#editor-image-remove');
 
-    // --- Imagen: click → file picker
-    imageArea.onclick = () => imageInput.click();
+    // Re-pinta la tira de imagen según haya o no imagen actual.
+    function rerenderImageStrip() {
+        const existingInput = strip.querySelector('#editor-image-input');
+        if (currentImageUrl) {
+            strip.innerHTML = `
+                <img id="editor-image-thumb" src="${currentImageUrl}" style="width: 90px; height: 60px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0;">
+                <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar imagen
+                </button>
+                <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
+                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                </button>
+            `;
+        } else {
+            strip.innerHTML = `
+                <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.55rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                    <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen del bloque
+                </button>
+            `;
+        }
+        // El input file siempre vive en el strip (lo recolocamos)
+        strip.insertBefore(existingInput, strip.firstChild);
+        bindImageButtons();
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    // Asocia los handlers a los botones actuales del strip.
+    function bindImageButtons() {
+        const add = strip.querySelector('#editor-image-add');
+        const change = strip.querySelector('#editor-image-change');
+        const remove = strip.querySelector('#editor-image-remove');
+        const thumb = strip.querySelector('#editor-image-thumb');
+        if (add) add.onclick = () => imageInput.click();
+        if (change) change.onclick = () => imageInput.click();
+        if (thumb) thumb.onclick = () => imageInput.click();
+        if (remove) remove.onclick = () => {
+            currentImageUrl = '';
+            rerenderImageStrip();
+        };
+    }
+
     imageInput.onchange = async (e) => {
         if (!e.target.files.length) return;
         const file = e.target.files[0];
         const formData = new FormData();
         formData.append('file', file);
 
-        imageArea.style.opacity = '0.5';
+        strip.style.opacity = '0.5';
         try {
             const res = await fetch('/api/agenda/upload', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.url) {
                 currentImageUrl = data.url;
-                imageArea.innerHTML = `<img id="editor-image-preview" src="${data.url}" style="max-width: 100%; max-height: 220px; border-radius: 0.5rem; display: block;">
-                    <input id="editor-image-input" type="file" accept="image/*" style="display: none;">`;
-                imageArea.style.padding = '0.5rem';
-                // Re-bindeo el nuevo input (porque cambió el DOM)
-                const newInput = imageArea.querySelector('#editor-image-input');
-                newInput.onchange = imageInput.onchange;
-                imageArea.onclick = () => newInput.click();
-                // Si no había botón remove, lo agrego
-                if (!overlay.querySelector('#editor-image-remove')) {
-                    const wrap = imageArea.parentElement;
-                    const btn = document.createElement('button');
-                    btn.id = 'editor-image-remove';
-                    btn.style.cssText = 'margin-top: 0.5rem; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem;';
-                    btn.textContent = '✕ Quitar imagen';
-                    btn.onclick = () => {
-                        currentImageUrl = '';
-                        imageArea.innerHTML = `<i data-lucide="image-up" style="width: 28px; height: 28px; color: var(--text-muted);"></i>
-                            <span style="color: var(--text-muted); font-size: 0.85rem;">Click para subir una imagen</span>
-                            <input id="editor-image-input" type="file" accept="image/*" style="display: none;">`;
-                        imageArea.style.padding = '1.5rem';
-                        const ni = imageArea.querySelector('#editor-image-input');
-                        ni.onchange = imageInput.onchange;
-                        imageArea.onclick = () => ni.click();
-                        btn.remove();
-                        if (window.lucide) window.lucide.createIcons();
-                    };
-                    wrap.appendChild(btn);
-                }
+                rerenderImageStrip();
             }
         } catch (err) {
             console.error(err);
             alert('Error al subir imagen');
         } finally {
-            imageArea.style.opacity = '1';
+            strip.style.opacity = '1';
+            imageInput.value = '';  // permite re-elegir el mismo archivo
         }
     };
 
-    if (removeBtn) {
-        removeBtn.onclick = () => {
-            currentImageUrl = '';
-            imageArea.innerHTML = `<i data-lucide="image-up" style="width: 28px; height: 28px; color: var(--text-muted);"></i>
-                <span style="color: var(--text-muted); font-size: 0.85rem;">Click para subir una imagen</span>
-                <input id="editor-image-input" type="file" accept="image/*" style="display: none;">`;
-            imageArea.style.padding = '1.5rem';
-            const ni = imageArea.querySelector('#editor-image-input');
-            ni.onchange = imageInput.onchange;
-            imageArea.onclick = () => ni.click();
-            removeBtn.remove();
-            if (window.lucide) window.lucide.createIcons();
-        };
-    }
+    bindImageButtons();
 
     // --- Botón IA (sólo en bloques de actividad) ---
     if (isActivity) {
