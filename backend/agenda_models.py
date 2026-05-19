@@ -29,6 +29,10 @@ class Activity(Base):
     is_custom = Column(Boolean, default=False)
     order_index = Column(Integer, default=0)
     image_url = Column(String, default="")
+    # "fixed" | "variable" | None — None significa que es una actividad normal,
+    # no un bloque de newsletter. Reemplaza el viejo flag observations='FIXED_BLOCK'
+    # que era frágil (cualquier edit del form lo pisaba).
+    block_type = Column(String, nullable=True, default=None)
 
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
@@ -54,6 +58,7 @@ class ActivityBase(BaseModel):
     is_custom: Optional[bool] = False
     order_index: Optional[int] = 0
     image_url: Optional[str] = ""
+    block_type: Optional[str] = None  # "fixed" | "variable" | None
 
 class ActivityCreate(ActivityBase):
     pass
@@ -80,17 +85,22 @@ class ActivityUpdate(BaseModel):
     is_custom: Optional[bool] = None
     order_index: Optional[int] = None
     image_url: Optional[str] = None
+    block_type: Optional[str] = None
 
 class ActivityOut(ActivityBase):
     class Config:
         from_attributes = True
 
 class GenerateCopyRequest(BaseModel):
-    mode: str  # 'ig' or 'li'
+    mode: str  # 'ig' | 'li' | 'newsletter_block'
     title: str
     description: Optional[str] = ""
     observations: Optional[str] = ""
     participants_enriched: Optional[str] = ""
+    # newsletter_block: texto base del que se parte (LinkedIn, Instagram, o
+    # info cruda de la actividad — el front decide la prioridad).
+    base_text: Optional[str] = ""
+    base_source: Optional[str] = ""  # 'linkedin' | 'instagram' | 'basic'
 
 
 # Efemérides y Aniversarios (recurrentes anuales — sin año)

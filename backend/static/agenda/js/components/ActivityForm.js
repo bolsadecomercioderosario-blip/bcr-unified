@@ -1,5 +1,7 @@
 import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
-import { generateIGCopy, generateLICopy } from '../utils/ai-engine.js';
+// Nota: los botones de "Generar con IA" en este modal se sacaron por seguridad
+// (no exponer la API key de OpenAI desde un endpoint público). La generación
+// IA queda sólo en el botón del bloque de Conectados.
 
 export function renderActivityForm(container, preData = null) {
     const sourceAct = preData || state.currentActivity || {};
@@ -147,19 +149,14 @@ export function renderActivityForm(container, preData = null) {
                     </div>
 
                     <div style="margin-top: 1.5rem; background: #f8fafc; padding: 1.5rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
-                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">GENERACIÓN DE TEXTOS (IA)</div>
-                        
+                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">COPYS DE DIFUSIÓN</div>
+
                         <div class="form-group">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy Instagram</label>
-                                <div style="display: flex; gap: 0.5rem;">
-                                    <button type="button" id="btn-copy-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
-                                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
-                                    </button>
-                                    <button type="button" id="btn-gen-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
-                                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
-                                    </button>
-                                </div>
+                                <button type="button" id="btn-copy-ig" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
+                                    <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
+                                </button>
                             </div>
                             <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_instagram}</textarea>
                         </div>
@@ -167,14 +164,9 @@ export function renderActivityForm(container, preData = null) {
                         <div class="form-group" style="margin-top: 1.5rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <label style="margin: 0;">Copy LinkedIn / Conectados</label>
-                                <div style="display: flex; gap: 0.5rem;">
-                                    <button type="button" id="btn-copy-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
-                                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
-                                    </button>
-                                    <button type="button" id="btn-gen-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.8rem; font-size: 0.75rem; background: var(--primary); border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;">
-                                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar
-                                    </button>
-                                </div>
+                                <button type="button" id="btn-copy-li" class="btn-primary" style="width: auto; padding: 0.35rem 0.6rem; font-size: 0.75rem; background: #64748b; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem;" title="Copiar al portapapeles">
+                                    <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
+                                </button>
                             </div>
                             <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_linkedin}</textarea>
                         </div>
@@ -229,48 +221,8 @@ export function renderActivityForm(container, preData = null) {
     channelChecks.forEach(c => c.onchange = updateVisibility);
     updateVisibility();
 
-    // AI Generation logic (Updated sequential flow)
-    const btnGenIg = container.querySelector('#btn-gen-ig');
-    const btnGenLi = container.querySelector('#btn-gen-li');
     const txtIg = container.querySelector('#copy-ig');
     const txtLi = container.querySelector('#copy-li');
-
-    btnGenIg.onclick = async () => {
-        const title = form.title.value;
-        const desc = form.description.value;
-        const obs = form.observations.value;
-        
-        if (!title) return alert('Ingresa un título.');
-        
-        btnGenIg.disabled = true;
-        const originalTextIg = btnGenIg.innerHTML;
-        btnGenIg.innerHTML = '<i data-lucide="loader" class="spin"></i> ...';
-        if (window.lucide) window.lucide.createIcons();
-
-        txtIg.value = await generateIGCopy(title, desc, obs);
-        
-        btnGenIg.innerHTML = originalTextIg;
-        btnGenIg.disabled = false;
-        if (window.lucide) window.lucide.createIcons();
-    };
-
-    btnGenLi.onclick = async () => {
-        const title = form.title.value;
-        const desc = form.description.value;
-        const obs = form.observations.value;
-        const participants = form.participants.value;
-        
-        btnGenLi.disabled = true;
-        const originalTextLi = btnGenLi.innerHTML;
-        btnGenLi.innerHTML = '<i data-lucide="loader" class="spin"></i> ...';
-        if (window.lucide) window.lucide.createIcons();
-
-        txtLi.value = await generateLICopy(title, desc, obs, participants);
-        
-        btnGenLi.innerHTML = originalTextLi;
-        btnGenLi.disabled = false;
-        if (window.lucide) window.lucide.createIcons();
-    };
 
     const copyToClipboard = (btnId, inputEl) => {
         const btn = container.querySelector('#' + btnId);

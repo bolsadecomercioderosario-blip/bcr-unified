@@ -69,6 +69,61 @@ export async function generateIGCopy(title, description, observations) {
     }
 }
 
+/**
+ * Genera el contenido (título + cuerpo) de un bloque de Conectados,
+ * reformulando un texto base en tono periodístico.
+ *
+ * Prioridad de la fuente:
+ *   1. copy_linkedin si está cargado
+ *   2. copy_instagram si está cargado
+ *   3. campos básicos (título + descripción + lugar)
+ *
+ * Devuelve { title, copy }. Si la llamada falla, devuelve null y el caller
+ * decide qué hacer (no pisa el contenido actual).
+ */
+export async function generateNewsletterBlock(activity) {
+    let base_text = '';
+    let base_source = 'basic';
+
+    if (activity.copy_linkedin && activity.copy_linkedin.trim()) {
+        base_text = activity.copy_linkedin.trim();
+        base_source = 'linkedin';
+    } else if (activity.copy_instagram && activity.copy_instagram.trim()) {
+        base_text = activity.copy_instagram.trim();
+        base_source = 'instagram';
+    } else {
+        const parts = [];
+        if (activity.title) parts.push(`Título: ${activity.title}`);
+        if (activity.description) parts.push(`Descripción: ${activity.description}`);
+        if (activity.location) parts.push(`Lugar: ${activity.location}`);
+        base_text = parts.join('. ');
+        base_source = 'basic';
+    }
+
+    try {
+        const response = await fetch('/api/agenda/generate-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'newsletter_block',
+                title: activity.title || '',
+                base_text,
+                base_source,
+            })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Error al generar bloque');
+        }
+        const data = await response.json();
+        return { title: data.title || '', copy: data.copy || '', source: base_source };
+    } catch (error) {
+        console.error('generateNewsletterBlock:', error);
+        alert("Error de IA: " + error.message);
+        return null;
+    }
+}
+
 export async function generateLICopy(title, description, observations, participantsText) {
     // 1. Enriquecer los nombres de los participantes usando BCR_AUTHORITIES
     let enrichedParticipants = "";

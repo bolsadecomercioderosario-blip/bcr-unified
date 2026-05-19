@@ -22,6 +22,41 @@ def migrate():
         except:
             pass
 
+        # block_type: reemplaza al viejo flag observations='FIXED_BLOCK' con una
+        # columna propia. Es idempotente: el ALTER falla silencioso si ya existe,
+        # y los UPDATE de backfill sólo tocan filas que todavía tengan el flag viejo.
+        try:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN block_type VARCHAR DEFAULT NULL"))
+            conn.commit()
+            print("Columna 'block_type' agregada con éxito.")
+        except Exception:
+            pass
+
+        try:
+            # Backfill: bloques fijos viejos → block_type='fixed' y se limpia el
+            # observations contaminado.
+            res = conn.execute(text(
+                "UPDATE activities SET block_type='fixed', observations='' "
+                "WHERE is_custom = 1 AND observations = 'FIXED_BLOCK' "
+                "AND (block_type IS NULL OR block_type = '')"
+            ))
+            conn.commit()
+            print(f"Backfill block_type='fixed': {res.rowcount} fila(s) actualizada(s).")
+        except Exception as e:
+            print(f"Nota: backfill de fixed se saltó ({e}).")
+
+        try:
+            # Bloques variables viejos: cualquier is_custom que no era fijo ni
+            # ya tiene block_type → variable.
+            res = conn.execute(text(
+                "UPDATE activities SET block_type='variable' "
+                "WHERE is_custom = 1 AND (block_type IS NULL OR block_type = '')"
+            ))
+            conn.commit()
+            print(f"Backfill block_type='variable': {res.rowcount} fila(s) actualizada(s).")
+        except Exception as e:
+            print(f"Nota: backfill de variable se saltó ({e}).")
+
     seed_efemerides_if_empty()
 
 

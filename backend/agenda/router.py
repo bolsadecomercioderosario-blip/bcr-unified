@@ -89,15 +89,47 @@ Redacción en pasado.
 Tono institucional, profesional, narrativo y descriptivo.
 No usar emojis ni adjetivos grandilocuentes.
 No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final directamente."""
-    else:
-        raise HTTPException(status_code=400, detail="Modo inválido. Use 'ig' o 'li'.")
+    elif request.mode == 'newsletter_block':
+        # Modo del botón IA en cada bloque de Conectados.
+        # Toma un base_text (LinkedIn, Instagram o info básica) y lo reformula
+        # en tono periodístico, devolviendo título + cuerpo separados como JSON.
+        system_prompt = """Sos editor periodístico institucional de la Bolsa de Comercio de Rosario.
+Te pasan un texto base sobre una actividad de la BCR y tu tarea es reescribirlo
+para una sección de newsletter institucional ("Conectados") en tono periodístico
+sobrio, informativo y descriptivo.
 
-    user_content = f"Título: {request.title}\nDescripción: {request.description}\nObservaciones: {request.observations}"
-    if request.mode == 'li' and request.participants_enriched:
-        user_content += f"\nAutoridades Presentes (Agregar al final como se indicó): {request.participants_enriched}"
+⚠️ REGLAS
+- Usar SÓLO la información del texto base. No inventar nombres, lugares, cargos
+  ni datos.
+- Redacción en pasado, voz institucional, tercera persona.
+- Sin emojis, sin adjetivos grandilocuentes, sin frases publicitarias.
+- 2 a 3 párrafos cortos en total. Que sea apto para newsletter — entrada
+  rápida, no extenso.
+
+📐 SALIDA — DEVOLVÉ EXACTAMENTE UN JSON CON DOS CAMPOS:
+{
+  "title": "...",   // Titular periodístico breve (máximo 10 palabras)
+  "copy": "..."     // Cuerpo del bloque, 2-3 párrafos separados por \\n\\n
+}
+
+No agregues nada fuera del JSON. No uses prefijos como "Título:" en el title."""
+    else:
+        raise HTTPException(status_code=400, detail="Modo inválido. Use 'ig', 'li' o 'newsletter_block'.")
+
+    if request.mode == 'newsletter_block':
+        source_label = {
+            'linkedin': 'Copy de LinkedIn ya redactado (úsalo como base principal):',
+            'instagram': 'Copy de Instagram ya redactado (úsalo como base principal):',
+            'basic': 'Información cruda de la actividad (título, descripción, lugar):',
+        }.get(request.base_source or 'basic', 'Texto base:')
+        user_content = f"{source_label}\n\n{request.base_text or ''}\n\nTítulo original: {request.title}"
+    else:
+        user_content = f"Título: {request.title}\nDescripción: {request.description}\nObservaciones: {request.observations}"
+        if request.mode == 'li' and request.participants_enriched:
+            user_content += f"\nAutoridades Presentes (Agregar al final como se indicó): {request.participants_enriched}"
 
     try:
-        response = client.chat.completions.create(
+        kwargs = dict(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -105,7 +137,19 @@ No usar etiquetas ni explicaciones en tu respuesta, entregar el texto final dire
             ],
             temperature=0.3,
         )
-        return {"copy": response.choices[0].message.content}
+        if request.mode == 'newsletter_block':
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        content = response.choices[0].message.content
+
+        if request.mode == 'newsletter_block':
+            import json
+            parsed = json.loads(content)
+            return {
+                "title": (parsed.get("title") or "").strip(),
+                "copy": (parsed.get("copy") or "").strip(),
+            }
+        return {"copy": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

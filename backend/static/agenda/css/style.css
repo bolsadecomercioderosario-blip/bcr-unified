@@ -1048,3 +1048,79 @@ body[data-view="santi"] #btn-new-activity {
     }
 }
 
+/* ============================================================
+   Vista previa compacta del bloque (desktop).
+   La edición real pasa al modal — la vista previa NO es editable.
+   ============================================================ */
+.conectados-grid > .conectados-item .conectados-image-area {
+    cursor: default;
+}
+.conectados-grid > .conectados-item .conectados-image-area:hover {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+.conectados-preview-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text-main);
+    margin: 0 0 0.4rem 0;
+    /* Truncado a 2 líneas para mantener altura predecible */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.conectados-preview-snippet {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #475569;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.conectados-block-badge {
+    align-self: flex-start;
+}
+
+/* Espaciado más generoso en el botón Editar para que se note */
+.conectados-action-buttons .btn-edit-conectados:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* ============================================================
+   Modal de edición de bloque
+   ============================================================ */
+.conectados-editor-overlay {
+    /* hereda de .login-overlay */
+    z-index: 1000;
+}
+
+.conectados-editor-card {
+    /* override del max-width chico de .login-card */
+    padding: 0 !important;
+    text-align: left;
+}
+
+.conectados-editor-card textarea,
+.conectados-editor-card input[type="text"] {
+    font-family: inherit;
+}
+
+.conectados-editor-card #editor-image-area:hover {
+    border-color: var(--primary);
+    background: #f1f5f9;
+}
+
+/* Animación del loader del botón IA */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
