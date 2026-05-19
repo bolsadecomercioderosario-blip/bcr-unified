@@ -255,54 +255,48 @@ function openConectadosEditor(act) {
     const overlay = document.createElement('div');
     overlay.className = 'login-overlay conectados-editor-overlay';
     overlay.innerHTML = `
-        <div class="login-card conectados-editor-card" style="max-width: 760px; width: 92%; height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+        <div class="login-card conectados-editor-card" style="position: relative; max-width: 760px; width: 92%; height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
 
-            <!-- Header minimalista: solo badge del tipo + cerrar -->
-            <div class="editor-toprow" style="padding: 0.65rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
-                <span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.65rem; background: ${BLOCK_BADGE[kind].bg}; color: ${BLOCK_BADGE[kind].color}; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">
-                    ${BLOCK_BADGE[kind].icon} ${BLOCK_BADGE[kind].label}
-                </span>
-                <button id="btn-editor-close" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0.25rem; line-height: 0;" title="Cerrar"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
-            </div>
+            <!-- X flotante (no ocupa una fila propia) -->
+            <button id="btn-editor-close" style="position: absolute; top: 0.5rem; right: 0.6rem; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0.25rem; line-height: 0; z-index: 5;" title="Cerrar"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
 
-            <!-- Cuerpo: imagen-strip + título inline + textarea que llena el resto -->
-            <div style="flex: 1; padding: 0.85rem 1.1rem 0.5rem; display: flex; flex-direction: column; gap: 0.65rem; min-height: 0;">
+            <!-- Cuerpo: fila imagen+IA, título, textarea -->
+            <div style="flex: 1; padding: 0.9rem 1.1rem 0.5rem; display: flex; flex-direction: column; gap: 0.65rem; min-height: 0;">
 
-                <!-- Strip de imagen (sin label, sin caja gigante) -->
-                <div id="editor-image-strip" style="display: flex; align-items: center; gap: 0.65rem; min-height: 56px;">
-                    <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
-                    ${act.image_url ? `
-                        <img id="editor-image-thumb" src="${act.image_url}" style="width: 90px; height: 60px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0;">
-                        <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar imagen
+                <!-- Fila 1: imagen-strip a la izquierda, botón IA a la derecha -->
+                <div style="display: flex; align-items: center; gap: 0.65rem; padding-right: 1.5rem; /* deja aire para la X */">
+                    <div id="editor-image-strip" style="display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0;">
+                        <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
+                        ${act.image_url ? `
+                            <img id="editor-image-thumb" src="${act.image_url}" style="width: 80px; height: 54px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0; cursor: pointer;">
+                            <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar
+                            </button>
+                            <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
+                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        ` : `
+                            <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.5rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen
+                            </button>
+                        `}
+                    </div>
+                    ${isActivity ? `
+                        <button id="editor-ai" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+                            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar con IA
                         </button>
-                        <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
-                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                        </button>
-                    ` : `
-                        <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.55rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-                            <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen del bloque
-                        </button>
-                    `}
+                    ` : ''}
                 </div>
 
-                <!-- Título sin label, tipografía grande -->
+                <!-- Título sin label -->
                 <input id="editor-title" type="text"
                     value="${(act.title || '').replace(/"/g, '&quot;')}"
                     placeholder="Título del bloque"
                     style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.05rem; font-weight: 600;">
 
-                <!-- Botón IA flotando arriba del textarea (sólo en bloques de actividad) -->
-                ${isActivity ? `
-                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem;">
-                        <span id="editor-ai-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
-                        <button id="editor-ai" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar con IA
-                        </button>
-                    </div>
-                ` : ''}
+                ${isActivity ? '<div id="editor-ai-status" style="font-size: 0.75rem; color: var(--text-muted); min-height: 0;"></div>' : ''}
 
-                <!-- Textarea: protagonista, llena el espacio que sobra -->
+                <!-- Textarea: protagonista, llena todo el alto disponible -->
                 <textarea id="editor-body"
                     placeholder="Texto del bloque…"
                     style="flex: 1; width: 100%; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.55; resize: none; font-family: inherit; min-height: 0;">${blockBodyText(act)}</textarea>
@@ -331,9 +325,9 @@ function openConectadosEditor(act) {
         const existingInput = strip.querySelector('#editor-image-input');
         if (currentImageUrl) {
             strip.innerHTML = `
-                <img id="editor-image-thumb" src="${currentImageUrl}" style="width: 90px; height: 60px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0;">
+                <img id="editor-image-thumb" src="${currentImageUrl}" style="width: 80px; height: 54px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0; cursor: pointer;">
                 <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                    <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar imagen
+                    <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar
                 </button>
                 <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
                     <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
@@ -341,8 +335,8 @@ function openConectadosEditor(act) {
             `;
         } else {
             strip.innerHTML = `
-                <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.55rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-                    <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen del bloque
+                <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.5rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                    <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen
                 </button>
             `;
         }
