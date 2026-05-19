@@ -1,61 +1,68 @@
+"""
+Migraciones idempotentes — corren en cada arranque del server.
+
+OJO con Postgres: si un ALTER TABLE falla dentro de una transaction, la
+transaction queda "aborted" y CUALQUIER query posterior en esa misma conexión
+falla con "current transaction is aborted, commands ignored until end of
+transaction block". Por eso cada operación usa su PROPIA conexión — si una
+falla, la siguiente arranca limpia.
+"""
 from sqlalchemy import text
 from database import engine, SessionLocal
 
+
+def _try_exec(label, sql, expect_rowcount=False):
+    """Corre `sql` en una conexión nueva. Si falla, se ignora y se sigue.
+    Cada llamada es transactionalmente independiente — no contagia errores
+    a las siguientes."""
+    try:
+        with engine.connect() as conn:
+            res = conn.execute(text(sql))
+            conn.commit()
+            if expect_rowcount:
+                print(f"  [OK] {label}: {res.rowcount} fila(s).")
+            else:
+                print(f"  [OK] {label}.")
+    except Exception as e:
+        # Truncamos el mensaje porque algunos drivers son verbosos.
+        msg = str(e).split('\n')[0][:200]
+        print(f"  [SKIP] {label}: ({msg}).")
+
+
 def migrate():
     print("Iniciando migración de base de datos...")
-    with engine.connect() as conn:
-        # SQLite y Postgres tienen sintaxis similar para esto
-        try:
-            # Intentamos agregar la columna image_url
-            conn.execute(text("ALTER TABLE activities ADD COLUMN image_url VARCHAR DEFAULT ''"))
-            conn.commit()
-            print("Columna 'image_url' agregada con éxito.")
-        except Exception as e:
-            # Si falla es porque probablemente ya existe
-            print(f"Nota: La migración de 'image_url' se saltó (posiblemente ya existe).")
 
-        try:
-            # Por las dudas, chequeamos otras columnas que agregamos recientemente
-            conn.execute(text("ALTER TABLE activities ADD COLUMN order_index INTEGER DEFAULT 0"))
-            conn.commit()
-            print("Columna 'order_index' agregada con éxito.")
-        except:
-            pass
+    # --- Nuevas columnas (idempotente: si ya existen, el ALTER falla y se ignora) ---
+    _try_exec(
+        "ALTER add image_url",
+        "ALTER TABLE activities ADD COLUMN image_url VARCHAR DEFAULT ''",
+    )
+    _try_exec(
+        "ALTER add order_index",
+        "ALTER TABLE activities ADD COLUMN order_index INTEGER DEFAULT 0",
+    )
+    _try_exec(
+        "ALTER add block_type",
+        "ALTER TABLE activities ADD COLUMN block_type VARCHAR DEFAULT NULL",
+    )
 
-        # block_type: reemplaza al viejo flag observations='FIXED_BLOCK' con una
-        # columna propia. Es idempotente: el ALTER falla silencioso si ya existe,
-        # y los UPDATE de backfill sólo tocan filas que todavía tengan el flag viejo.
-        try:
-            conn.execute(text("ALTER TABLE activities ADD COLUMN block_type VARCHAR DEFAULT NULL"))
-            conn.commit()
-            print("Columna 'block_type' agregada con éxito.")
-        except Exception:
-            pass
-
-        try:
-            # Backfill: bloques fijos viejos → block_type='fixed' y se limpia el
-            # observations contaminado.
-            res = conn.execute(text(
-                "UPDATE activities SET block_type='fixed', observations='' "
-                "WHERE is_custom = 1 AND observations = 'FIXED_BLOCK' "
-                "AND (block_type IS NULL OR block_type = '')"
-            ))
-            conn.commit()
-            print(f"Backfill block_type='fixed': {res.rowcount} fila(s) actualizada(s).")
-        except Exception as e:
-            print(f"Nota: backfill de fixed se saltó ({e}).")
-
-        try:
-            # Bloques variables viejos: cualquier is_custom que no era fijo ni
-            # ya tiene block_type → variable.
-            res = conn.execute(text(
-                "UPDATE activities SET block_type='variable' "
-                "WHERE is_custom = 1 AND (block_type IS NULL OR block_type = '')"
-            ))
-            conn.commit()
-            print(f"Backfill block_type='variable': {res.rowcount} fila(s) actualizada(s).")
-        except Exception as e:
-            print(f"Nota: backfill de variable se saltó ({e}).")
+    # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
+    # Idempotente: sólo toca filas que todavía no tengan block_type seteado.
+    # is_custom: en SQLite es INTEGER (0/1), en Postgres es BOOLEAN. Usamos
+    # comparación contra string para que ambos dialectos lo evalúen bien.
+    _try_exec(
+        "Backfill bloques 'fixed' (legacy observations=FIXED_BLOCK)",
+        "UPDATE activities SET block_type='fixed', observations='' "
+        "WHERE is_custom AND observations = 'FIXED_BLOCK' "
+        "AND (block_type IS NULL OR block_type = '')",
+        expect_rowcount=True,
+    )
+    _try_exec(
+        "Backfill bloques 'variable' (resto de is_custom sin block_type)",
+        "UPDATE activities SET block_type='variable' "
+        "WHERE is_custom AND (block_type IS NULL OR block_type = '')",
+        expect_rowcount=True,
+    )
 
     seed_efemerides_if_empty()
 
