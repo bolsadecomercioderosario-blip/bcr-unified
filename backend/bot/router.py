@@ -1,39 +1,46 @@
 """
 Módulo Bot BCR: agente conversacional con tools.
 
-Estado actual (chunk 2.1): solo el endpoint de testing local con respuesta
-hardcoded. En los próximos chunks iremos sumando:
-  - 2.2: tool consultar_agenda (lee tabla activities)
+Estado actual (chunk 2.2): el endpoint /api/bot/test ya llama al agente real
+con OpenAI + tool calling. La única tool disponible por ahora es
+consultar_agenda. Próximos chunks:
   - 2.3: tools RAG sobre vector stores OpenAI (institucional + comentarios + informativo)
   - 2.4: tool get_precios_pizarra (lee tabla precios_pizarra)
   - 2.5: webhook de Twilio + envío de respuestas + log de exchanges en DB
 """
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from auth import require_auth
+from database import get_db
 
-from bot import models
+from bot import agent, models
 
 
 router = APIRouter(prefix="/api/bot", dependencies=[Depends(require_auth)])
 
 
 @router.post("/test", response_model=models.BotTestResponse)
-def bot_test(payload: models.BotTestRequest) -> models.BotTestResponse:
-    """Endpoint de testing local — recibe un mensaje y devuelve una respuesta.
+def bot_test(
+    payload: models.BotTestRequest,
+    db: Session = Depends(get_db),
+) -> models.BotTestResponse:
+    """Recibe un mensaje y devuelve la respuesta generada por el agente.
 
-    Por ahora devuelve un eco hardcoded. En los próximos chunks reemplazamos
-    el cuerpo por una llamada al LLM con tools.
+    Sirve para testear desde curl o desde un cliente HTTP sin pasar por
+    Twilio. Una vez integrado el webhook de WhatsApp (chunk 2.5), el flujo
+    público va a usar el mismo agente por debajo.
     """
+    result = agent.run_agent(
+        message=payload.message,
+        from_phone=payload.from_phone,
+        db=db,
+    )
     return models.BotTestResponse(
-        reply=(
-            "Bot BCR (stub chunk 2.1). Recibí tu mensaje y todavía no sé responder, "
-            f"pero el endpoint está vivo. Mensaje recibido: {payload.message!r}"
-        ),
-        tools_used=[],
+        reply=result.reply,
+        tools_used=result.tools_used,
         debug={
-            "stub": True,
-            "chunk": "2.1",
-            "from_phone": payload.from_phone,
+            "iterations": result.iterations,
+            **result.debug,
         },
     )
