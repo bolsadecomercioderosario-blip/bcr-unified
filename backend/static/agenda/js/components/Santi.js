@@ -90,19 +90,12 @@ export function renderSanti(container) {
                         ${act.story_type || 'Video'}
                     </span>
                 </td>
-                <td>
-                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                        ${act.drive_bcr ? `<a href="${act.drive_bcr}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.75rem; color: var(--primary); text-decoration: none;">📁 Drive BCR</a>` : ''}
-                        ${act.drive_santiago ? `<a href="${act.drive_santiago}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.75rem; color: #7c3aed; text-decoration: none;">📽️ Drive Santi</a>` : ''}
-                        ${!act.drive_bcr && !act.drive_santiago ? '<span style="color: var(--text-muted); font-size: 0.75rem;">Sin links aún</span>' : ''}
-                    </div>
-                </td>
             </tr>
         `).join('');
 
         return `
             <tr class="santi-group-row">
-                <td colspan="5" style="background: #f8fafc; padding: 0.85rem 1rem 0.5rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+                <td colspan="4" style="background: #f8fafc; padding: 0.85rem 1rem 0.5rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
                     <div style="display: flex; align-items: center; gap: 0.6rem;">
                         <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary); letter-spacing: 0.06em;">${groupName}</span>
                         <span style="font-size: 0.7rem; color: var(--text-muted); background: white; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid var(--border);">${groups[groupName].length}</span>
@@ -126,7 +119,6 @@ export function renderSanti(container) {
                         <th style="width: 70px;">Hora</th>
                         <th>Actividad / Video</th>
                         <th style="width: 100px;">Tipo</th>
-                        <th style="width: 250px;">Links Drive</th>
                     </tr>
                 </thead>
                 <tbody>
