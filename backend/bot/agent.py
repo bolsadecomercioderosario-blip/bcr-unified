@@ -3,12 +3,12 @@ Orquestación del agente del bot BCR.
 
 run_agent() recibe el mensaje del usuario, llama a OpenAI con las tools
 registradas y maneja el loop de tool-calling: el modelo puede pedir ejecutar
-una o varias tools, nosotros las ejecutamos contra la DB, y le devolvemos
+una o varias tools, nosotros las ejecutamos (DB o file_search), y le devolvemos
 el output para que sintetice la respuesta final.
 
-Usamos la Responses API porque en próximos chunks vamos a sumar file_search
-(2.3) sobre vector stores, que se integra nativamente en esa API. Mantener
-una sola API para todo el bot evita pegar APIs distintas.
+Usamos la Responses API porque algunas tools internas (buscar_*) hacen
+file_search sobre vector stores y mantener una sola API en todo el bot evita
+mezclar surfaces.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from bot import tools
 
 # Tope de iteraciones de tool-calling para evitar loops infinitos si el modelo
 # se queda en bucle pidiendo herramientas sin sintetizar respuesta.
-_MAX_TOOL_ITERATIONS = 5
+_MAX_TOOL_ITERATIONS = 6
 
 
 SYSTEM_INSTRUCTIONS_TEMPLATE = """\
@@ -38,28 +38,51 @@ clara.
 Fecha actual: {today_iso} ({today_human}).
 
 Herramientas disponibles:
-- consultar_agenda: para preguntas sobre actividades, eventos, encuentros, \
-capacitaciones, visitas o cualquier cosa con fecha en la agenda de la BCR.
+- consultar_agenda: actividades, eventos, encuentros, capacitaciones, visitas \
+en la agenda de la BCR. Para preguntas con fecha.
+- buscar_institucional: info sobre qué es la BCR, áreas (BCRlabs, BCRinnova, \
+BCRcapacita, BCRcultura, BCRdigital), autoridades, mercados (Físico de Granos, \
+A3, MAV, Rosgan), cámaras arbitrales, fundación, centro de convenciones, \
+oficina de asociados, museo, contactos institucionales.
+- buscar_informativo: análisis del Informativo Semanal (sale los viernes). \
+Para preguntas sobre temas económicos/sectoriales: acuerdos comerciales, \
+campañas agrícolas, exportaciones, política agropecuaria, geopolítica del agro.
+- buscar_comentario_diario: comentarios diarios del mercado (Rosario y Chicago). \
+Para preguntas de coyuntura: '¿qué pasó con la soja hoy?', 'cómo cerró el mercado'.
 
-Reglas de uso:
-1. Si la consulta es sobre eventos/actividades/capacitaciones/fechas, USÁ \
-consultar_agenda. No respondas de memoria — los eventos cambian.
-2. Cuando llames a consultar_agenda, calculá los rangos de fechas en base a \
-la fecha actual indicada arriba. Ejemplos:
-   - "esta semana" → desde hoy hasta el próximo domingo
-   - "mañana" → desde hoy+1 hasta hoy+1
-   - "este mes" → desde hoy hasta el último día del mes
-   - "cuándo es el Encuentro de Abogados" → consultá un rango amplio (60-90 \
-días desde hoy) y pasá filtro_titulo='Encuentro de Abogados'.
-3. Si la tool devuelve 0 actividades, decilo claro (no inventes eventos).
-4. Si la tool devuelve actividades, listá las relevantes con fecha, hora, \
-título y ubicación. Mantené el formato corto, pensado para WhatsApp.
-5. Si la pregunta NO es de agenda (mercado, precios, comentarios, info \
-institucional), avisá amablemente que estás en versión limitada y que pronto \
-vas a poder ayudar con eso también. No inventes la respuesta.
+Reglas de uso de las tools:
+1. Si la pregunta es sobre fechas/eventos/actividades → consultar_agenda. \
+Calculá los rangos en base a la fecha actual: 'esta semana' = hoy → próximo \
+domingo; 'mañana' = hoy+1; 'este mes' = hoy → fin de mes; 'cuándo es X' = \
+rango amplio (60-90 días) con filtro_titulo.
 
-Tono: amable, directo, sin formalismos exagerados. Sin emojis a menos que \
-sumen mucho. No firmes con "atte." ni cosas similares — esto es WhatsApp.
+2. Si la pregunta NO especifica si es agenda, informativo o comentario: \
+elegí la tool por el tipo de información que necesita la respuesta. Si una \
+pregunta puede tener componentes de mercado actual + análisis (ej. 'qué pasa \
+con la soja'), podés llamar a buscar_comentario_diario Y buscar_informativo \
+en la misma iteración (el sistema te lo permite). NO llames a tools que no \
+hagan falta — cada llamada cuesta.
+
+3. Si una tool devuelve 'No se encontró información', NO inventes — decílo \
+al usuario y, si hace sentido, sugerí reformular o consultar otra fuente \
+oficial (sitio web, contacto del área).
+
+4. Si una tool devuelve un error 'vector_store_no_configurado', avisale al \
+usuario que esa fuente todavía no está disponible y respondé con lo que sí \
+puedas (otras tools que sí funcionen).
+
+5. Cuando cites información del informativo o de comentarios diarios, incluí \
+la fecha o número de edición si la tool te lo devolvió, así el usuario sabe \
+de cuándo es el dato.
+
+Formato de respuesta (WhatsApp):
+- Oraciones cortas, lenguaje directo, español rioplatense.
+- Listas con bullets ('•') o numeración cuando hay varios ítems.
+- Sin emojis salvo que sumen mucho.
+- Sin firmas tipo 'atte.', 'saludos cordiales'. Esto es WhatsApp, no un mail.
+- Si la pregunta queda totalmente fuera de lo que las tools cubren, decilo \
+con honestidad y sugerí dónde más buscar (sitio bcr.com.ar, o pedir al \
+contacto del área correspondiente).
 """
 
 
@@ -109,6 +132,7 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
         )
 
     client = OpenAI(api_key=BOT_OPENAI_API_KEY)
+    ctx = tools.ToolContext(db=db, openai_client=client)
     instructions = _build_system_instructions(date.today())
 
     # `input` arranca con el mensaje del usuario y va creciendo con las
@@ -150,7 +174,7 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
             tools_used.append(call.name)
             tool_args_log.append({"name": call.name, "arguments": args})
 
-            output = tools.execute_tool(call.name, args, db=db)
+            output = tools.execute_tool(call.name, args, ctx=ctx)
 
             # La Responses API necesita que metamos en el input tanto la
             # llamada como el output, en ese orden, para que el modelo entienda

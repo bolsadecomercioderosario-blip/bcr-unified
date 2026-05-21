@@ -8,16 +8,41 @@ Tools del bot BCR — cada herramienta tiene dos partes:
 
 execute_tool() es el dispatcher: dado el nombre y argumentos que devolvió
 el modelo, llama a la función correcta y devuelve un dict serializable.
+
+Tools registradas:
+- consultar_agenda: lee tabla activities con filtros de fecha y título.
+- buscar_institucional / buscar_informativo / buscar_comentario_diario:
+  wrappers de file_search sobre los 3 vector stores OpenAI. Cada uno hace
+  una llamada interna a la Responses API contra su VS dedicado.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
+from openai import OpenAI
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
+from config import (
+    BOT_OPENAI_MODEL,
+    BOT_VS_COMENTARIOS,
+    BOT_VS_INFORMATIVO,
+    BOT_VS_INSTITUCIONAL,
+)
+
+
+# ---------------------------------------------------------------------------
+# ToolContext: lo que reciben TODAS las tools. Cada una usa lo que le sirve;
+# ignora el resto. Centralizar el contexto evita que cada nueva tool tenga
+# que cambiar la firma de execute_tool ni de las que ya existen.
+# ---------------------------------------------------------------------------
+@dataclass
+class ToolContext:
+    db: Session
+    openai_client: OpenAI
 
 
 # ---------------------------------------------------------------------------
@@ -65,11 +90,88 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "name": "buscar_institucional",
+        "description": (
+            "Busca en la base de conocimiento INSTITUCIONAL de la BCR. Contiene info "
+            "sobre: qué es la BCR, historia, autoridades, sedes y contacto general; "
+            "los mercados (Mercado Físico de Granos, A3, MAV, Rosgan); las cámaras "
+            "arbitrales (Cereales, CAAVS, Tribunal General); BCRlabs (laboratorios); "
+            "Dirección de Información y Estudios Económicos; BCRdigital, BCRinnova, "
+            "BCRcapacita, BCRcultura; Fundación BCR; Centro de Convenciones; Oficina "
+            "de Asociados; museo y biblioteca. Usá esta tool para preguntas tipo "
+            "'¿qué es BCRlabs?', '¿quién es el presidente?', '¿cómo me asocio?', "
+            "'¿dónde queda la BCR?'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": (
+                        "Consulta a buscar, idealmente reformulada para maximizar el match "
+                        "con los documentos (sustantivos clave > frase coloquial)."
+                    ),
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "buscar_informativo",
+        "description": (
+            "Busca en el INFORMATIVO SEMANAL de la BCR — la publicación que sale "
+            "todos los viernes con artículos de análisis sobre mercados, commodities, "
+            "geopolítica del agro, comercio exterior, economía, política agropecuaria, "
+            "novedades del sector. Usá esta tool cuando la pregunta sea sobre un "
+            "tema económico/comercial/sectorial que probablemente fue analizado en "
+            "el informativo: 'qué es el acuerdo UE-Mercosur', 'cómo viene la "
+            "campaña de girasol', 'qué pasó con las exportaciones de soja en 2026', "
+            "etc. NO confundir con los comentarios diarios (precios del día) — para "
+            "esos usá buscar_comentario_diario."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Consulta a buscar en el informativo semanal.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "buscar_comentario_diario",
+        "description": (
+            "Busca en los COMENTARIOS DIARIOS del mercado de la BCR — reportes "
+            "que se publican cada día sobre lo que pasó en el mercado físico de "
+            "Rosario y en Chicago: precios de soja/maíz/trigo, movimientos del "
+            "tipo de cambio, ofertas y operatoria del día. Usá esta tool para "
+            "preguntas de coyuntura inmediata: 'qué pasó con la soja hoy', "
+            "'cómo cerró el mercado ayer', 'qué movimientos tuvo el trigo esta "
+            "semana'. Si la pregunta es de análisis o tendencia, usá "
+            "buscar_informativo en su lugar."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Consulta a buscar en los comentarios diarios.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
 ]
 
 
 # ---------------------------------------------------------------------------
-# Implementaciones.
+# Implementación: consultar_agenda (DB).
 # ---------------------------------------------------------------------------
 def _parse_iso_date(value: str | None, fallback: date) -> date:
     """Parsea una fecha YYYY-MM-DD del LLM. Si falla, devuelve el fallback —
@@ -96,7 +198,7 @@ def _activity_to_compact_dict(activity: agenda_models.Activity) -> dict[str, Any
 
 
 def consultar_agenda(
-    db: Session,
+    ctx: ToolContext,
     desde: str | None = None,
     hasta: str | None = None,
     filtro_titulo: str | None = None,
@@ -110,7 +212,7 @@ def consultar_agenda(
     if hasta_d < desde_d:
         desde_d, hasta_d = hasta_d, desde_d
 
-    query = db.query(agenda_models.Activity).filter(
+    query = ctx.db.query(agenda_models.Activity).filter(
         agenda_models.Activity.date >= desde_d.isoformat(),
         agenda_models.Activity.date <= hasta_d.isoformat(),
     )
@@ -139,22 +241,131 @@ def consultar_agenda(
 
 
 # ---------------------------------------------------------------------------
+# Implementación: file_search wrappers (RAG sobre vector stores OpenAI).
+#
+# Cada wrapper hace una llamada interna a la Responses API con file_search
+# apuntando a UN vector store dedicado. Devuelve el texto sintetizado que
+# el modelo principal incorpora en la respuesta final al usuario.
+#
+# Trade-off: 1 llamada extra a OpenAI por tool invocada. Con gpt-5-mini sale
+# muy barato; a cambio el modelo principal decide qué fuentes consultar en
+# vez de buscar a ciegas en todos los stores juntos.
+# ---------------------------------------------------------------------------
+_SEARCH_INSTRUCTIONS = (
+    "Sos un buscador de pasajes en documentos de la Bolsa de Comercio de Rosario. "
+    "Buscá los pasajes más relevantes para la consulta y devolvé un resumen breve "
+    "y fiel al contenido encontrado. Si los documentos no contienen información "
+    "útil sobre la consulta, decilo claramente con la frase 'No se encontró "
+    "información en los documentos'. Nunca inventes ni completes con conocimiento "
+    "general. Cuando el documento mencione una fecha o número de edición, "
+    "incluila para que el llamador pueda citar la fuente."
+)
+
+
+def _search_in_vector_store(
+    ctx: ToolContext,
+    vector_store_id: str | None,
+    consulta: str,
+    fuente_nombre: str,
+    hint: str,
+) -> dict[str, Any]:
+    """Wrapper de file_search sobre un único vector store.
+
+    Si el VS no está configurado (env var vacía), devuelve un error legible
+    en vez de romper. El agente principal lo incorpora a la respuesta tal
+    cual lo necesite — ej.: 'todavía no tenemos comentarios indexados'.
+    """
+    if not vector_store_id:
+        return {
+            "fuente": fuente_nombre,
+            "error": "vector_store_no_configurado",
+            "detalle": (
+                f"El vector store '{fuente_nombre}' no está configurado en este "
+                "entorno (falta env var). Avisale al usuario que esa fuente no "
+                "está disponible todavía y respondé con las fuentes que sí lo estén."
+            ),
+        }
+
+    response = ctx.openai_client.responses.create(
+        model=BOT_OPENAI_MODEL,
+        instructions=f"{_SEARCH_INSTRUCTIONS}\n\nContexto: {hint}",
+        input=consulta,
+        tools=[{"type": "file_search", "vector_store_ids": [vector_store_id]}],
+        max_output_tokens=900,
+    )
+
+    text = (response.output_text or "").strip()
+    return {
+        "fuente": fuente_nombre,
+        "consulta": consulta,
+        "resultado": text or "No se encontró información en los documentos.",
+    }
+
+
+def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    return _search_in_vector_store(
+        ctx,
+        vector_store_id=BOT_VS_INSTITUCIONAL,
+        consulta=consulta,
+        fuente_nombre="institucional",
+        hint=(
+            "Los documentos cubren áreas, autoridades, mercados (Físico de Granos, "
+            "A3, MAV, Rosgan), cámaras arbitrales, BCRlabs, BCRdigital, BCRinnova, "
+            "BCRcapacita, BCRcultura, Fundación BCR, Centro de Convenciones, Oficina "
+            "de Asociados, museo, biblioteca, contactos institucionales."
+        ),
+    )
+
+
+def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    return _search_in_vector_store(
+        ctx,
+        vector_store_id=BOT_VS_INFORMATIVO,
+        consulta=consulta,
+        fuente_nombre="informativo_semanal",
+        hint=(
+            "Los documentos son artículos del Informativo Semanal de la BCR "
+            "(publicación de los viernes). Cubren análisis de mercados, commodities, "
+            "geopolítica del agro, comercio exterior, economía, política agropecuaria. "
+            "Si encontrás fecha o número de edición, incluilo."
+        ),
+    )
+
+
+def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    return _search_in_vector_store(
+        ctx,
+        vector_store_id=BOT_VS_COMENTARIOS,
+        consulta=consulta,
+        fuente_nombre="comentario_diario",
+        hint=(
+            "Los documentos son comentarios diarios del Mercado Físico de Rosario y "
+            "Chicago, con precios, ofertas, operatoria del día y tipo de cambio. "
+            "Si el documento trae fecha, incluila en el resumen para que se pueda citar."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher.
 # ---------------------------------------------------------------------------
 _TOOL_REGISTRY = {
     "consultar_agenda": consultar_agenda,
+    "buscar_institucional": buscar_institucional,
+    "buscar_informativo": buscar_informativo,
+    "buscar_comentario_diario": buscar_comentario_diario,
 }
 
 
-def execute_tool(name: str, arguments: dict[str, Any], db: Session) -> dict[str, Any]:
+def execute_tool(name: str, arguments: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     """Llama la tool por nombre. Si no existe o tira excepción, devuelve un
     dict con 'error' que el LLM puede leer y comunicar al usuario sin romper."""
     func = _TOOL_REGISTRY.get(name)
     if func is None:
         return {"error": f"tool_desconocida: {name}"}
     try:
-        return func(db=db, **arguments)
+        return func(ctx=ctx, **arguments)
     except TypeError as exc:
         return {"error": f"argumentos_invalidos: {exc}"}
-    except Exception as exc:  # noqa: BLE001 — queremos capturar todo para no romper la conversación
+    except Exception as exc:  # noqa: BLE001 — capturamos todo para no romper la conversación
         return {"error": f"fallo_tool: {type(exc).__name__}: {exc}"}
