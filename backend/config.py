@@ -36,6 +36,37 @@ EXTERNAL_INTEGRATIONS_ENABLED = (
 
 
 # ---------------------------------------------------------------------------
+# Bot BCR — env vars del módulo backend/bot/.
+#
+# Todas opcionales: si faltan, los endpoints que las necesiten devuelven 503
+# (no rompen el arranque del server). El endpoint /api/bot/test del chunk 2.1
+# no necesita ninguna; van quedando reservadas para los próximos chunks.
+# ---------------------------------------------------------------------------
+
+# OpenAI: se reusa OPENAI_API_KEY que ya usa el módulo agenda. Sin valor por
+# defecto — si falta, el bot no puede llamar al LLM.
+BOT_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
+# IDs de los vector stores ya creados en la cuenta de OpenAI (los podés
+# copiar del panel de PipeDream o de la plataforma de OpenAI). Reservados
+# para los chunks 2.3 y 3.x.
+BOT_VS_INSTITUCIONAL = os.environ.get("BOT_VS_INSTITUCIONAL")
+BOT_VS_INFORMATIVO = os.environ.get("BOT_VS_INFORMATIVO")
+BOT_VS_COMENTARIOS = os.environ.get("BOT_VS_COMENTARIOS")
+
+# Twilio — reservado para el chunk 2.5 (webhook + envío de WhatsApp).
+# Importante: NUNCA hardcodear estas credenciales en código. Si las ves
+# en algún archivo del repo, rotalas en Twilio Console y movelas acá.
+BOT_TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
+BOT_TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+BOT_TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+
+# Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
+# usando en PipeDream). Se puede sobreescribir vía env var.
+BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")
+
+
+# ---------------------------------------------------------------------------
 # Cloudinary (CDN para imágenes del newsletter Conectados).
 # Sólo se activa si las tres env vars están presentes; si faltan, los uploads
 # del newsletter caen al storage local — útil para dev y como fallback.

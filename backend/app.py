@@ -26,6 +26,7 @@ import agenda_models  # noqa: F401
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
+from bot.router import router as bot_api
 from lluvias.router import router as lluvias_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
@@ -75,6 +76,7 @@ app.include_router(lluvias_api)
 app.include_router(social_api)
 app.include_router(agenda_api)
 app.include_router(semana_datos_api)
+app.include_router(bot_api)
 
 
 # ---------------------------------------------------------
