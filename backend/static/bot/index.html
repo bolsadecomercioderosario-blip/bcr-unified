@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot BCR — Test | __VERSION__</title>
+    <script src="/static/auth.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-elev: #273548;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #34d399;
+            --accent-dim: rgba(52, 211, 153, 0.12);
+            --user-bubble: #4f46e5;
+            --bot-bubble: #1e293b;
+            --error: #f87171;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .topbar a.back {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+        .topbar a.back:hover {
+            background: var(--bg-elev);
+            color: var(--text);
+        }
+        .topbar h1 {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .topbar .badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .intro {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem 1.25rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .intro strong { color: var(--text); }
+        .intro ul { margin: 0.5rem 0 0 1.25rem; }
+        .intro li { margin-bottom: 0.2rem; }
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            min-height: 200px;
+        }
+        .bubble {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .bubble.user {
+            background: var(--user-bubble);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.25rem;
+        }
+        .bubble.bot {
+            background: var(--bot-bubble);
+            border: 1px solid var(--border);
+            align-self: flex-start;
+            border-bottom-left-radius: 0.25rem;
+        }
+        .bubble.bot.loading {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .bubble.bot.error {
+            border-color: var(--error);
+            color: var(--error);
+        }
+        .debug {
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .debug .tag {
+            background: var(--bg-elev);
+            padding: 0.2rem 0.55rem;
+            border-radius: 0.4rem;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+        }
+        .input-row {
+            position: sticky;
+            bottom: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.85rem;
+            margin-top: auto;
+        }
+        textarea {
+            flex: 1;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 0.6rem;
+            padding: 0.65rem 0.85rem;
+            font-family: inherit;
+            font-size: 0.92rem;
+            resize: none;
+            outline: none;
+            min-height: 44px;
+            max-height: 160px;
+        }
+        textarea:focus { border-color: var(--primary-light); }
+        button.send {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 1.25rem;
+            border-radius: 0.6rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        button.send:hover:not(:disabled) { background: var(--primary-light); }
+        button.send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+        }
+        .example-chip {
+            font-size: 0.75rem;
+            background: var(--bg-elev);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .example-chip:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="/" class="back">← Hub</a>
+        <h1>Bot BCR</h1>
+        <span class="badge">TEST</span>
+    </div>
+
+    <div class="container">
+        <div class="intro">
+            <strong>Página de prueba del bot.</strong> Escribí una consulta y mirá cómo responde. Por debajo el bot va a usar las herramientas que correspondan:
+            <ul>
+                <li>📅 <strong>consultar_agenda</strong> — para preguntas con fecha</li>
+                <li>🏛 <strong>buscar_institucional</strong> — para áreas, autoridades, mercados, etc.</li>
+                <li>📰 <strong>buscar_informativo</strong> — para análisis del informativo semanal</li>
+                <li>📈 <strong>buscar_comentario_diario</strong> — para coyuntura del mercado</li>
+            </ul>
+        </div>
+
+        <div class="chat" id="chat"></div>
+
+        <div>
+            <div class="input-row">
+                <textarea id="msg" placeholder="Escribí tu consulta…" rows="1"></textarea>
+                <button class="send" id="send">Enviar</button>
+            </div>
+            <div class="examples" id="examples">
+                <span class="example-chip" data-q="¿Qué actividades hay esta semana?">¿Qué actividades hay esta semana?</span>
+                <span class="example-chip" data-q="¿Quién es el presidente de la BCR?">¿Quién es el presidente?</span>
+                <span class="example-chip" data-q="¿Qué es BCRlabs?">¿Qué es BCRlabs?</span>
+                <span class="example-chip" data-q="¿Cómo me asocio a la BCR?">¿Cómo me asocio?</span>
+                <span class="example-chip" data-q="¿Qué pasó con la soja hoy?">¿Qué pasó con la soja hoy?</span>
+                <span class="example-chip" data-q="¿Qué dice el último informativo sobre exportaciones?">Últimas exportaciones</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatEl = document.getElementById('chat');
+        const msgEl = document.getElementById('msg');
+        const sendBtn = document.getElementById('send');
+
+        function addBubble(text, who, debug) {
+            const b = document.createElement('div');
+            b.className = 'bubble ' + who;
+            b.textContent = text;
+            if (who === 'bot' && debug) {
+                const d = document.createElement('div');
+                d.className = 'debug';
+                const tools = (debug.tools_used || []);
+                if (tools.length) {
+                    tools.forEach(t => {
+                        const tag = document.createElement('span');
+                        tag.className = 'tag';
+                        tag.textContent = '🛠 ' + t;
+                        d.appendChild(tag);
+                    });
+                }
+                if (debug.iterations) {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = '⟲ ' + debug.iterations + ' iter';
+                    d.appendChild(tag);
+                }
+                b.appendChild(d);
+            }
+            chatEl.appendChild(b);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            return b;
+        }
+
+        async function send() {
+            const text = msgEl.value.trim();
+            if (!text) return;
+            msgEl.value = '';
+            msgEl.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            addBubble(text, 'user');
+            const loading = addBubble('Pensando…', 'bot');
+            loading.classList.add('loading');
+
+            try {
+                const res = await fetch('/api/bot/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text }),
+                });
+                const data = await res.json();
+                loading.remove();
+                if (!res.ok) {
+                    const b = addBubble(data.detail || ('Error HTTP ' + res.status), 'bot');
+                    b.classList.add('error');
+                } else {
+                    addBubble(data.reply || '(sin respuesta)', 'bot', {
+                        tools_used: data.tools_used,
+                        iterations: data.debug && data.debug.iterations,
+                    });
+                }
+            } catch (e) {
+                loading.remove();
+                const b = addBubble('Error de red: ' + (e.message || e), 'bot');
+                b.classList.add('error');
+            } finally {
+                sendBtn.disabled = false;
+                msgEl.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', send);
+        msgEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+            }
+        });
+        msgEl.addEventListener('input', () => {
+            msgEl.style.height = 'auto';
+            msgEl.style.height = Math.min(msgEl.scrollHeight, 160) + 'px';
+        });
+        document.getElementById('examples').addEventListener('click', (e) => {
+            if (e.target.classList.contains('example-chip')) {
+                msgEl.value = e.target.dataset.q;
+                send();
+            }
+        });
+    </script>
+</body>
+</html>
