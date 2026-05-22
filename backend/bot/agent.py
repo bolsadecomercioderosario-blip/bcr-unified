@@ -38,17 +38,31 @@ clara.
 Fecha actual: {today_iso} ({today_human}).
 
 Herramientas disponibles:
+
+A. AGENDA
 - consultar_agenda: actividades, eventos, encuentros, capacitaciones, visitas \
 en la agenda de la BCR. Para preguntas con fecha.
-- buscar_institucional: info sobre qué es la BCR, áreas (BCRlabs, BCRinnova, \
-BCRcapacita, BCRcultura, BCRdigital), autoridades, mercados (Físico de Granos, \
-A3, MAV, Rosgan), cámaras arbitrales, fundación, centro de convenciones, \
-oficina de asociados, museo, contactos institucionales.
-- buscar_informativo: análisis del Informativo Semanal (sale los viernes). \
-Para preguntas sobre temas económicos/sectoriales: acuerdos comerciales, \
-campañas agrícolas, exportaciones, política agropecuaria, geopolítica del agro.
+
+B. RAG (búsqueda en documentos)
+- buscar_institucional: qué es la BCR, áreas (BCRlabs, BCRinnova, BCRcapacita, \
+BCRcultura, BCRdigital), autoridades, mercados (Físico de Granos, A3, MAV, \
+Rosgan), cámaras arbitrales, fundación, centro de convenciones, oficina de \
+asociados, museo, contactos institucionales.
+- buscar_informativo: análisis del Informativo Semanal (viernes). Temas \
+económicos/sectoriales: acuerdos comerciales, campañas agrícolas, exportaciones, \
+política agropecuaria, geopolítica del agro.
 - buscar_comentario_diario: comentarios diarios del mercado (Rosario y Chicago). \
 Para preguntas de coyuntura: '¿qué pasó con la soja hoy?', 'cómo cerró el mercado'.
+- buscar_informe_gea: informes mensuales de Estimación Nacional de Producción de \
+GEA (Guía Estratégica para el Agro). Para preguntas sobre el porqué de los cambios \
+en estimaciones, condiciones climáticas, decisiones de siembra, ajustes de producción.
+
+C. DATA ESTRUCTURADA (números exactos)
+- get_precios_pizarra: precios de soja/trigo/maíz/otros del Mercado Físico de Rosario. \
+Para preguntas con respuesta numérica: 'cuánto está la soja', 'precio del trigo'.
+- get_estimaciones_gea: estimaciones de producción nacional (área, rinde, producción) \
+para soja/trigo/maíz, campaña vigente y anterior. Para preguntas de magnitud: \
+'cuánto se va a producir de soja', 'qué área tiene el trigo esta campaña'.
 
 Reglas de uso de las tools:
 1. Si la pregunta es sobre fechas/eventos/actividades → consultar_agenda. \
@@ -56,24 +70,25 @@ Calculá los rangos en base a la fecha actual: 'esta semana' = hoy → próximo 
 domingo; 'mañana' = hoy+1; 'este mes' = hoy → fin de mes; 'cuándo es X' = \
 rango amplio (60-90 días) con filtro_titulo.
 
-2. Si la pregunta NO especifica si es agenda, informativo o comentario: \
-elegí la tool por el tipo de información que necesita la respuesta. Si una \
-pregunta puede tener componentes de mercado actual + análisis (ej. 'qué pasa \
-con la soja'), podés llamar a buscar_comentario_diario Y buscar_informativo \
-en la misma iteración (el sistema te lo permite). NO llames a tools que no \
-hagan falta — cada llamada cuesta.
+2. Para preguntas que combinan número + contexto: llamá a la tool estructurada \
+PRIMERO (get_precios_pizarra o get_estimaciones_gea), y si necesitás "por qué", \
+llamá también a la narrativa correspondiente (buscar_comentario_diario o \
+buscar_informe_gea). Ejemplo: '¿cuánto está la soja y por qué bajó?' → \
+get_precios_pizarra + buscar_comentario_diario en paralelo.
 
-3. Si una tool devuelve 'No se encontró información', NO inventes — decílo \
-al usuario y, si hace sentido, sugerí reformular o consultar otra fuente \
-oficial (sitio web, contacto del área).
+3. NO llames a tools que no hagan falta — cada llamada cuesta. Si una sola \
+herramienta basta, usá esa.
 
-4. Si una tool devuelve un error 'vector_store_no_configurado', avisale al \
-usuario que esa fuente todavía no está disponible y respondé con lo que sí \
-puedas (otras tools que sí funcionen).
+4. Si una tool devuelve estado 'datos_no_disponibles_aun', avisale al usuario \
+que esa fuente todavía está en desarrollo y compartile el link oficial que \
+trae el campo 'detalle'.
 
-5. Cuando cites información del informativo o de comentarios diarios, incluí \
-la fecha o número de edición si la tool te lo devolvió, así el usuario sabe \
-de cuándo es el dato.
+5. Si una tool devuelve 'No se encontró información' o 'vector_store_no_configurado', \
+NO inventes — decílo claro al usuario y, si hace sentido, sugerí reformular o \
+consultar otra fuente oficial.
+
+6. Cuando cites información de informativos, comentarios o informes GEA, incluí \
+la fecha o autor si la tool te lo devolvió.
 
 Formato de respuesta (WhatsApp):
 - Oraciones cortas, lenguaje directo, español rioplatense.
@@ -113,22 +128,28 @@ class AgentResult:
     reply: str
     tools_used: list[str] = field(default_factory=list)
     iterations: int = 0
+    response_id: str | None = None
     debug: dict[str, Any] = field(default_factory=dict)
 
 
-def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
-    """Corre el agente sobre un único mensaje del usuario y devuelve la respuesta.
+def run_agent(
+    message: str,
+    from_phone: str | None,
+    db: Session,
+    previous_response_id: str | None = None,
+) -> AgentResult:
+    """Corre el agente sobre un mensaje del usuario y devuelve la respuesta.
 
-    Patrón de continuación: en la primera llamada mandamos el mensaje + las
-    instrucciones; en las siguientes pasamos previous_response_id y SÓLO los
-    function_call_output nuevos. Esto es lo que la Responses API exige para
-    modelos de razonamiento (gpt-5-mini, o1, o3, etc.): cada function_call
-    está asociada server-side a un item de 'reasoning' que el cliente no
-    debería reconstruir manualmente. Sin previous_response_id la API rompe
-    con 'function_call was provided without its required reasoning item'.
+    Si `previous_response_id` viene seteado, encadena con ese turno previo
+    para mantener memoria conversacional. Si no, arranca de cero con las
+    instrucciones del sistema. El llamador puede leer `result.response_id`
+    y pasarlo en el próximo turno.
 
-    Sin historial conversacional cross-mensaje todavía (el bot es stateless
-    entre mensajes — eso se suma con Twilio en 2.5 + persistencia en DB).
+    Patrón de continuación: en la primera llamada del turno mandamos el
+    mensaje + las instrucciones; en las siguientes (loop de tool-calling)
+    pasamos previous_response_id y SÓLO los function_call_output nuevos.
+    Esto es lo que la Responses API exige para modelos de razonamiento
+    (gpt-5-mini, o1, o3, etc.).
     """
     if not BOT_OPENAI_API_KEY:
         return AgentResult(
@@ -141,14 +162,17 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
 
     client = OpenAI(api_key=BOT_OPENAI_API_KEY)
     ctx = tools.ToolContext(db=db, openai_client=client)
-    instructions = _build_system_instructions(date.today())
 
     tools_used: list[str] = []
     tool_args_log: list[dict[str, Any]] = []
-    previous_response_id: str | None = None
 
-    # Primera iteración: mandamos el mensaje del usuario. Siguientes: sólo
-    # los outputs de las tools, encadenados via previous_response_id.
+    # current_response_id arranca con lo que nos pasó el caller (memoria del
+    # turno anterior) o None si es el primer mensaje de la conversación.
+    current_response_id: str | None = previous_response_id
+
+    # Primera iteración: mandamos el mensaje del usuario. Si hay memoria
+    # previa, encadenamos vía previous_response_id; si no, mandamos las
+    # instrucciones del sistema.
     next_input: list[dict[str, Any]] = [{"role": "user", "content": message}]
 
     for iteration in range(_MAX_TOOL_ITERATIONS):
@@ -157,13 +181,14 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
             "input": next_input,
             "tools": tools.TOOL_DEFINITIONS,
         }
-        if previous_response_id is None:
-            create_kwargs["instructions"] = instructions
+        if current_response_id is None:
+            # Primer turno de la conversación — pasamos las instrucciones.
+            create_kwargs["instructions"] = _build_system_instructions(date.today())
         else:
-            create_kwargs["previous_response_id"] = previous_response_id
+            create_kwargs["previous_response_id"] = current_response_id
 
         response = client.responses.create(**create_kwargs)
-        previous_response_id = response.id
+        current_response_id = response.id
 
         function_calls = [item for item in response.output if item.type == "function_call"]
 
@@ -174,6 +199,7 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
                 or "No supe cómo responder a eso. ¿Podés reformular?",
                 tools_used=tools_used,
                 iterations=iteration + 1,
+                response_id=response.id,
                 debug={"tool_args": tool_args_log, "response_id": response.id},
             )
 
@@ -207,5 +233,6 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
         ),
         tools_used=tools_used,
         iterations=_MAX_TOOL_ITERATIONS,
+        response_id=current_response_id,
         debug={"tool_args": tool_args_log, "exhausted_iterations": True},
     )

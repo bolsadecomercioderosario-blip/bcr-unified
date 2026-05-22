@@ -42,10 +42,12 @@ def bot_test(
             message=payload.message,
             from_phone=payload.from_phone,
             db=db,
+            previous_response_id=payload.previous_response_id,
         )
         return models.BotTestResponse(
             reply=result.reply,
             tools_used=result.tools_used,
+            response_id=result.response_id,
             debug={
                 "iterations": result.iterations,
                 **result.debug,
@@ -57,6 +59,7 @@ def bot_test(
         return models.BotTestResponse(
             reply=f"Se cayó el bot procesando tu mensaje. Detalle: {type(exc).__name__}: {exc}",
             tools_used=[],
+            response_id=None,
             debug={
                 "error": str(exc),
                 "error_type": type(exc).__name__,

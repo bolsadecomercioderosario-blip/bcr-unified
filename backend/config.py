@@ -53,6 +53,7 @@ BOT_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 BOT_VS_INSTITUCIONAL = os.environ.get("BOT_VS_INSTITUCIONAL")
 BOT_VS_INFORMATIVO = os.environ.get("BOT_VS_INFORMATIVO")
 BOT_VS_COMENTARIOS = os.environ.get("BOT_VS_COMENTARIOS")
+BOT_VS_GEA = os.environ.get("BOT_VS_GEA")
 
 # Twilio — reservado para el chunk 2.5 (webhook + envío de WhatsApp).
 # Importante: NUNCA hardcodear estas credenciales en código. Si las ves
