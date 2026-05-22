@@ -280,7 +280,14 @@ def consultar_agenda(
     filtro_titulo: str | None = None,
 ) -> dict[str, Any]:
     """Devuelve actividades de la BCR en el rango. Compara fechas como strings
-    porque están almacenadas en YYYY-MM-DD (orden lexicográfico === cronológico)."""
+    porque están almacenadas en YYYY-MM-DD (orden lexicográfico === cronológico).
+
+    Sólo expone al bot las actividades con el canal 'Bot' tildado en la
+    agenda (channels contiene "Bot"). El filtrado se hace en Python para
+    ser DB-agnóstico (JSON contains varía entre Postgres y SQLite); con el
+    tamaño de la agenda (decenas a cientos de filas) no hay riesgo de
+    performance.
+    """
     today = date.today()
     desde_d = _parse_iso_date(desde, today)
     hasta_d = _parse_iso_date(hasta, desde_d + timedelta(days=7))
@@ -302,17 +309,21 @@ def consultar_agenda(
             )
         )
 
-    activities = query.order_by(
+    all_in_range = query.order_by(
         agenda_models.Activity.date.asc(),
         agenda_models.Activity.time.asc(),
         agenda_models.Activity.order_index.asc(),
     ).all()
 
+    # Solo actividades marcadas para el Bot.
+    visible = [a for a in all_in_range if "Bot" in (a.channels or [])]
+
     return {
         "rango_consultado": {"desde": desde_d.isoformat(), "hasta": hasta_d.isoformat()},
         "filtro_titulo": filtro_titulo or None,
-        "total_encontradas": len(activities),
-        "actividades": [_activity_to_compact_dict(a) for a in activities],
+        "total_encontradas": len(visible),
+        "total_en_rango_sin_filtro_bot": len(all_in_range),
+        "actividades": [_activity_to_compact_dict(a) for a in visible],
     }
 
 
