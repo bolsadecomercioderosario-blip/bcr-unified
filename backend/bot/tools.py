@@ -456,22 +456,70 @@ def get_precios_pizarra(
     producto: str | None = None,
     fecha: str | None = None,
 ) -> dict[str, Any]:
-    """Placeholder hasta que el scraper de chunk 3.1 llene la tabla precios_pizarra.
+    """Lee la tabla precios_pizarra que mantiene el scraper diario (chunk 3.1).
 
-    Cuando esté el scraper, esta función va a hacer un SELECT sobre la tabla
-    y devolver un dict con {fecha, producto, precio_ars_tn}. Mientras tanto
-    devuelve 'datos_no_disponibles_aun' para que el agente avise honestamente.
+    - Sin filtros → devuelve los precios de la última fecha disponible para
+      todos los productos.
+    - Con `producto` → filtra por ese (case/acento-insensitive).
+    - Con `fecha` → trae esa fecha en particular (YYYY-MM-DD).
+
+    Si la tabla está vacía (scraper nunca corrió), devuelve estado especial
+    para que el agente pueda avisar al usuario sin alucinar números.
     """
+    # Import local para evitar ciclo bot.tools ↔ bot.db_models al cargar el
+    # módulo desde el scraper.
+    from bot.db_models import PrecioPizarra
+
+    query = ctx.db.query(PrecioPizarra)
+
+    if producto:
+        producto_norm = (
+            "".join(
+                ch for ch in __import__("unicodedata").normalize("NFKD", producto.strip().lower())
+                if not __import__("unicodedata").combining(ch)
+            )
+        )
+        if producto_norm != "todos":
+            query = query.filter(PrecioPizarra.producto == producto_norm)
+
+    if fecha:
+        query = query.filter(PrecioPizarra.fecha == fecha)
+    else:
+        # Sin fecha explícita: traemos la fecha más reciente disponible.
+        latest_subq = ctx.db.query(PrecioPizarra.fecha).order_by(
+            PrecioPizarra.fecha.desc()
+        ).limit(1).scalar_subquery()
+        query = query.filter(PrecioPizarra.fecha == latest_subq)
+
+    rows = query.order_by(PrecioPizarra.producto.asc()).all()
+
+    if not rows:
+        return {
+            "fuente": "precios_pizarra",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay precios cargados en la base. El scraper diario "
+                "corre a las 10:30 ART; si todavía no corrió, sugerile al usuario "
+                "que mire https://www.bcr.com.ar/es/mercados/mercado-de-granos/"
+                "cotizaciones/cotizaciones-locales-0 directamente."
+            ),
+            "consulta": {"producto": producto, "fecha": fecha},
+        }
+
     return {
         "fuente": "precios_pizarra",
-        "estado": "datos_no_disponibles_aun",
-        "detalle": (
-            "Los precios pizarra todavía no están integrados al bot — el scraper "
-            "que va a poblarlos diariamente está en desarrollo. Decile al usuario "
-            "que la consulte temporalmente en https://www.bcr.com.ar/es/mercados/"
-            "mercado-de-granos/cotizaciones/cotizaciones-locales-0."
-        ),
-        "consulta": {"producto": producto, "fecha": fecha},
+        "estado": "ok",
+        "moneda": "ARS",
+        "unidad": "pesos por tonelada",
+        "filas": [
+            {
+                "producto": r.producto,
+                "fecha": r.fecha,
+                "precio_ars_tn": r.precio_ars_tn,
+                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+            }
+            for r in rows
+        ],
     }
 
 

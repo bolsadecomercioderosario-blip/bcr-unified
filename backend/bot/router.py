@@ -230,6 +230,18 @@ def list_recent_exchanges(
     }
 
 
+@router.post(
+    "/admin/scrape-pizarra",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_pizarra(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Dispara manualmente el scraper de precios pizarra. Útil para debug y
+    para llenar la tabla la primera vez sin esperar el cron de las 10:30."""
+    from bot.scraper_pizarra import scrape_precios_pizarra
+
+    return scrape_precios_pizarra(db)
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],

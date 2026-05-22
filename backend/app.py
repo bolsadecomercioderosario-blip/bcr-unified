@@ -81,6 +81,15 @@ app.include_router(bot_api)
 
 
 # ---------------------------------------------------------
+# Scheduler in-process del bot (cron jobs de scrapers BCR).
+# Asume un único worker — ver bot/scheduler.py si escalamos.
+# ---------------------------------------------------------
+from bot.scheduler import start as start_bot_scheduler  # noqa: E402
+
+start_bot_scheduler()
+
+
+# ---------------------------------------------------------
 # Archivos estáticos generados por la app (uploads, mapas, videos).
 # Cachean libremente — los nombres incluyen UUIDs/timestamps, son inmutables.
 # ---------------------------------------------------------

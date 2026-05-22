@@ -7,6 +7,10 @@ Modelos SQLAlchemy del bot BCR.
   response_id de OpenAI por número de WhatsApp para encadenar turnos con
   previous_response_id. Con TTL: si pasaron más de SESSION_TTL_SECONDS sin
   mensajes, la conversación arranca de cero.
+- PrecioPizarra: cotizaciones diarias del Mercado Físico de Rosario. Se
+  pueblan vía scraper (chunk 3.1) y se consultan vía la tool
+  get_precios_pizarra del bot. (producto, fecha) es único — los reruns del
+  scraper sobreescriben en lugar de duplicar.
 
 Las tablas se crean automáticamente al arrancar la app (Base.metadata.create_all
 en app.py), siempre y cuando este módulo se importe ANTES — el import del
@@ -14,7 +18,17 @@ side-effect del registro de modelos ya está agregado en app.py.
 """
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from database import Base
 
@@ -59,3 +73,22 @@ class BotSession(Base):
     from_phone = Column(String, primary_key=True)
     last_response_id = Column(String, nullable=True)
     last_message_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PrecioPizarra(Base):
+    """Cotización del Mercado Físico de Rosario para un (producto, fecha).
+
+    El scraper corre diariamente y hace upsert sobre (producto, fecha). Si
+    el sitio actualiza un precio retroactivamente, la fila se actualiza —
+    no se duplica."""
+    __tablename__ = "precios_pizarra"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    producto = Column(String, nullable=False, index=True)  # 'soja', 'trigo', 'maiz', 'girasol', ...
+    fecha = Column(String, nullable=False, index=True)  # YYYY-MM-DD
+    precio_ars_tn = Column(Float, nullable=False)
+    scraped_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("producto", "fecha", name="uix_precio_producto_fecha"),
+    )
