@@ -29,6 +29,7 @@ import agenda_models
 from config import (
     BOT_OPENAI_MODEL,
     BOT_VS_COMENTARIOS,
+    BOT_VS_GEA,
     BOT_VS_INFORMATIVO,
     BOT_VS_INSTITUCIONAL,
 )
@@ -162,6 +163,85 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "consulta": {
                     "type": "string",
                     "description": "Consulta a buscar en los comentarios diarios.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_precios_pizarra",
+        "description": (
+            "Devuelve los precios pizarra del Mercado Físico de Rosario para "
+            "soja, trigo, maíz y otros granos, con la(s) fecha(s) de los últimos "
+            "días disponibles. Es DATA ESTRUCTURADA (números exactos), distinto "
+            "de los comentarios narrativos. Usá esta tool cuando la pregunta "
+            "pida un valor numérico concreto: 'cuánto está la soja hoy', "
+            "'precio del trigo', 'cotización del maíz ayer'. Para análisis o "
+            "contexto, usá buscar_comentario_diario."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "producto": {
+                    "type": "string",
+                    "description": (
+                        "Producto a consultar: 'soja', 'trigo', 'maiz', 'girasol' "
+                        "o 'todos' para traer todos los disponibles."
+                    ),
+                },
+                "fecha": {
+                    "type": "string",
+                    "description": (
+                        "Fecha específica YYYY-MM-DD. Si se omite, devuelve la "
+                        "última fecha disponible."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_estimaciones_gea",
+        "description": (
+            "Devuelve las estimaciones de producción nacional de GEA (Guía "
+            "Estratégica para el Agro de la BCR) para soja, trigo y maíz: área "
+            "sembrada, rinde y producción de la campaña vigente y la anterior. "
+            "Es DATA ESTRUCTURADA. Usá esta tool cuando la pregunta sea sobre "
+            "cuánto se va a producir, área sembrada, rindes proyectados a nivel "
+            "nacional. Para análisis o detalle del informe, usá buscar_informe_gea."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "cultivo": {
+                    "type": "string",
+                    "description": (
+                        "Cultivo a consultar: 'soja', 'trigo', 'maiz' o 'todos'."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "name": "buscar_informe_gea",
+        "description": (
+            "Busca en los INFORMES DE ESTIMACIÓN NACIONAL DE PRODUCCIÓN de GEA. "
+            "Son reportes mensuales firmados (ej. por Cristián Russo) con análisis "
+            "técnico de campañas agrícolas: condiciones climáticas, reservas de "
+            "agua, decisiones de siembra, ajustes de producción, etc. Usá esta "
+            "tool para preguntas sobre el porqué de los cambios en estimaciones "
+            "('por qué cae la siembra de trigo', 'cómo afectaron las lluvias a "
+            "la soja'), o cuando la pregunta pida narrativa/explicación. Para "
+            "los números puros usá get_estimaciones_gea."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Consulta a buscar en los informes GEA.",
                 },
             },
             "required": ["consulta"],
@@ -346,6 +426,124 @@ def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     )
 
 
+def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    return _search_in_vector_store(
+        ctx,
+        vector_store_id=BOT_VS_GEA,
+        consulta=consulta,
+        fuente_nombre="informe_gea",
+        hint=(
+            "Los documentos son informes mensuales de Estimación Nacional de "
+            "Producción de la Guía Estratégica para el Agro (GEA) de la BCR. "
+            "Cubren campañas de soja, trigo, maíz, girasol y otros, con análisis "
+            "de área sembrada, rinde, producción, clima, reservas de agua, decisiones "
+            "de siembra. Si el documento trae fecha del informe o autor (ej. "
+            "Cristián Russo), incluilos en el resumen."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Implementación: data estructurada (placeholders hasta que existan scrapers).
+#
+# get_precios_pizarra y get_estimaciones_gea van a leer tablas que todavía no
+# creamos — los scrapers de chunks 3.1 y 3.5 las van a poblar. Por ahora
+# devuelven un dict "datos_no_disponibles_aun" para que el agente pueda
+# avisar al usuario sin romper.
+# ---------------------------------------------------------------------------
+def get_precios_pizarra(
+    ctx: ToolContext,
+    producto: str | None = None,
+    fecha: str | None = None,
+) -> dict[str, Any]:
+    """Lee la tabla precios_pizarra que mantiene el scraper diario (chunk 3.1).
+
+    - Sin filtros → devuelve los precios de la última fecha disponible para
+      todos los productos.
+    - Con `producto` → filtra por ese (case/acento-insensitive).
+    - Con `fecha` → trae esa fecha en particular (YYYY-MM-DD).
+
+    Si la tabla está vacía (scraper nunca corrió), devuelve estado especial
+    para que el agente pueda avisar al usuario sin alucinar números.
+    """
+    # Import local para evitar ciclo bot.tools ↔ bot.db_models al cargar el
+    # módulo desde el scraper.
+    from bot.db_models import PrecioPizarra
+
+    query = ctx.db.query(PrecioPizarra)
+
+    if producto:
+        producto_norm = (
+            "".join(
+                ch for ch in __import__("unicodedata").normalize("NFKD", producto.strip().lower())
+                if not __import__("unicodedata").combining(ch)
+            )
+        )
+        if producto_norm != "todos":
+            query = query.filter(PrecioPizarra.producto == producto_norm)
+
+    if fecha:
+        query = query.filter(PrecioPizarra.fecha == fecha)
+    else:
+        # Sin fecha explícita: traemos la fecha más reciente disponible.
+        latest_subq = ctx.db.query(PrecioPizarra.fecha).order_by(
+            PrecioPizarra.fecha.desc()
+        ).limit(1).scalar_subquery()
+        query = query.filter(PrecioPizarra.fecha == latest_subq)
+
+    rows = query.order_by(PrecioPizarra.producto.asc()).all()
+
+    if not rows:
+        return {
+            "fuente": "precios_pizarra",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay precios cargados en la base. El scraper diario "
+                "corre a las 10:30 ART; si todavía no corrió, sugerile al usuario "
+                "que mire https://www.bcr.com.ar/es/mercados/mercado-de-granos/"
+                "cotizaciones/cotizaciones-locales-0 directamente."
+            ),
+            "consulta": {"producto": producto, "fecha": fecha},
+        }
+
+    return {
+        "fuente": "precios_pizarra",
+        "estado": "ok",
+        "moneda": "ARS",
+        "unidad": "pesos por tonelada",
+        "filas": [
+            {
+                "producto": r.producto,
+                "fecha": r.fecha,
+                "precio_ars_tn": r.precio_ars_tn,
+                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+def get_estimaciones_gea(
+    ctx: ToolContext,
+    cultivo: str | None = None,
+) -> dict[str, Any]:
+    """Placeholder hasta que el scraper de chunk 3.5 llene la tabla gea_estimaciones.
+
+    Va a devolver {cultivo, campaña, area_sembrada_mha, rinde_qq_ha, produccion_mtn}
+    cuando esté el scraper. Por ahora avisa honestamente.
+    """
+    return {
+        "fuente": "estimaciones_gea",
+        "estado": "datos_no_disponibles_aun",
+        "detalle": (
+            "Las estimaciones de producción de GEA todavía no están integradas al "
+            "bot — el scraper mensual está en desarrollo. Decile al usuario que "
+            "consulte temporalmente en https://www.bcr.com.ar/es/mercados/gea."
+        ),
+        "consulta": {"cultivo": cultivo},
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher.
 # ---------------------------------------------------------------------------
@@ -354,6 +552,9 @@ _TOOL_REGISTRY = {
     "buscar_institucional": buscar_institucional,
     "buscar_informativo": buscar_informativo,
     "buscar_comentario_diario": buscar_comentario_diario,
+    "buscar_informe_gea": buscar_informe_gea,
+    "get_precios_pizarra": get_precios_pizarra,
+    "get_estimaciones_gea": get_estimaciones_gea,
 }
 
 

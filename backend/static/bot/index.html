@@ -187,6 +187,36 @@
         }
         button.send:hover:not(:disabled) { background: var(--primary-light); }
         button.send:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.reset {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button.reset:hover { background: var(--bg-elev); color: var(--text); }
+        .conv-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+            padding: 0 0.25rem;
+        }
+        .conv-status .dot {
+            display: inline-block;
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background: var(--text-muted);
+            margin-right: 0.4rem;
+            vertical-align: middle;
+        }
+        .conv-status.active .dot { background: var(--accent); }
         .examples {
             display: flex;
             flex-wrap: wrap;
@@ -231,6 +261,10 @@
         <div class="chat" id="chat"></div>
 
         <div>
+            <div class="conv-status" id="conv-status">
+                <span><span class="dot"></span><span id="conv-label">Conversación nueva</span></span>
+                <button class="reset" id="reset" style="display:none">Reiniciar conversación</button>
+            </div>
             <div class="input-row">
                 <textarea id="msg" placeholder="Escribí tu consulta…" rows="1"></textarea>
                 <button class="send" id="send">Enviar</button>
@@ -250,6 +284,34 @@
         const chatEl = document.getElementById('chat');
         const msgEl = document.getElementById('msg');
         const sendBtn = document.getElementById('send');
+        const resetBtn = document.getElementById('reset');
+        const convStatus = document.getElementById('conv-status');
+        const convLabel = document.getElementById('conv-label');
+
+        // Memoria conversacional: guardamos el último response_id que devolvió
+        // el bot y lo mandamos como previous_response_id en el siguiente turno.
+        // Así OpenAI mantiene el contexto server-side y no tenemos que
+        // reconstruir la conversación de cero.
+        let lastResponseId = null;
+
+        function updateConvStatus() {
+            if (lastResponseId) {
+                convStatus.classList.add('active');
+                convLabel.textContent = 'Conversación activa — el bot recuerda lo anterior';
+                resetBtn.style.display = '';
+            } else {
+                convStatus.classList.remove('active');
+                convLabel.textContent = 'Conversación nueva';
+                resetBtn.style.display = 'none';
+            }
+        }
+
+        function resetConversation() {
+            lastResponseId = null;
+            chatEl.innerHTML = '';
+            updateConvStatus();
+            msgEl.focus();
+        }
 
         function addBubble(text, who, debug) {
             const b = document.createElement('div');
@@ -295,7 +357,10 @@
                 const res = await fetch('/api/bot/test', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text }),
+                    body: JSON.stringify({
+                        message: text,
+                        previous_response_id: lastResponseId,
+                    }),
                 });
                 // Leemos como texto primero — si el server devuelve un 500
                 // con body plain ("Internal Server Error"), res.json() rompe.
@@ -315,6 +380,10 @@
                         tools_used: data.tools_used,
                         iterations: data.debug && data.debug.iterations,
                     });
+                    if (data.response_id) {
+                        lastResponseId = data.response_id;
+                        updateConvStatus();
+                    }
                 }
             } catch (e) {
                 loading.remove();
@@ -327,6 +396,7 @@
         }
 
         sendBtn.addEventListener('click', send);
+        resetBtn.addEventListener('click', resetConversation);
         msgEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

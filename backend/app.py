@@ -20,9 +20,10 @@ from config import STATIC_DIR, NoCacheStaticFiles, get_module_html
 from database import Base, engine
 from migrate import migrate
 
-# Importamos agenda_models para que SQLAlchemy registre las tablas antes de
-# create_all (registra Activity + Efemeride como side effect del import).
+# Importamos los módulos de modelos para que SQLAlchemy registre las tablas
+# antes de create_all (side effect del import).
 import agenda_models  # noqa: F401
+import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -77,6 +78,15 @@ app.include_router(social_api)
 app.include_router(agenda_api)
 app.include_router(semana_datos_api)
 app.include_router(bot_api)
+
+
+# ---------------------------------------------------------
+# Scheduler in-process del bot (cron jobs de scrapers BCR).
+# Asume un único worker — ver bot/scheduler.py si escalamos.
+# ---------------------------------------------------------
+from bot.scheduler import start as start_bot_scheduler  # noqa: E402
+
+start_bot_scheduler()
 
 
 # ---------------------------------------------------------
