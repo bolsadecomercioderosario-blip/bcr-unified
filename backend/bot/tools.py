@@ -26,13 +26,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
-from config import (
-    BOT_OPENAI_MODEL,
-    BOT_VS_COMENTARIOS,
-    BOT_VS_GEA,
-    BOT_VS_INFORMATIVO,
-    BOT_VS_INSTITUCIONAL,
-)
+from config import BOT_OPENAI_MODEL
+
+from bot.openai_vector_stores import get_vector_store_id
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +280,14 @@ def consultar_agenda(
     filtro_titulo: str | None = None,
 ) -> dict[str, Any]:
     """Devuelve actividades de la BCR en el rango. Compara fechas como strings
-    porque están almacenadas en YYYY-MM-DD (orden lexicográfico === cronológico)."""
+    porque están almacenadas en YYYY-MM-DD (orden lexicográfico === cronológico).
+
+    Sólo expone al bot las actividades con el canal 'Bot' tildado en la
+    agenda (channels contiene "Bot"). El filtrado se hace en Python para
+    ser DB-agnóstico (JSON contains varía entre Postgres y SQLite); con el
+    tamaño de la agenda (decenas a cientos de filas) no hay riesgo de
+    performance.
+    """
     today = date.today()
     desde_d = _parse_iso_date(desde, today)
     hasta_d = _parse_iso_date(hasta, desde_d + timedelta(days=7))
@@ -306,17 +309,21 @@ def consultar_agenda(
             )
         )
 
-    activities = query.order_by(
+    all_in_range = query.order_by(
         agenda_models.Activity.date.asc(),
         agenda_models.Activity.time.asc(),
         agenda_models.Activity.order_index.asc(),
     ).all()
 
+    # Solo actividades marcadas para el Bot.
+    visible = [a for a in all_in_range if "Bot" in (a.channels or [])]
+
     return {
         "rango_consultado": {"desde": desde_d.isoformat(), "hasta": hasta_d.isoformat()},
         "filtro_titulo": filtro_titulo or None,
-        "total_encontradas": len(activities),
-        "actividades": [_activity_to_compact_dict(a) for a in activities],
+        "total_encontradas": len(visible),
+        "total_en_rango_sin_filtro_bot": len(all_in_range),
+        "actividades": [_activity_to_compact_dict(a) for a in visible],
     }
 
 
@@ -385,7 +392,7 @@ def _search_in_vector_store(
 def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_INSTITUCIONAL,
+        vector_store_id=get_vector_store_id(ctx.db, "institucional"),
         consulta=consulta,
         fuente_nombre="institucional",
         hint=(
@@ -400,7 +407,7 @@ def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_INFORMATIVO,
+        vector_store_id=get_vector_store_id(ctx.db, "informativo"),
         consulta=consulta,
         fuente_nombre="informativo_semanal",
         hint=(
@@ -415,7 +422,7 @@ def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_COMENTARIOS,
+        vector_store_id=get_vector_store_id(ctx.db, "comentarios"),
         consulta=consulta,
         fuente_nombre="comentario_diario",
         hint=(
@@ -429,7 +436,7 @@ def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_GEA,
+        vector_store_id=get_vector_store_id(ctx.db, "gea"),
         consulta=consulta,
         fuente_nombre="informe_gea",
         hint=(
@@ -527,20 +534,64 @@ def get_estimaciones_gea(
     ctx: ToolContext,
     cultivo: str | None = None,
 ) -> dict[str, Any]:
-    """Placeholder hasta que el scraper de chunk 3.5 llene la tabla gea_estimaciones.
+    """Lee la tabla estimaciones_gea que mantiene el scraper de GEA (chunk 3.5).
 
-    Va a devolver {cultivo, campaña, area_sembrada_mha, rinde_qq_ha, produccion_mtn}
-    cuando esté el scraper. Por ahora avisa honestamente.
+    - Sin filtros → trae todas las filas (todas las campañas para todos los cultivos)
+    - Con `cultivo` ('soja', 'trigo', 'maiz', 'girasol') → filtra por ese.
+      Acepta también acentos ('maíz' se normaliza a 'maiz').
+
+    Si la tabla está vacía, devuelve estado especial para que el agente
+    pueda avisar al usuario sin alucinar números.
     """
+    from bot.db_models import EstimacionGea
+
+    query = ctx.db.query(EstimacionGea)
+    if cultivo:
+        cultivo_norm = (
+            "".join(
+                ch for ch in __import__("unicodedata").normalize("NFKD", cultivo.strip().lower())
+                if not __import__("unicodedata").combining(ch)
+            )
+        )
+        if cultivo_norm != "todos":
+            query = query.filter(EstimacionGea.cultivo == cultivo_norm)
+
+    rows = query.order_by(
+        EstimacionGea.cultivo.asc(),
+        EstimacionGea.campania.desc(),
+    ).all()
+
+    if not rows:
+        return {
+            "fuente": "estimaciones_gea",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay estimaciones de GEA cargadas en la base. El scraper "
+                "semanal va a llenar la tabla automáticamente. Mientras tanto, "
+                "sugerile al usuario que mire https://www.bcr.com.ar/es/mercados/gea."
+            ),
+            "consulta": {"cultivo": cultivo},
+        }
+
     return {
         "fuente": "estimaciones_gea",
-        "estado": "datos_no_disponibles_aun",
-        "detalle": (
-            "Las estimaciones de producción de GEA todavía no están integradas al "
-            "bot — el scraper mensual está en desarrollo. Decile al usuario que "
-            "consulte temporalmente en https://www.bcr.com.ar/es/mercados/gea."
-        ),
-        "consulta": {"cultivo": cultivo},
+        "estado": "ok",
+        "unidades": {
+            "area_sembrada": "millones de hectáreas",
+            "rinde": "quintales por hectárea",
+            "produccion": "millones de toneladas",
+        },
+        "filas": [
+            {
+                "cultivo": r.cultivo,
+                "campania": r.campania,
+                "area_sembrada_mha": r.area_sembrada_mha,
+                "rinde_qq_ha": r.rinde_qq_ha,
+                "produccion_mtn": r.produccion_mtn,
+                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+            }
+            for r in rows
+        ],
     }
 
 

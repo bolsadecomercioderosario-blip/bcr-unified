@@ -242,20 +242,99 @@ def trigger_scrape_pizarra(db: Session = Depends(get_db)) -> dict[str, Any]:
     return scrape_precios_pizarra(db)
 
 
+@router.post(
+    "/admin/scrape-comentarios",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_comentarios(
+    source: str = "local",
+    max_pages: int = 1,
+    max_upload: int = 25,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de comentarios diarios. Útil para
+    backfill inicial (subí max_pages a 5-10 para traer más historia)."""
+    from bot.scraper_comentarios import scrape_comentarios
+
+    return scrape_comentarios(db, source=source, max_pages=max_pages, max_upload_per_run=max_upload)
+
+
+@router.post(
+    "/admin/scrape-informativo",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_informativo(
+    max_uploads: int = 20,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de la edición vigente del informativo
+    semanal. Útil para llenar la primera vez sin esperar al viernes."""
+    from bot.scraper_informativo import scrape_current_edition
+
+    return scrape_current_edition(db, max_uploads=max_uploads)
+
+
+@router.post(
+    "/admin/backfill-informativo",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_backfill_informativo(
+    max_editions: int = 8,
+    max_articles_total: int = 40,
+    start_page: int = 0,
+    pages_to_walk: int = 3,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """One-shot para traer ediciones pasadas del informativo semanal.
+    Llamalo varias veces variando start_page (0, 3, 6, ...) para ir más
+    atrás en el tiempo sin que un solo POST tarde una eternidad."""
+    from bot.scraper_informativo import backfill_past_editions
+
+    return backfill_past_editions(
+        db,
+        max_editions=max_editions,
+        max_articles_total=max_articles_total,
+        start_page=start_page,
+        pages_to_walk=pages_to_walk,
+    )
+
+
+@router.post(
+    "/admin/scrape-gea-panel",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_panel(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Dispara manualmente el scraper del panel GEA. Útil para llenar la
+    tabla la primera vez sin esperar el cron diario."""
+    from bot.scraper_gea import scrape_gea_panel
+
+    return scrape_gea_panel(db)
+
+
+@router.post(
+    "/admin/scrape-gea-informes",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_informes(
+    max_pages: int = 1,
+    max_upload: int = 12,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de informes mensuales GEA. Para
+    backfill, subí max_pages (cada página tiene ~10 informes)."""
+    from bot.scraper_gea import scrape_gea_informes
+
+    return scrape_gea_informes(db, max_pages=max_pages, max_upload_per_run=max_upload)
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],
 )
 def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Diagnóstico rápido — qué hay configurado y qué no."""
-    from config import (
-        BOT_OPENAI_API_KEY,
-        BOT_OPENAI_MODEL,
-        BOT_VS_COMENTARIOS,
-        BOT_VS_GEA,
-        BOT_VS_INFORMATIVO,
-        BOT_VS_INSTITUCIONAL,
-    )
+    from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
+    from bot.openai_vector_stores import get_vector_store_id
 
     yesterday = datetime.utcnow() - timedelta(hours=24)
     recent_count = db.query(db_models.BotExchange).filter(
@@ -271,10 +350,10 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         "openai_model": BOT_OPENAI_MODEL,
         "twilio_configured": twilio_client.is_configured(),
         "vector_stores": {
-            "institucional": bool(BOT_VS_INSTITUCIONAL),
-            "informativo": bool(BOT_VS_INFORMATIVO),
-            "comentarios": bool(BOT_VS_COMENTARIOS),
-            "gea": bool(BOT_VS_GEA),
+            "institucional": get_vector_store_id(db, "institucional"),
+            "informativo": get_vector_store_id(db, "informativo"),
+            "comentarios": get_vector_store_id(db, "comentarios"),
+            "gea": get_vector_store_id(db, "gea"),
         },
         "exchanges_24h": recent_count,
         "failures_24h": failures_24h,
