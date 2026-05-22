@@ -26,13 +26,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
-from config import (
-    BOT_OPENAI_MODEL,
-    BOT_VS_COMENTARIOS,
-    BOT_VS_GEA,
-    BOT_VS_INFORMATIVO,
-    BOT_VS_INSTITUCIONAL,
-)
+from config import BOT_OPENAI_MODEL
+
+from bot.openai_vector_stores import get_vector_store_id
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +381,7 @@ def _search_in_vector_store(
 def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_INSTITUCIONAL,
+        vector_store_id=get_vector_store_id(ctx.db, "institucional"),
         consulta=consulta,
         fuente_nombre="institucional",
         hint=(
@@ -400,7 +396,7 @@ def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_INFORMATIVO,
+        vector_store_id=get_vector_store_id(ctx.db, "informativo"),
         consulta=consulta,
         fuente_nombre="informativo_semanal",
         hint=(
@@ -415,7 +411,7 @@ def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_COMENTARIOS,
+        vector_store_id=get_vector_store_id(ctx.db, "comentarios"),
         consulta=consulta,
         fuente_nombre="comentario_diario",
         hint=(
@@ -429,7 +425,7 @@ def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     return _search_in_vector_store(
         ctx,
-        vector_store_id=BOT_VS_GEA,
+        vector_store_id=get_vector_store_id(ctx.db, "gea"),
         consulta=consulta,
         fuente_nombre="informe_gea",
         hint=(

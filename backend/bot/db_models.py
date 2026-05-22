@@ -92,3 +92,40 @@ class PrecioPizarra(Base):
     __table_args__ = (
         UniqueConstraint("producto", "fecha", name="uix_precio_producto_fecha"),
     )
+
+
+class IngestedComentario(Base):
+    """Tracking de qué comentarios diarios ya subimos al vector store.
+
+    Sin esto, cada corrida del scraper subiría todo de nuevo y duplicaría
+    los archivos en OpenAI. Con esto, sólo subimos los nuevos.
+    """
+    __tablename__ = "ingested_comentarios"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String, nullable=False)  # "local" o "chicago"
+    comentario_id = Column(Integer, nullable=False)  # ej. 1711
+    fecha = Column(String, nullable=False, index=True)  # YYYY-MM-DD
+    fecha_legible = Column(String, nullable=True)  # "20 de Mayo de 2026"
+    url = Column(String, nullable=False)
+    openai_file_id = Column(String, nullable=True)  # útil para debug
+    ingested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("source", "comentario_id", name="uix_comentario_source_id"),
+    )
+
+
+class BotConfig(Base):
+    """KV de configuración runtime del bot — sobre todo para IDs de vector
+    stores que se auto-crean cuando no están seteados por env var.
+
+    No usamos esto para secretos: sólo para identifiers de OpenAI que
+    sobreviven entre deploys (porque borrarlos accidentalmente fuerza a
+    re-ingestar todo desde cero, lo cual es lento y caro).
+    """
+    __tablename__ = "bot_config"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)

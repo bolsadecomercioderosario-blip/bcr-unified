@@ -242,20 +242,31 @@ def trigger_scrape_pizarra(db: Session = Depends(get_db)) -> dict[str, Any]:
     return scrape_precios_pizarra(db)
 
 
+@router.post(
+    "/admin/scrape-comentarios",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_comentarios(
+    source: str = "local",
+    max_pages: int = 1,
+    max_upload: int = 25,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de comentarios diarios. Útil para
+    backfill inicial (subí max_pages a 5-10 para traer más historia)."""
+    from bot.scraper_comentarios import scrape_comentarios
+
+    return scrape_comentarios(db, source=source, max_pages=max_pages, max_upload_per_run=max_upload)
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],
 )
 def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Diagnóstico rápido — qué hay configurado y qué no."""
-    from config import (
-        BOT_OPENAI_API_KEY,
-        BOT_OPENAI_MODEL,
-        BOT_VS_COMENTARIOS,
-        BOT_VS_GEA,
-        BOT_VS_INFORMATIVO,
-        BOT_VS_INSTITUCIONAL,
-    )
+    from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
+    from bot.openai_vector_stores import get_vector_store_id
 
     yesterday = datetime.utcnow() - timedelta(hours=24)
     recent_count = db.query(db_models.BotExchange).filter(
@@ -271,10 +282,10 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         "openai_model": BOT_OPENAI_MODEL,
         "twilio_configured": twilio_client.is_configured(),
         "vector_stores": {
-            "institucional": bool(BOT_VS_INSTITUCIONAL),
-            "informativo": bool(BOT_VS_INFORMATIVO),
-            "comentarios": bool(BOT_VS_COMENTARIOS),
-            "gea": bool(BOT_VS_GEA),
+            "institucional": get_vector_store_id(db, "institucional"),
+            "informativo": get_vector_store_id(db, "informativo"),
+            "comentarios": get_vector_store_id(db, "comentarios"),
+            "gea": get_vector_store_id(db, "gea"),
         },
         "exchanges_24h": recent_count,
         "failures_24h": failures_24h,

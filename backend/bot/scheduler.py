@@ -45,6 +45,27 @@ def _run_scrape_precios_pizarra() -> None:
         db.close()
 
 
+def _run_scrape_comentarios() -> None:
+    """Wrapper para el job diario de comentarios. Corre LOCAL y CHICAGO
+    secuencialmente."""
+    from bot.scraper_comentarios import scrape_comentarios
+
+    db = SessionLocal()
+    try:
+        for source in ("local", "chicago"):
+            try:
+                result = scrape_comentarios(db, source=source)
+                print(f"[bot.scheduler] scrape_comentarios({source}) → "
+                      f"new={result.get('new_found', 0)} "
+                      f"uploaded={len(result.get('uploaded', []))} "
+                      f"failed={len(result.get('failed', []))}")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[bot.scheduler] scrape_comentarios({source}) falló: "
+                      f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def start() -> None:
     """Arranca el scheduler con los jobs registrados. Idempotente — si ya
     está corriendo (ej. uvicorn --reload), no hace nada."""
@@ -60,6 +81,17 @@ def start() -> None:
         replace_existing=True,
         max_instances=1,  # No dejar arrancar otro tick si el anterior aún corre
         coalesce=True,    # Si nos perdimos ticks (por restart), correr UNO solo
+    )
+
+    # Comentarios diarios: 17:00 ART. La BCR suele publicar a la tarde —
+    # dejamos margen para que ya esté el del día.
+    scheduler.add_job(
+        _run_scrape_comentarios,
+        CronTrigger(hour=17, minute=0),
+        id="scrape_comentarios_diarios",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     scheduler.start()
