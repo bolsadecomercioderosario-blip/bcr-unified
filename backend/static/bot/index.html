@@ -297,10 +297,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text }),
                 });
-                const data = await res.json();
+                // Leemos como texto primero — si el server devuelve un 500
+                // con body plain ("Internal Server Error"), res.json() rompe.
+                const raw = await res.text();
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { data = null; }
                 loading.remove();
                 if (!res.ok) {
-                    const b = addBubble(data.detail || ('Error HTTP ' + res.status), 'bot');
+                    const detail = (data && (data.detail || data.reply)) || raw || ('HTTP ' + res.status);
+                    const b = addBubble('Server respondió ' + res.status + ': ' + detail, 'bot');
+                    b.classList.add('error');
+                } else if (!data) {
+                    const b = addBubble('Respuesta no-JSON del server: ' + raw, 'bot');
                     b.classList.add('error');
                 } else {
                     addBubble(data.reply || '(sin respuesta)', 'bot', {
