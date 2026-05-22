@@ -119,8 +119,16 @@ class AgentResult:
 def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
     """Corre el agente sobre un único mensaje del usuario y devuelve la respuesta.
 
-    Sin historial conversacional todavía (el bot es stateless por ahora — eso
-    se sumará cuando enchufemos Twilio en 2.5 con persistencia en DB).
+    Patrón de continuación: en la primera llamada mandamos el mensaje + las
+    instrucciones; en las siguientes pasamos previous_response_id y SÓLO los
+    function_call_output nuevos. Esto es lo que la Responses API exige para
+    modelos de razonamiento (gpt-5-mini, o1, o3, etc.): cada function_call
+    está asociada server-side a un item de 'reasoning' que el cliente no
+    debería reconstruir manualmente. Sin previous_response_id la API rompe
+    con 'function_call was provided without its required reasoning item'.
+
+    Sin historial conversacional cross-mensaje todavía (el bot es stateless
+    entre mensajes — eso se suma con Twilio en 2.5 + persistencia en DB).
     """
     if not BOT_OPENAI_API_KEY:
         return AgentResult(
@@ -135,22 +143,27 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
     ctx = tools.ToolContext(db=db, openai_client=client)
     instructions = _build_system_instructions(date.today())
 
-    # `input` arranca con el mensaje del usuario y va creciendo con las
-    # function_calls del modelo y los function_call_output que devolvemos.
-    conversation_input: list[dict[str, Any]] = [
-        {"role": "user", "content": message},
-    ]
-
     tools_used: list[str] = []
     tool_args_log: list[dict[str, Any]] = []
+    previous_response_id: str | None = None
+
+    # Primera iteración: mandamos el mensaje del usuario. Siguientes: sólo
+    # los outputs de las tools, encadenados via previous_response_id.
+    next_input: list[dict[str, Any]] = [{"role": "user", "content": message}]
 
     for iteration in range(_MAX_TOOL_ITERATIONS):
-        response = client.responses.create(
-            model=BOT_OPENAI_MODEL,
-            instructions=instructions,
-            input=conversation_input,
-            tools=tools.TOOL_DEFINITIONS,
-        )
+        create_kwargs: dict[str, Any] = {
+            "model": BOT_OPENAI_MODEL,
+            "input": next_input,
+            "tools": tools.TOOL_DEFINITIONS,
+        }
+        if previous_response_id is None:
+            create_kwargs["instructions"] = instructions
+        else:
+            create_kwargs["previous_response_id"] = previous_response_id
+
+        response = client.responses.create(**create_kwargs)
+        previous_response_id = response.id
 
         function_calls = [item for item in response.output if item.type == "function_call"]
 
@@ -164,7 +177,11 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
                 debug={"tool_args": tool_args_log, "response_id": response.id},
             )
 
-        # Ejecutamos cada tool pedida y sumamos input para la próxima iteración.
+        # Ejecutamos las tools pedidas y armamos el input de la próxima
+        # iteración SÓLO con los function_call_output. Los reasoning items y
+        # function_call items ya quedaron asociados a previous_response_id
+        # del lado de OpenAI — no los tenemos que reenviar.
+        next_input = []
         for call in function_calls:
             try:
                 args = json.loads(call.arguments) if call.arguments else {}
@@ -176,11 +193,7 @@ def run_agent(message: str, from_phone: str | None, db: Session) -> AgentResult:
 
             output = tools.execute_tool(call.name, args, ctx=ctx)
 
-            # La Responses API necesita que metamos en el input tanto la
-            # llamada como el output, en ese orden, para que el modelo entienda
-            # la continuidad.
-            conversation_input.append(call.model_dump(exclude_unset=True))
-            conversation_input.append({
+            next_input.append({
                 "type": "function_call_output",
                 "call_id": call.call_id,
                 "output": json.dumps(output, ensure_ascii=False, default=str),
