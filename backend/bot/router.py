@@ -259,6 +259,46 @@ def trigger_scrape_comentarios(
     return scrape_comentarios(db, source=source, max_pages=max_pages, max_upload_per_run=max_upload)
 
 
+@router.post(
+    "/admin/scrape-informativo",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_informativo(
+    max_uploads: int = 20,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de la edición vigente del informativo
+    semanal. Útil para llenar la primera vez sin esperar al viernes."""
+    from bot.scraper_informativo import scrape_current_edition
+
+    return scrape_current_edition(db, max_uploads=max_uploads)
+
+
+@router.post(
+    "/admin/backfill-informativo",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_backfill_informativo(
+    max_editions: int = 8,
+    max_articles_total: int = 40,
+    start_page: int = 0,
+    pages_to_walk: int = 3,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """One-shot para traer ediciones pasadas del informativo semanal.
+    Llamalo varias veces variando start_page (0, 3, 6, ...) para ir más
+    atrás en el tiempo sin que un solo POST tarde una eternidad."""
+    from bot.scraper_informativo import backfill_past_editions
+
+    return backfill_past_editions(
+        db,
+        max_editions=max_editions,
+        max_articles_total=max_articles_total,
+        start_page=start_page,
+        pages_to_walk=pages_to_walk,
+    )
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],

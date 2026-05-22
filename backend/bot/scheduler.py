@@ -66,6 +66,26 @@ def _run_scrape_comentarios() -> None:
         db.close()
 
 
+def _run_scrape_informativo() -> None:
+    """Wrapper para el job del viernes del informativo semanal."""
+    from bot.scraper_informativo import scrape_current_edition
+
+    db = SessionLocal()
+    try:
+        result = scrape_current_edition(db)
+        print(f"[bot.scheduler] scrape_current_edition → "
+              f"edicion={result.get('edicion', {}).get('numero')} "
+              f"in_page={result.get('in_page', 0)} "
+              f"new_found={result.get('new_found', 0)} "
+              f"uploaded={len(result.get('uploaded', []))} "
+              f"failed={len(result.get('failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_current_edition falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def start() -> None:
     """Arranca el scheduler con los jobs registrados. Idempotente — si ya
     está corriendo (ej. uvicorn --reload), no hace nada."""
@@ -89,6 +109,18 @@ def start() -> None:
         _run_scrape_comentarios,
         CronTrigger(hour=17, minute=0),
         id="scrape_comentarios_diarios",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Informativo semanal: viernes 13:00 y 18:00 ART. La edición sale al
+    # mediodía pero el horario varía — dos pasadas cubren el rango sin
+    # quedar muy atrás del corte.
+    scheduler.add_job(
+        _run_scrape_informativo,
+        CronTrigger(day_of_week="fri", hour="13,18", minute=0),
+        id="scrape_informativo_viernes",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
