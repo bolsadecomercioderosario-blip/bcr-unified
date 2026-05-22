@@ -1,13 +1,17 @@
 """
 Módulo Bot BCR: agente conversacional con tools.
 
-Estado actual (chunk 2.2): el endpoint /api/bot/test ya llama al agente real
-con OpenAI + tool calling. La única tool disponible por ahora es
-consultar_agenda. Próximos chunks:
-  - 2.3: tools RAG sobre vector stores OpenAI (institucional + comentarios + informativo)
+Tools enchufadas:
+  - consultar_agenda (chunk 2.2) — lee tabla activities
+  - buscar_institucional / buscar_informativo / buscar_comentario_diario
+    (chunk 2.3) — file_search sobre vector stores OpenAI
+
+Próximos chunks:
   - 2.4: tool get_precios_pizarra (lee tabla precios_pizarra)
   - 2.5: webhook de Twilio + envío de respuestas + log de exchanges en DB
 """
+import traceback
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -27,20 +31,35 @@ def bot_test(
 ) -> models.BotTestResponse:
     """Recibe un mensaje y devuelve la respuesta generada por el agente.
 
-    Sirve para testear desde curl o desde un cliente HTTP sin pasar por
-    Twilio. Una vez integrado el webhook de WhatsApp (chunk 2.5), el flujo
-    público va a usar el mismo agente por debajo.
+    Cualquier excepción del agente (OpenAI down, tool con bug, etc.) se
+    captura acá y devolvemos un BotTestResponse con `debug.error` lleno,
+    en vez de propagarla como 500 — así la UI muestra el mensaje sin
+    perderlo en un Internal Server Error genérico. Crítico mientras el
+    bot está en desarrollo; lo podemos endurecer después.
     """
-    result = agent.run_agent(
-        message=payload.message,
-        from_phone=payload.from_phone,
-        db=db,
-    )
-    return models.BotTestResponse(
-        reply=result.reply,
-        tools_used=result.tools_used,
-        debug={
-            "iterations": result.iterations,
-            **result.debug,
-        },
-    )
+    try:
+        result = agent.run_agent(
+            message=payload.message,
+            from_phone=payload.from_phone,
+            db=db,
+        )
+        return models.BotTestResponse(
+            reply=result.reply,
+            tools_used=result.tools_used,
+            debug={
+                "iterations": result.iterations,
+                **result.debug,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 — durante el bring-up queremos ver todo error en la UI
+        tb = traceback.format_exc()
+        print(f"[bot.test] ERROR procesando mensaje {payload.message!r}: {exc}\n{tb}")
+        return models.BotTestResponse(
+            reply=f"Se cayó el bot procesando tu mensaje. Detalle: {type(exc).__name__}: {exc}",
+            tools_used=[],
+            debug={
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "traceback_tail": tb.splitlines()[-6:],
+            },
+        )
