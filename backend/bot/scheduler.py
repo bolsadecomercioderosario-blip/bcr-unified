@@ -86,6 +86,40 @@ def _run_scrape_informativo() -> None:
         db.close()
 
 
+def _run_scrape_gea_panel() -> None:
+    """Wrapper para el job diario del panel GEA (table de estimaciones)."""
+    from bot.scraper_gea import scrape_gea_panel
+
+    db = SessionLocal()
+    try:
+        result = scrape_gea_panel(db)
+        print(f"[bot.scheduler] scrape_gea_panel → status={result.get('status')} "
+              f"upserted={result.get('upserted', 0)}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_gea_panel falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
+def _run_scrape_gea_informes() -> None:
+    """Wrapper para el job semanal de informes mensuales GEA."""
+    from bot.scraper_gea import scrape_gea_informes
+
+    db = SessionLocal()
+    try:
+        result = scrape_gea_informes(db)
+        print(f"[bot.scheduler] scrape_gea_informes → "
+              f"new_found={result.get('new_found', 0)} "
+              f"uploaded={len(result.get('uploaded', []))} "
+              f"failed={len(result.get('failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_gea_informes falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def start() -> None:
     """Arranca el scheduler con los jobs registrados. Idempotente — si ya
     está corriendo (ej. uvicorn --reload), no hace nada."""
@@ -121,6 +155,28 @@ def start() -> None:
         _run_scrape_informativo,
         CronTrigger(day_of_week="fri", hour="13,18", minute=0),
         id="scrape_informativo_viernes",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Panel GEA (estimaciones de producción): el sitio actualiza esporádicamente
+    # — corremos diario a las 9:00 ART. Idempotente, no hace daño correr de más.
+    scheduler.add_job(
+        _run_scrape_gea_panel,
+        CronTrigger(hour=9, minute=0),
+        id="scrape_gea_panel_diario",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Informes GEA (estimaciones nacionales mensuales): semanal los lunes
+    # a las 9:30 ART. Idempotente — sólo sube los slugs nuevos.
+    scheduler.add_job(
+        _run_scrape_gea_informes,
+        CronTrigger(day_of_week="mon", hour=9, minute=30),
+        id="scrape_gea_informes_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

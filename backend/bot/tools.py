@@ -523,20 +523,64 @@ def get_estimaciones_gea(
     ctx: ToolContext,
     cultivo: str | None = None,
 ) -> dict[str, Any]:
-    """Placeholder hasta que el scraper de chunk 3.5 llene la tabla gea_estimaciones.
+    """Lee la tabla estimaciones_gea que mantiene el scraper de GEA (chunk 3.5).
 
-    Va a devolver {cultivo, campaña, area_sembrada_mha, rinde_qq_ha, produccion_mtn}
-    cuando esté el scraper. Por ahora avisa honestamente.
+    - Sin filtros → trae todas las filas (todas las campañas para todos los cultivos)
+    - Con `cultivo` ('soja', 'trigo', 'maiz', 'girasol') → filtra por ese.
+      Acepta también acentos ('maíz' se normaliza a 'maiz').
+
+    Si la tabla está vacía, devuelve estado especial para que el agente
+    pueda avisar al usuario sin alucinar números.
     """
+    from bot.db_models import EstimacionGea
+
+    query = ctx.db.query(EstimacionGea)
+    if cultivo:
+        cultivo_norm = (
+            "".join(
+                ch for ch in __import__("unicodedata").normalize("NFKD", cultivo.strip().lower())
+                if not __import__("unicodedata").combining(ch)
+            )
+        )
+        if cultivo_norm != "todos":
+            query = query.filter(EstimacionGea.cultivo == cultivo_norm)
+
+    rows = query.order_by(
+        EstimacionGea.cultivo.asc(),
+        EstimacionGea.campania.desc(),
+    ).all()
+
+    if not rows:
+        return {
+            "fuente": "estimaciones_gea",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay estimaciones de GEA cargadas en la base. El scraper "
+                "semanal va a llenar la tabla automáticamente. Mientras tanto, "
+                "sugerile al usuario que mire https://www.bcr.com.ar/es/mercados/gea."
+            ),
+            "consulta": {"cultivo": cultivo},
+        }
+
     return {
         "fuente": "estimaciones_gea",
-        "estado": "datos_no_disponibles_aun",
-        "detalle": (
-            "Las estimaciones de producción de GEA todavía no están integradas al "
-            "bot — el scraper mensual está en desarrollo. Decile al usuario que "
-            "consulte temporalmente en https://www.bcr.com.ar/es/mercados/gea."
-        ),
-        "consulta": {"cultivo": cultivo},
+        "estado": "ok",
+        "unidades": {
+            "area_sembrada": "millones de hectáreas",
+            "rinde": "quintales por hectárea",
+            "produccion": "millones de toneladas",
+        },
+        "filas": [
+            {
+                "cultivo": r.cultivo,
+                "campania": r.campania,
+                "area_sembrada_mha": r.area_sembrada_mha,
+                "rinde_qq_ha": r.rinde_qq_ha,
+                "produccion_mtn": r.produccion_mtn,
+                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+            }
+            for r in rows
+        ],
     }
 
 

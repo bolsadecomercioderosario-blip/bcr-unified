@@ -299,6 +299,34 @@ def trigger_backfill_informativo(
     )
 
 
+@router.post(
+    "/admin/scrape-gea-panel",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_panel(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Dispara manualmente el scraper del panel GEA. Útil para llenar la
+    tabla la primera vez sin esperar el cron diario."""
+    from bot.scraper_gea import scrape_gea_panel
+
+    return scrape_gea_panel(db)
+
+
+@router.post(
+    "/admin/scrape-gea-informes",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_informes(
+    max_pages: int = 1,
+    max_upload: int = 12,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de informes mensuales GEA. Para
+    backfill, subí max_pages (cada página tiene ~10 informes)."""
+    from bot.scraper_gea import scrape_gea_informes
+
+    return scrape_gea_informes(db, max_pages=max_pages, max_upload_per_run=max_upload)
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],
