@@ -1,5 +1,8 @@
 import { state, updateActivity, addActivity, deleteActivity } from '../state.js';
-import { generateNewsletterBlock } from '../utils/ai-engine.js';
+// Nota: la generación con IA (botón "Generar con IA" en cada bloque) se sacó
+// porque los resultados no eran lo suficientemente buenos. Por ahora los copys
+// se redactan a mano o en ChatGPT externo. La función generateNewsletterBlock
+// sigue exportada en utils/ai-engine.js por si querés re-habilitarlo.
 import { generateNewsletterHTML } from '../utils/NewsletterGenerator.js';
 
 // --- Helpers de fecha (semana de newsletter = sábado a viernes) ---
@@ -250,7 +253,6 @@ export function renderConectados(container) {
 // =================================================================
 function openConectadosEditor(act) {
     const kind = blockKind(act);
-    const isActivity = kind === 'activity';
 
     const overlay = document.createElement('div');
     overlay.className = 'login-overlay conectados-editor-overlay';
@@ -260,32 +262,25 @@ function openConectadosEditor(act) {
             <!-- X flotante (no ocupa una fila propia) -->
             <button id="btn-editor-close" style="position: absolute; top: 0.5rem; right: 0.6rem; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0.25rem; line-height: 0; z-index: 5;" title="Cerrar"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
 
-            <!-- Cuerpo: fila imagen+IA, título, textarea -->
+            <!-- Cuerpo: strip imagen, título, textarea -->
             <div style="flex: 1; padding: 0.9rem 1.1rem 0.5rem; display: flex; flex-direction: column; gap: 0.65rem; min-height: 0;">
 
-                <!-- Fila 1: imagen-strip a la izquierda, botón IA a la derecha -->
-                <div style="display: flex; align-items: center; gap: 0.65rem; padding-right: 1.5rem; /* deja aire para la X */">
-                    <div id="editor-image-strip" style="display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0;">
-                        <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
-                        ${act.image_url ? `
-                            <img id="editor-image-thumb" src="${act.image_url}" style="width: 80px; height: 54px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0; cursor: pointer;">
-                            <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                                <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar
-                            </button>
-                            <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
-                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                            </button>
-                        ` : `
-                            <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.5rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-                                <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen
-                            </button>
-                        `}
-                    </div>
-                    ${isActivity ? `
-                        <button id="editor-ai" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-                            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Generar con IA
+                <!-- Fila 1: strip de imagen -->
+                <div id="editor-image-strip" style="display: flex; align-items: center; gap: 0.6rem; padding-right: 1.5rem; /* deja aire para la X */">
+                    <input id="editor-image-input" type="file" accept="image/*" style="display: none;">
+                    ${act.image_url ? `
+                        <img id="editor-image-thumb" src="${act.image_url}" style="width: 80px; height: 54px; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); flex-shrink: 0; cursor: pointer;">
+                        <button id="editor-image-change" type="button" style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="image" style="width: 14px; height: 14px;"></i> Cambiar
                         </button>
-                    ` : ''}
+                        <button id="editor-image-remove" type="button" style="background: none; border: none; color: #ef4444; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;" title="Quitar imagen">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    ` : `
+                        <button id="editor-image-add" type="button" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.5rem 0.85rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                            <i data-lucide="image-up" style="width: 16px; height: 16px;"></i> Agregar imagen
+                        </button>
+                    `}
                 </div>
 
                 <!-- Título sin label -->
@@ -293,8 +288,6 @@ function openConectadosEditor(act) {
                     value="${(act.title || '').replace(/"/g, '&quot;')}"
                     placeholder="Título del bloque"
                     style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.05rem; font-weight: 600;">
-
-                ${isActivity ? '<div id="editor-ai-status" style="font-size: 0.75rem; color: var(--text-muted); min-height: 0;"></div>' : ''}
 
                 <!-- Textarea: protagonista, llena todo el alto disponible -->
                 <textarea id="editor-body"
@@ -385,41 +378,6 @@ function openConectadosEditor(act) {
     };
 
     bindImageButtons();
-
-    // --- Botón IA (sólo en bloques de actividad) ---
-    if (isActivity) {
-        const btnAI = overlay.querySelector('#editor-ai');
-        const status = overlay.querySelector('#editor-ai-status');
-        btnAI.onclick = async () => {
-            // Tomamos los datos más frescos: lo que ya está en la actividad +
-            // lo que el usuario haya escrito en este modal (por si recién
-            // pegó algo y le pega al botón).
-            const liveAct = {
-                ...act,
-                title: inputTitle.value || act.title,
-            };
-            btnAI.disabled = true;
-            const orig = btnAI.innerHTML;
-            btnAI.innerHTML = '<i data-lucide="loader" class="spin" style="width: 14px; height: 14px;"></i> Generando…';
-            if (window.lucide) window.lucide.createIcons();
-
-            const result = await generateNewsletterBlock(liveAct);
-            if (result) {
-                if (result.title) inputTitle.value = result.title;
-                if (result.copy) inputBody.value = result.copy;
-                const sourceTxt = {
-                    linkedin: 'tomó como base el copy de LinkedIn',
-                    instagram: 'tomó como base el copy de Instagram',
-                    basic: 'tomó como base los datos de la actividad (sin copys cargados)',
-                }[result.source] || '';
-                status.textContent = `✓ IA ${sourceTxt}.`;
-            }
-
-            btnAI.innerHTML = orig;
-            btnAI.disabled = false;
-            if (window.lucide) window.lucide.createIcons();
-        };
-    }
 
     // --- Cerrar / Cancelar ---
     const close = () => overlay.remove();
