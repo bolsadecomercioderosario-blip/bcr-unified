@@ -332,9 +332,11 @@ def trigger_scrape_gea_informes(
     dependencies=[Depends(require_auth)],
 )
 def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Diagnóstico rápido — qué hay configurado y qué no."""
+    """Diagnóstico rápido — qué hay configurado y qué no, y estado de los
+    crons del scheduler (último firing y próximo)."""
     from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
     from bot.openai_vector_stores import get_vector_store_id
+    from bot.scheduler import scheduler
 
     yesterday = datetime.utcnow() - timedelta(hours=24)
     recent_count = db.query(db_models.BotExchange).filter(
@@ -344,6 +346,57 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         db_models.BotExchange.created_at >= yesterday,
         db_models.BotExchange.success.is_(False),
     ).count()
+
+    # Cuándo fue la última ingesta exitosa de cada fuente — eso nos dice si
+    # los crons están firmando (más útil que mirar la config aislada).
+    last_pizarra = (
+        db.query(db_models.PrecioPizarra.scraped_at)
+        .order_by(db_models.PrecioPizarra.scraped_at.desc())
+        .first()
+    )
+    last_comentario = (
+        db.query(db_models.IngestedComentario.ingested_at)
+        .order_by(db_models.IngestedComentario.ingested_at.desc())
+        .first()
+    )
+    last_informativo = (
+        db.query(db_models.IngestedInformativoArticle.ingested_at)
+        .order_by(db_models.IngestedInformativoArticle.ingested_at.desc())
+        .first()
+    )
+    last_gea_panel = (
+        db.query(db_models.EstimacionGea.scraped_at)
+        .order_by(db_models.EstimacionGea.scraped_at.desc())
+        .first()
+    )
+    last_gea_informe = (
+        db.query(db_models.IngestedGeaReport.ingested_at)
+        .order_by(db_models.IngestedGeaReport.ingested_at.desc())
+        .first()
+    )
+
+    def _iso_or_none(row):
+        return row[0].isoformat() if row and row[0] else None
+
+    # Estado del scheduler in-process.
+    scheduler_info: dict[str, Any] = {
+        "running": getattr(scheduler, "running", False),
+        "timezone": str(getattr(scheduler, "timezone", None)),
+        "jobs": [],
+    }
+    try:
+        for job in scheduler.get_jobs():
+            scheduler_info["jobs"].append({
+                "id": job.id,
+                "next_run_time": (
+                    job.next_run_time.isoformat() if job.next_run_time else None
+                ),
+                "trigger": str(job.trigger),
+                "coalesce": job.coalesce,
+                "max_instances": job.max_instances,
+            })
+    except Exception as exc:  # noqa: BLE001
+        scheduler_info["error"] = f"{type(exc).__name__}: {exc}"
 
     return {
         "openai_configured": bool(BOT_OPENAI_API_KEY),
@@ -357,4 +410,13 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         },
         "exchanges_24h": recent_count,
         "failures_24h": failures_24h,
+        "last_ingest": {
+            "precios_pizarra": _iso_or_none(last_pizarra),
+            "comentario_diario": _iso_or_none(last_comentario),
+            "informativo_semanal": _iso_or_none(last_informativo),
+            "gea_panel": _iso_or_none(last_gea_panel),
+            "gea_informes": _iso_or_none(last_gea_informe),
+        },
+        "scheduler": scheduler_info,
+        "now_utc": datetime.utcnow().isoformat(),
     }
