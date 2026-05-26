@@ -328,6 +328,89 @@ def trigger_scrape_gea_informes(
 
 
 @router.get(
+    "/admin/ingested",
+    dependencies=[Depends(require_auth)],
+)
+def list_ingested(
+    source: str = "informativo",
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Lista los items ya ingestados por fuente. Útil para auditar si un
+    artículo/comentario específico está o no en el vector store.
+
+    source: 'informativo' | 'comentarios' | 'gea_informes'
+    """
+    if source == "informativo":
+        rows = (
+            db.query(db_models.IngestedInformativoArticle)
+            .order_by(db_models.IngestedInformativoArticle.ingested_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return {
+            "source": "informativo",
+            "total": len(rows),
+            "items": [
+                {
+                    "slug": r.slug,
+                    "edicion_numero": r.edicion_numero,
+                    "fecha": r.fecha,
+                    "titulo": r.titulo,
+                    "seccion": r.seccion,
+                    "url": r.url,
+                    "ingested_at": r.ingested_at.isoformat() if r.ingested_at else None,
+                }
+                for r in rows
+            ],
+        }
+    if source == "comentarios":
+        rows = (
+            db.query(db_models.IngestedComentario)
+            .order_by(db_models.IngestedComentario.ingested_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return {
+            "source": "comentarios",
+            "total": len(rows),
+            "items": [
+                {
+                    "source": r.source,
+                    "comentario_id": r.comentario_id,
+                    "fecha": r.fecha,
+                    "url": r.url,
+                    "ingested_at": r.ingested_at.isoformat() if r.ingested_at else None,
+                }
+                for r in rows
+            ],
+        }
+    if source == "gea_informes":
+        rows = (
+            db.query(db_models.IngestedGeaReport)
+            .order_by(db_models.IngestedGeaReport.ingested_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return {
+            "source": "gea_informes",
+            "total": len(rows),
+            "items": [
+                {
+                    "slug": r.slug,
+                    "fecha": r.fecha,
+                    "titulo": r.titulo,
+                    "autor": r.autor,
+                    "url": r.url,
+                    "ingested_at": r.ingested_at.isoformat() if r.ingested_at else None,
+                }
+                for r in rows
+            ],
+        }
+    return {"error": f"source desconocido: {source!r}", "valid": ["informativo", "comentarios", "gea_informes"]}
+
+
+@router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],
 )
