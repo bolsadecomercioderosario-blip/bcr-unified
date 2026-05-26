@@ -247,11 +247,14 @@ def start() -> None:
     if scheduler.running:
         return
 
-    # Precios pizarra: todos los días a las 10:30 ART. El sitio actualiza a
-    # las 10:00, dejamos margen para que esté disponible.
+    # Precios pizarra: tres firings al día (10:30, 13:00, 17:00 ART).
+    # La BCR publica el card "del día" a las ~10:00 pero la tabla histórica
+    # debajo tarda más; varios firings cubren la ventana sin tener que
+    # adivinar el horario exacto. Scraper idempotente y barato (1 request,
+    # 20-25 upserts), así que correr de más no molesta.
     scheduler.add_job(
         _run_scrape_precios_pizarra,
-        CronTrigger(hour=10, minute=30),
+        CronTrigger(hour="10,13,17", minute=30),
         id="scrape_precios_pizarra",
         replace_existing=True,
         max_instances=1,  # No dejar arrancar otro tick si el anterior aún corre
