@@ -3,11 +3,12 @@ Scraper de los Comentarios Diarios del Mercado de la BCR.
 
 URL listado:  /es/mercados/mercado-de-granos/comentario-del-mercado/
               comentario-del-mercado-{local|chicago}
-URL detalle: .../{listado}/comentario-NNNN
+URL detalle:  .../{listado}/comentario-NNNN  (local)
+              .../{listado}/cierre-del-NNNN  (chicago)  ← formato distinto!
 
 Patrón:
-- Comentario IDs son enteros secuenciales descendentes
-- Fecha está en el listado ("20 de Mayo de 2026"), no en el detalle
+- IDs son enteros secuenciales descendentes en ambas variantes.
+- Fecha está en el listado ("20 de Mayo de 2026"), no en el detalle.
 - Cuerpo es HTML, lo bajamos a texto plano y lo subimos como TXT al
   vector store de "Comentarios Diarios" (auto-creado si no existe).
 
@@ -86,18 +87,25 @@ def _absolute_url(href: str) -> str:
     return _BASE + "/" + href
 
 
+# Regex que matchea ambos formatos de URL de detalle:
+#   /comentario-NNNN   ← Mercado Local
+#   /cierre-del-NNNN   ← Mercado Chicago
+_DETAIL_LINK_RE = re.compile(r"/(?:comentario|cierre-del)-\d+")
+_DETAIL_ID_RE = re.compile(r"/(?:comentario|cierre-del)-(\d+)")
+
+
 def _parse_listing_page(html: str, source: str) -> list[dict[str, Any]]:
     """Parsea un listado y devuelve dicts {source, comentario_id, fecha,
     fecha_legible, url}. Robusto a cambios menores en el markup: busca
-    links que matcheen /comentario-NNNN y trepa al contenedor más cercano
-    para encontrar la fecha."""
+    links que matcheen /comentario-NNNN o /cierre-del-NNNN, y trepa al
+    contenedor más cercano para encontrar la fecha."""
     soup = BeautifulSoup(html, "html.parser")
     items: list[dict[str, Any]] = []
     seen_ids: set[int] = set()
 
-    for link in soup.find_all("a", href=re.compile(r"/comentario-\d+")):
+    for link in soup.find_all("a", href=_DETAIL_LINK_RE):
         href = link.get("href", "")
-        m = re.search(r"/comentario-(\d+)", href)
+        m = _DETAIL_ID_RE.search(href)
         if not m:
             continue
         comentario_id = int(m.group(1))
