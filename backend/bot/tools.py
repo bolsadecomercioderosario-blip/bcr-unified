@@ -338,15 +338,11 @@ def consultar_agenda(
 # muy barato; a cambio el modelo principal decide qué fuentes consultar en
 # vez de buscar a ciegas en todos los stores juntos.
 # ---------------------------------------------------------------------------
-_SEARCH_INSTRUCTIONS = (
-    "Sos un buscador de pasajes en documentos de la Bolsa de Comercio de Rosario. "
-    "Buscá los pasajes más relevantes para la consulta y devolvé un resumen breve "
-    "y fiel al contenido encontrado. Si los documentos no contienen información "
-    "útil sobre la consulta, decilo claramente con la frase 'No se encontró "
-    "información en los documentos'. Nunca inventes ni completes con conocimiento "
-    "general. Cuando el documento mencione una fecha o número de edición, "
-    "incluila para que el llamador pueda citar la fuente."
-)
+# Cuántos chunks pedir al vector store por búsqueda. El default de OpenAI
+# anda en ~20; subimos porque los stores tienen cientos de chunks (la mayoría
+# del PipeDream histórico) y el artículo nuevo queda fuera del top-20 a
+# menudo. 50 es seguro respecto a tokens del prompt y mejora el recall.
+_FILE_SEARCH_MAX_RESULTS = 50
 
 
 def _search_in_vector_store(
@@ -356,11 +352,18 @@ def _search_in_vector_store(
     fuente_nombre: str,
     hint: str,
 ) -> dict[str, Any]:
-    """Wrapper de file_search sobre un único vector store.
+    """Búsqueda directa en el vector store de OpenAI (sin loop de LLM
+    interno). Antes pasábamos por client.responses.create con file_search
+    como tool — eso funcionaba pero metía un segundo LLM en el medio que a
+    veces decidía 'no encontré' sin usar file_search agresivamente, y a
+    veces resumía mal el resultado relevante.
 
-    Si el VS no está configurado (env var vacía), devuelve un error legible
-    en vez de romper. El agente principal lo incorpora a la respuesta tal
-    cual lo necesite — ej.: 'todavía no tenemos comentarios indexados'.
+    Ahora llamamos directo a client.vector_stores.search() y devolvemos los
+    chunks crudos al agente principal. El agente ve el texto literal de los
+    documentos relevantes y los cita él mismo. Más determinístico, más
+    barato (una llamada OpenAI menos por tool invocada), y más fácil de
+    debuggear: si la respuesta no es buena, el problema está en el
+    índice (chunks) o en la query, no en una capa de LLM intermedia.
     """
     if not vector_store_id:
         return {
@@ -373,19 +376,53 @@ def _search_in_vector_store(
             ),
         }
 
-    response = ctx.openai_client.responses.create(
-        model=BOT_OPENAI_MODEL,
-        instructions=f"{_SEARCH_INSTRUCTIONS}\n\nContexto: {hint}",
-        input=consulta,
-        tools=[{"type": "file_search", "vector_store_ids": [vector_store_id]}],
-        max_output_tokens=900,
-    )
+    try:
+        page = ctx.openai_client.vector_stores.search(
+            vector_store_id=vector_store_id,
+            query=consulta,
+            max_num_results=_FILE_SEARCH_MAX_RESULTS,
+            rewrite_query=True,  # que OpenAI mejore la query para vector search
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "fuente": fuente_nombre,
+            "consulta": consulta,
+            "error": f"fallo_search: {type(exc).__name__}: {exc}",
+            "hint": hint,
+        }
 
-    text = (response.output_text or "").strip()
+    items = list(getattr(page, "data", []) or [])
+    if not items:
+        return {
+            "fuente": fuente_nombre,
+            "consulta": consulta,
+            "resultado": "No se encontró información en los documentos.",
+            "chunks_devueltos": 0,
+        }
+
+    # Devolvemos los chunks crudos, ordenados por score descendente que ya
+    # viene del API. Truncamos cada chunk a ~700 chars para no inflar el
+    # prompt del agente principal con texto repetido (el header de cada TXT
+    # se repite igual entre chunks del mismo archivo).
+    chunks: list[dict[str, Any]] = []
+    for item in items[:8]:  # top 8 al agente — suficiente para sintetizar respuesta
+        content_text = ""
+        if getattr(item, "content", None):
+            content_text = "\n".join(
+                getattr(c, "text", "") for c in item.content if getattr(c, "text", "")
+            )
+        chunks.append({
+            "archivo": getattr(item, "filename", None) or getattr(item, "file_id", "?"),
+            "score": getattr(item, "score", None),
+            "texto": content_text[:700],
+        })
+
     return {
         "fuente": fuente_nombre,
         "consulta": consulta,
-        "resultado": text or "No se encontró información en los documentos.",
+        "chunks_devueltos": len(items),
+        "resultado": chunks,
+        "hint": hint,
     }
 
 
