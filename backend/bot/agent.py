@@ -202,9 +202,15 @@ def _build_system_instructions(today: date) -> str:
         f"{_SPANISH_WEEKDAYS[today.weekday()]} "
         f"{today.day} de {_SPANISH_MONTHS[today.month]} de {today.year}"
     )
-    return SYSTEM_INSTRUCTIONS_TEMPLATE.format(
-        today_iso=today.isoformat(),
-        today_human=today_human,
+    # Usamos .replace() en lugar de .format() porque el template tiene llaves
+    # {...} dentro de los ejemplos de formato (placeholders pensados para que
+    # el LLM los lea, no para Python). Con .format() Python intenta resolverlos
+    # como kwargs y revienta con KeyError ante cualquier '{algo}' que no
+    # coincida con today_iso/today_human.
+    return (
+        SYSTEM_INSTRUCTIONS_TEMPLATE
+        .replace("{today_iso}", today.isoformat())
+        .replace("{today_human}", today_human)
     )
 
 
