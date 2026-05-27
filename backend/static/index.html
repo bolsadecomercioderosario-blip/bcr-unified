@@ -25,6 +25,7 @@
             --accent-agenda: #a78bfa;
             --accent-data: #34d399;
             --accent-bot: #fbbf24;
+            --accent-web: #fb923c;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -152,12 +153,14 @@
         .tool-card.agenda::before { background: var(--accent-agenda); }
         .tool-card.data::before { background: var(--accent-data); }
         .tool-card.bot::before { background: var(--accent-bot); }
+        .tool-card.web::before { background: var(--accent-web); }
 
         .tool-card.rain:hover { border-color: rgba(56, 189, 248, 0.3); }
         .tool-card.social:hover { border-color: rgba(244, 114, 182, 0.3); }
         .tool-card.agenda:hover { border-color: rgba(167, 139, 250, 0.3); }
         .tool-card.data:hover { border-color: rgba(52, 211, 153, 0.3); }
         .tool-card.bot:hover { border-color: rgba(251, 191, 36, 0.3); }
+        .tool-card.web:hover { border-color: rgba(251, 146, 60, 0.3); }
 
         .tool-icon {
             width: 56px;
@@ -179,6 +182,7 @@
         .tool-card.agenda .tool-icon { background: rgba(167, 139, 250, 0.15); }
         .tool-card.data .tool-icon { background: rgba(52, 211, 153, 0.15); }
         .tool-card.bot .tool-icon { background: rgba(251, 191, 36, 0.15); }
+        .tool-card.web .tool-icon { background: rgba(251, 146, 60, 0.15); }
 
         .tool-card h3 {
             font-size: 1.15rem;
@@ -206,6 +210,7 @@
         .tool-card.agenda .tool-badge { background: rgba(167, 139, 250, 0.12); color: var(--accent-agenda); }
         .tool-card.data .tool-badge { background: rgba(52, 211, 153, 0.12); color: var(--accent-data); }
         .tool-card.bot .tool-badge { background: rgba(251, 191, 36, 0.12); color: var(--accent-bot); }
+        .tool-card.web .tool-badge { background: rgba(251, 146, 60, 0.12); color: var(--accent-web); }
 
         .footer-text {
             margin-top: 3rem;
@@ -225,6 +230,7 @@
         .tool-card:nth-child(3) { animation-delay: 0.3s; }
         .tool-card:nth-child(4) { animation-delay: 0.4s; }
         .tool-card:nth-child(5) { animation-delay: 0.5s; }
+        .tool-card:nth-child(6) { animation-delay: 0.6s; }
 
         @keyframes cardIn {
             to { opacity: 1; transform: translateY(0); }
@@ -275,6 +281,11 @@
             <a href="/bot" class="tool-card bot" id="tool-bot">
                 <div class="tool-icon">🤖</div>
                 <h3>Bot BCR</h3>
+            </a>
+
+            <a href="https://bcr-portal-poc.onrender.com/" target="_blank" rel="noopener noreferrer" class="tool-card web" id="tool-web">
+                <div class="tool-icon">🌐</div>
+                <h3>Web</h3>
             </a>
         </div>
 
