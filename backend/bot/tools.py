@@ -18,7 +18,7 @@ Tools registradas:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from openai import OpenAI
@@ -29,6 +29,30 @@ import agenda_models
 from config import BOT_OPENAI_MODEL
 
 from bot.openai_vector_stores import get_vector_store_id
+
+
+# Todos los timestamps que el bot devuelve al LLM (y por extensión al usuario)
+# deben estar en hora local Argentina, no en UTC. Guardamos en DB como
+# datetime.utcnow() (naive UTC); convertimos sólo al serializar para mostrar.
+try:
+    from zoneinfo import ZoneInfo
+    _ART_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
+except ImportError:  # pragma: no cover — Python 3.9+ tiene zoneinfo en stdlib
+    _ART_TZ = None
+
+
+def _utc_naive_to_art_iso(dt: datetime | None) -> str | None:
+    """Naive UTC datetime → ISO string en hora Argentina (UTC-3).
+
+    Si zoneinfo no está disponible o el datetime es None, devuelve None o el
+    isoformat naive como fallback."""
+    if dt is None:
+        return None
+    if _ART_TZ is None:
+        return dt.isoformat()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_ART_TZ).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -442,7 +466,7 @@ def buscar_institucional(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 
 
 def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
-    return _search_in_vector_store(
+    result = _search_in_vector_store(
         ctx,
         vector_store_id=get_vector_store_id(ctx.db, "informativo"),
         consulta=consulta,
@@ -454,10 +478,31 @@ def buscar_informativo(ctx: ToolContext, consulta: str) -> dict[str, Any]:
             "Si encontrás fecha o número de edición, incluilo."
         ),
     )
+    # Igual que en comentarios: el search es por relevancia, no por fecha.
+    # Adjuntamos las últimas ediciones ingestadas para que el agente sepa
+    # qué tan reciente es el corpus.
+    from bot.db_models import IngestedInformativoArticle
+    recientes = (
+        ctx.db.query(IngestedInformativoArticle)
+        .order_by(IngestedInformativoArticle.fecha.desc())
+        .limit(8)
+        .all()
+    )
+    result["recientes_por_fecha"] = [
+        {
+            "edicion_numero": r.edicion_numero,
+            "fecha": r.fecha,
+            "titulo": r.titulo,
+            "seccion": r.seccion,
+            "slug": r.slug,
+        }
+        for r in recientes
+    ]
+    return result
 
 
 def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
-    return _search_in_vector_store(
+    result = _search_in_vector_store(
         ctx,
         vector_store_id=get_vector_store_id(ctx.db, "comentarios"),
         consulta=consulta,
@@ -468,6 +513,26 @@ def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
             "Si el documento trae fecha, incluila en el resumen para que se pueda citar."
         ),
     )
+    # Sumamos metadata "recientes_por_fecha" leyendo directo de la DB. El
+    # vector search ordena por relevancia semántica, no por fecha — sin esto
+    # el agente no sabe cuál es realmente "el último" comentario disponible.
+    from bot.db_models import IngestedComentario
+    recientes = (
+        ctx.db.query(IngestedComentario)
+        .order_by(IngestedComentario.fecha.desc(), IngestedComentario.comentario_id.desc())
+        .limit(5)
+        .all()
+    )
+    result["recientes_por_fecha"] = [
+        {
+            "source": r.source,
+            "comentario_id": r.comentario_id,
+            "fecha": r.fecha,
+            "url": r.url,
+        }
+        for r in recientes
+    ]
+    return result
 
 
 def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
@@ -556,7 +621,10 @@ def get_precios_pizarra(
                 "producto": r.producto,
                 "fecha": r.fecha,
                 "precio_ars_tn": r.precio_ars_tn,
-                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+                # Mostramos el "scraped_at" en hora Argentina, no UTC, para
+                # que el agente no diga cosas como "actualizado a las 13:30"
+                # cuando son las 10:30 ART (offset -3h).
+                "actualizado_en_art": _utc_naive_to_art_iso(r.scraped_at),
             }
             for r in rows
         ]
@@ -671,7 +739,7 @@ def get_estimaciones_gea(
                 "area_sembrada_mha": r.area_sembrada_mha,
                 "rinde_qq_ha": r.rinde_qq_ha,
                 "produccion_mtn": r.produccion_mtn,
-                "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
+                "actualizado_en_art": _utc_naive_to_art_iso(r.scraped_at),
             }
             for r in rows
         ],
