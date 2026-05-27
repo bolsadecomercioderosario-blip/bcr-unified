@@ -28,6 +28,7 @@ import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 # Routers de cada módulo
 from agenda.router import router as agenda_api
 from bot.router import router as bot_api
+from buscador.router import router as buscador_api
 from lluvias.router import router as lluvias_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
@@ -78,6 +79,7 @@ app.include_router(social_api)
 app.include_router(agenda_api)
 app.include_router(semana_datos_api)
 app.include_router(bot_api)
+app.include_router(buscador_api)
 
 
 # ---------------------------------------------------------
