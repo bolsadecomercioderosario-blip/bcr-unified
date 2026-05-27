@@ -500,21 +500,24 @@ def get_precios_pizarra(
     producto: str | None = None,
     fecha: str | None = None,
 ) -> dict[str, Any]:
-    """Lee la tabla precios_pizarra que mantiene el scraper diario (chunk 3.1).
+    """Lee la tabla precios_pizarra que mantiene el scraper (chunk 3.1).
 
-    - Sin filtros → devuelve los precios de la última fecha disponible para
-      todos los productos.
+    Comportamiento clave:
+    - Sin filtros → devuelve los precios de la última fecha disponible.
     - Con `producto` → filtra por ese (case/acento-insensitive).
-    - Con `fecha` → trae esa fecha en particular (YYYY-MM-DD).
+    - Con `fecha` → trae esa fecha. Si NO existe esa fecha en la base,
+      devuelve estado 'fecha_no_disponible' y a la vez incluye los datos
+      de la fecha más reciente que sí tenemos. Eso le permite al agente
+      decir "no hay del 26/05; el último cargado es del 22/05" en una
+      sola pasada, sin hacer otra tool call.
 
-    Si la tabla está vacía (scraper nunca corrió), devuelve estado especial
-    para que el agente pueda avisar al usuario sin alucinar números.
+    Si la tabla está vacía (scraper nunca corrió), devuelve estado especial.
     """
     # Import local para evitar ciclo bot.tools ↔ bot.db_models al cargar el
     # módulo desde el scraper.
     from bot.db_models import PrecioPizarra
 
-    query = ctx.db.query(PrecioPizarra)
+    base_query = ctx.db.query(PrecioPizarra)
 
     if producto:
         producto_norm = (
@@ -524,38 +527,31 @@ def get_precios_pizarra(
             )
         )
         if producto_norm != "todos":
-            query = query.filter(PrecioPizarra.producto == producto_norm)
+            base_query = base_query.filter(PrecioPizarra.producto == producto_norm)
 
-    if fecha:
-        query = query.filter(PrecioPizarra.fecha == fecha)
-    else:
-        # Sin fecha explícita: traemos la fecha más reciente disponible.
-        latest_subq = ctx.db.query(PrecioPizarra.fecha).order_by(
-            PrecioPizarra.fecha.desc()
-        ).limit(1).scalar_subquery()
-        query = query.filter(PrecioPizarra.fecha == latest_subq)
+    # Última fecha disponible en la base (con los filtros de producto aplicados).
+    latest_fecha_row = (
+        base_query.with_entities(PrecioPizarra.fecha)
+        .order_by(PrecioPizarra.fecha.desc())
+        .first()
+    )
+    latest_fecha = latest_fecha_row[0] if latest_fecha_row else None
 
-    rows = query.order_by(PrecioPizarra.producto.asc()).all()
-
-    if not rows:
+    if latest_fecha is None:
         return {
             "fuente": "precios_pizarra",
             "estado": "sin_datos",
             "detalle": (
                 "Todavía no hay precios cargados en la base. El scraper diario "
-                "corre a las 10:30 ART; si todavía no corrió, sugerile al usuario "
-                "que mire https://www.bcr.com.ar/es/mercados/mercado-de-granos/"
-                "cotizaciones/cotizaciones-locales-0 directamente."
+                "corre varias veces al día; si todavía no corrió, mostrale al usuario "
+                "https://www.bcr.com.ar/es/mercados/mercado-de-granos/"
+                "cotizaciones/cotizaciones-locales-0."
             ),
             "consulta": {"producto": producto, "fecha": fecha},
         }
 
-    return {
-        "fuente": "precios_pizarra",
-        "estado": "ok",
-        "moneda": "ARS",
-        "unidad": "pesos por tonelada",
-        "filas": [
+    def _serialize(rows):
+        return [
             {
                 "producto": r.producto,
                 "fecha": r.fecha,
@@ -563,7 +559,57 @@ def get_precios_pizarra(
                 "actualizado_en": r.scraped_at.isoformat() if r.scraped_at else None,
             }
             for r in rows
-        ],
+        ]
+
+    # Caso: pidieron una fecha específica.
+    if fecha:
+        rows = (
+            base_query.filter(PrecioPizarra.fecha == fecha)
+            .order_by(PrecioPizarra.producto.asc())
+            .all()
+        )
+        if rows:
+            return {
+                "fuente": "precios_pizarra",
+                "estado": "ok",
+                "moneda": "ARS",
+                "unidad": "pesos por tonelada",
+                "filas": _serialize(rows),
+            }
+        # No hay datos para esa fecha — devolvemos lo más reciente que tengamos
+        # como contexto, para que el agente lo cite en su respuesta.
+        latest_rows = (
+            base_query.filter(PrecioPizarra.fecha == latest_fecha)
+            .order_by(PrecioPizarra.producto.asc())
+            .all()
+        )
+        return {
+            "fuente": "precios_pizarra",
+            "estado": "fecha_no_disponible",
+            "fecha_pedida": fecha,
+            "ultima_fecha_disponible": latest_fecha,
+            "moneda": "ARS",
+            "unidad": "pesos por tonelada",
+            "filas": _serialize(latest_rows),
+            "detalle": (
+                f"No hay datos para {fecha}. Devolvemos los precios de la "
+                f"última fecha que sí tenemos: {latest_fecha}. El agente debe "
+                "decirle eso al usuario explícitamente."
+            ),
+        }
+
+    # Sin fecha explícita: devolvemos la fecha más reciente.
+    rows = (
+        base_query.filter(PrecioPizarra.fecha == latest_fecha)
+        .order_by(PrecioPizarra.producto.asc())
+        .all()
+    )
+    return {
+        "fuente": "precios_pizarra",
+        "estado": "ok",
+        "moneda": "ARS",
+        "unidad": "pesos por tonelada",
+        "filas": _serialize(rows),
     }
 
 
