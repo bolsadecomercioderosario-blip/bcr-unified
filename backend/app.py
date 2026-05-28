@@ -163,6 +163,7 @@ app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "soci
 app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
+app.mount("/conversatorio", NoCacheStaticFiles(directory=_CONV_DIR, html=False), name="conversatorio_ui")
 
 
 @app.get("/")
