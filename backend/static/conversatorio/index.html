@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversatorio a la carta — BCR</title>
+    <meta name="description" content="Contanos qué temas te gustaría escuchar en el próximo conversatorio de la Bolsa de Comercio de Rosario.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #f59e0b;
+            --primary-light: #fbbf24;
+            --primary-dark: #b45309;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #0f172a;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --error: #f87171;
+            --success: #34d399;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 2rem 1rem 4rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 20% 0%, rgba(245, 158, 11, 0.10) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 100%, rgba(79, 70, 229, 0.06) 0%, transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 640px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header .logo-text {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text) 0%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.15;
+            margin-bottom: 0.75rem;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.55;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .field {
+            margin-bottom: 1.25rem;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            color: var(--text);
+        }
+
+        .field .hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 0.4rem;
+        }
+
+        .field input,
+        .field textarea {
+            width: 100%;
+            padding: 0.75rem 0.9rem;
+            border-radius: 0.55rem;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .field input:focus,
+        .field textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+
+        .field textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 0.55rem;
+            background: var(--primary);
+            color: #1f1300;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+            font-family: inherit;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--primary-light);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 0.8rem 0.95rem;
+            border-radius: 0.55rem;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert.error {
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            color: var(--error);
+        }
+
+        .alert.show { display: block; }
+
+        .success-state {
+            text-align: center;
+            padding: 1.5rem 0.5rem;
+        }
+
+        .success-state .check {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1.25rem;
+        }
+
+        .success-state h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-state p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            margin-bottom: 1.5rem;
+        }
+
+        .link-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.7rem 1.25rem;
+            border-radius: 0.55rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .link-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary-light);
+        }
+
+        .footer-text {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.7rem; }
+            .card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-text">Bolsa de Comercio de Rosario</div>
+            <h1>Conversatorio a la carta</h1>
+            <p>Contanos qué tema te gustaría escuchar en un próximo conversatorio. Tu sugerencia nos ayuda a armar la agenda.</p>
+        </div>
+
+        <div class="card" id="form-card">
+            <div class="alert error" id="alert-error"></div>
+            <form id="sug-form" novalidate>
+                <div class="field">
+                    <label for="tema">Tema sugerido <span class="hint">(obligatorio)</span></label>
+                    <input type="text" id="tema" name="tema" maxlength="500" required
+                           placeholder="Ej: Perspectivas del mercado de granos para la próxima campaña">
+                </div>
+
+                <div class="field">
+                    <label for="comentarios">¿Por qué te interesa? <span class="hint">(opcional)</span></label>
+                    <textarea id="comentarios" name="comentarios" maxlength="2000"
+                              placeholder="Algún ángulo, especialista que te interese escuchar, etc."></textarea>
+                </div>
+
+                <div class="field">
+                    <label for="nombre">Tu nombre <span class="hint">(opcional)</span></label>
+                    <input type="text" id="nombre" name="nombre" maxlength="120"
+                           placeholder="Cómo te llamás">
+                </div>
+
+                <div class="field">
+                    <label for="email">Email <span class="hint">(opcional, por si queremos contactarte)</span></label>
+                    <input type="email" id="email" name="email" maxlength="200"
+                           placeholder="tu@email.com">
+                </div>
+
+                <button type="submit" class="btn" id="submit-btn">Enviar sugerencia</button>
+            </form>
+        </div>
+
+        <div class="card" id="success-card" style="display:none;">
+            <div class="success-state">
+                <div class="check">✓</div>
+                <h2>¡Gracias!</h2>
+                <p>Recibimos tu sugerencia. La vamos a tener en cuenta para los próximos conversatorios.</p>
+                <button class="link-btn" id="another-btn">Enviar otra sugerencia</button>
+            </div>
+        </div>
+
+        <div class="footer-text">
+            Bolsa de Comercio de Rosario · Área de Comunicación
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('sug-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const alertErr = document.getElementById('alert-error');
+        const formCard = document.getElementById('form-card');
+        const successCard = document.getElementById('success-card');
+        const anotherBtn = document.getElementById('another-btn');
+
+        function showError(msg) {
+            alertErr.textContent = msg;
+            alertErr.classList.add('show');
+        }
+        function clearError() {
+            alertErr.classList.remove('show');
+            alertErr.textContent = '';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError();
+
+            const tema = document.getElementById('tema').value.trim();
+            if (tema.length < 3) {
+                showError('Contanos un poco más sobre el tema (mínimo 3 caracteres).');
+                return;
+            }
+
+            const payload = {
+                tema,
+                comentarios: document.getElementById('comentarios').value.trim(),
+                nombre: document.getElementById('nombre').value.trim(),
+                email: document.getElementById('email').value.trim(),
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enviando…';
+
+            try {
+                const res = await fetch('/api/conversatorio/sugerencias', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.detail || 'No pudimos guardar la sugerencia. Intentalo de nuevo en un minuto.');
+                }
+                formCard.style.display = 'none';
+                successCard.style.display = 'block';
+            } catch (err) {
+                showError(err.message || 'Error de conexión.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Enviar sugerencia';
+            }
+        });
+
+        anotherBtn.addEventListener('click', () => {
+            form.reset();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Enviar sugerencia';
+            successCard.style.display = 'none';
+            formCard.style.display = 'block';
+            document.getElementById('tema').focus();
+        });
+    </script>
+</body>
+</html>
