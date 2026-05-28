@@ -4,219 +4,236 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conversatorio a la carta — BCR</title>
-    <meta name="description" content="Contanos qué temas te gustaría escuchar en el próximo conversatorio de la Bolsa de Comercio de Rosario.">
+    <meta name="description" content="Contanos qué tema te gustaría escuchar en el próximo Conversatorio BCR.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #f59e0b;
-            --primary-light: #fbbf24;
-            --primary-dark: #b45309;
-            --bg: #0f172a;
-            --bg-card: #1e293b;
-            --bg-input: #0f172a;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #334155;
-            --error: #f87171;
-            --success: #34d399;
+            --ink: #0E2A47;
+            --ink-soft: #1f3a5f;
+            --cyan: #5FDDF2;
+            --cyan-strong: #2EC9E3;
+            --bg: #F4F6F9;
+            --card: #ffffff;
+            --border: #E2E8F0;
+            --muted: #5B6B82;
+            --input-bg: #F8FAFC;
+            --error: #b91c1c;
+            --success: #047857;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html, body { height: 100%; }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .page {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            padding: 2rem 1rem 4rem;
         }
 
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(ellipse at 20% 0%, rgba(245, 158, 11, 0.10) 0%, transparent 50%),
-                        radial-gradient(ellipse at 80% 100%, rgba(79, 70, 229, 0.06) 0%, transparent 50%);
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            max-width: 640px;
+        /* Banda superior dark navy con esquinas inferiores redondeadas, igual
+           que los flyers del Conversatorio BCR. */
+        .topbar {
             width: 100%;
+            background: var(--ink);
+            padding: 1.5rem 1rem 2.25rem;
+            display: flex;
+            justify-content: center;
+            border-radius: 0 0 28px 28px;
+            position: relative;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 2.5rem;
+        .topbar img {
+            height: 72px;
+            width: auto;
+            max-width: 90%;
+            display: block;
         }
 
-        .header .logo-text {
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
+        /* Contenido principal */
+        .container {
+            width: 100%;
+            max-width: 620px;
+            padding: 2.5rem 1.25rem 3rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        .header h1 {
-            font-size: 2.25rem;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: var(--ink);
             font-weight: 800;
-            background: linear-gradient(135deg, var(--text) 0%, var(--primary-light) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.15;
-            margin-bottom: 0.75rem;
+            font-size: 1.55rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.01em;
         }
 
-        .header p {
-            color: var(--text-muted);
-            font-size: 1rem;
+        .brand svg {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+        }
+
+        /* Bloque del título: "a la carta" sobre fondo cyan (highlighter)
+           replicando exactamente el estilo de los flyers. */
+        .title-wrap {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .title-hl {
+            display: inline-block;
+            background: var(--cyan);
+            color: #ffffff;
+            font-size: 2.4rem;
+            font-weight: 800;
+            padding: 0.25rem 1.1rem 0.35rem;
+            line-height: 1.15;
+            border-radius: 4px;
+            letter-spacing: -0.01em;
+        }
+
+        .subtitle {
+            color: var(--ink-soft);
+            font-size: 1.05rem;
             line-height: 1.55;
             max-width: 520px;
-            margin: 0 auto;
+            margin: 1.25rem auto 0;
+            text-align: center;
+            font-weight: 500;
         }
 
+        /* Tarjeta del formulario */
         .card {
-            background: var(--bg-card);
+            width: 100%;
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            background: var(--primary);
-        }
-
-        .field {
-            margin-bottom: 1.25rem;
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-top: 2rem;
+            box-shadow: 0 10px 30px -18px rgba(14, 42, 71, 0.25);
         }
 
         .field label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            margin-bottom: 0.4rem;
-            color: var(--text);
+            color: var(--ink);
+            margin-bottom: 0.55rem;
         }
 
-        .field .hint {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 400;
-            margin-left: 0.4rem;
-        }
-
-        .field input,
         .field textarea {
             width: 100%;
-            padding: 0.75rem 0.9rem;
-            border-radius: 0.55rem;
-            border: 1px solid var(--border);
-            background: var(--bg-input);
-            color: var(--text);
+            padding: 0.95rem 1rem;
+            border-radius: 10px;
+            border: 1.5px solid var(--border);
+            background: var(--input-bg);
+            color: var(--ink);
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 1rem;
+            line-height: 1.5;
             outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .field input:focus,
-        .field textarea:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
-        }
-
-        .field textarea {
-            min-height: 110px;
             resize: vertical;
+            min-height: 140px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .field textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        .field textarea:focus {
+            border-color: var(--cyan-strong);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(94, 221, 242, 0.25);
         }
 
         .btn {
             width: 100%;
-            padding: 0.85rem;
+            margin-top: 1.25rem;
+            padding: 0.95rem;
             border: none;
-            border-radius: 0.55rem;
-            background: var(--primary);
-            color: #1f1300;
+            border-radius: 999px;
+            background: var(--cyan);
+            color: var(--ink);
             font-weight: 700;
             font-size: 1rem;
             cursor: pointer;
-            transition: background 0.2s ease, transform 0.1s ease;
             font-family: inherit;
+            transition: background 0.2s ease, transform 0.05s ease;
         }
 
         .btn:hover:not(:disabled) {
-            background: var(--primary-light);
+            background: var(--cyan-strong);
+            color: #ffffff;
         }
 
-        .btn:active:not(:disabled) {
-            transform: translateY(1px);
-        }
+        .btn:active:not(:disabled) { transform: translateY(1px); }
 
         .btn:disabled {
-            opacity: 0.6;
+            opacity: 0.7;
             cursor: not-allowed;
         }
 
         .alert {
-            padding: 0.8rem 0.95rem;
-            border-radius: 0.55rem;
+            padding: 0.75rem 0.95rem;
+            border-radius: 8px;
             font-size: 0.9rem;
             margin-bottom: 1rem;
             display: none;
         }
 
         .alert.error {
-            background: rgba(248, 113, 113, 0.1);
-            border: 1px solid rgba(248, 113, 113, 0.3);
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
             color: var(--error);
         }
 
         .alert.show { display: block; }
 
+        /* Estado "gracias" */
         .success-state {
             text-align: center;
-            padding: 1.5rem 0.5rem;
+            padding: 0.75rem 0.25rem 0.25rem;
         }
 
         .success-state .check {
             width: 64px;
             height: 64px;
             border-radius: 50%;
-            background: rgba(52, 211, 153, 0.15);
-            color: var(--success);
+            background: var(--cyan);
+            color: var(--ink);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 2rem;
+            font-weight: 800;
             margin: 0 auto 1.25rem;
         }
 
         .success-state h2 {
-            font-size: 1.35rem;
-            font-weight: 700;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--ink);
             margin-bottom: 0.5rem;
         }
 
         .success-state p {
-            color: var(--text-muted);
+            color: var(--muted);
             font-size: 0.95rem;
             line-height: 1.55;
             margin-bottom: 1.5rem;
@@ -224,87 +241,75 @@
 
         .link-btn {
             background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 0.7rem 1.25rem;
-            border-radius: 0.55rem;
-            font-weight: 600;
+            border: 1.5px solid var(--cyan-strong);
+            color: var(--ink);
+            padding: 0.7rem 1.4rem;
+            border-radius: 999px;
+            font-weight: 700;
             cursor: pointer;
             font-family: inherit;
             font-size: 0.9rem;
-            transition: border-color 0.2s ease, color 0.2s ease;
+            transition: background 0.2s ease;
         }
 
         .link-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary-light);
+            background: rgba(94, 221, 242, 0.18);
         }
 
-        .footer-text {
-            margin-top: 2rem;
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-
-        @media (max-width: 480px) {
-            .header h1 { font-size: 1.7rem; }
-            .card { padding: 1.5rem; }
+        /* Mobile tweaks */
+        @media (max-width: 520px) {
+            .topbar { padding: 1.25rem 1rem 2rem; }
+            .topbar img { height: 56px; }
+            .container { padding: 2rem 1rem 2.5rem; }
+            .brand { font-size: 1.25rem; }
+            .brand svg { width: 26px; height: 26px; }
+            .title-hl { font-size: 1.8rem; padding: 0.2rem 0.85rem 0.3rem; }
+            .subtitle { font-size: 0.95rem; }
+            .card { padding: 1.35rem; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo-text">Bolsa de Comercio de Rosario</div>
-            <h1>Conversatorio a la carta</h1>
-            <p>Contanos qué tema te gustaría escuchar en un próximo conversatorio. Tu sugerencia nos ayuda a armar la agenda.</p>
-        </div>
+    <div class="page">
+        <header class="topbar">
+            <img src="logo_bcr.png" alt="Bolsa de Comercio de Rosario">
+        </header>
 
-        <div class="card" id="form-card">
-            <div class="alert error" id="alert-error"></div>
-            <form id="sug-form" novalidate>
-                <div class="field">
-                    <label for="tema">Tema sugerido <span class="hint">(obligatorio)</span></label>
-                    <input type="text" id="tema" name="tema" maxlength="500" required
-                           placeholder="Ej: Perspectivas del mercado de granos para la próxima campaña">
-                </div>
-
-                <div class="field">
-                    <label for="comentarios">¿Por qué te interesa? <span class="hint">(opcional)</span></label>
-                    <textarea id="comentarios" name="comentarios" maxlength="2000"
-                              placeholder="Algún ángulo, especialista que te interese escuchar, etc."></textarea>
-                </div>
-
-                <div class="field">
-                    <label for="nombre">Tu nombre <span class="hint">(opcional)</span></label>
-                    <input type="text" id="nombre" name="nombre" maxlength="120"
-                           placeholder="Cómo te llamás">
-                </div>
-
-                <div class="field">
-                    <label for="email">Email <span class="hint">(opcional, por si queremos contactarte)</span></label>
-                    <input type="email" id="email" name="email" maxlength="200"
-                           placeholder="tu@email.com">
-                </div>
-
-                <button type="submit" class="btn" id="submit-btn">Enviar sugerencia</button>
-            </form>
-        </div>
-
-        <div class="card" id="success-card" style="display:none;">
-            <div class="success-state">
-                <div class="check">✓</div>
-                <h2>¡Gracias!</h2>
-                <p>Recibimos tu sugerencia. La vamos a tener en cuenta para los próximos conversatorios.</p>
-                <button class="link-btn" id="another-btn">Enviar otra sugerencia</button>
+        <main class="container">
+            <div class="brand" aria-label="Conversatorio BCR">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6 7.5C6 6.12 7.12 5 8.5 5h12C21.88 5 23 6.12 23 7.5v8c0 1.38-1.12 2.5-2.5 2.5H13l-4.5 4v-4H8.5C7.12 18 6 16.88 6 15.5v-8z" stroke="#0E2A47" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M11 18.5C11 17.12 12.12 16 13.5 16h12C26.88 16 28 17.12 28 18.5v6c0 1.38-1.12 2.5-2.5 2.5H21l-3 3v-3h-4.5C12.12 27 11 25.88 11 24.5v-6z" stroke="#0E2A47" stroke-width="2" stroke-linejoin="round" fill="#ffffff"/>
+                </svg>
+                <span>Conversatorio BCR</span>
             </div>
-        </div>
 
-        <div class="footer-text">
-            Bolsa de Comercio de Rosario · Área de Comunicación
-        </div>
+            <div class="title-wrap">
+                <span class="title-hl">a la carta</span>
+                <p class="subtitle">Contanos qué tema te gustaría escuchar en un próximo conversatorio</p>
+            </div>
+
+            <section class="card" id="form-card">
+                <div class="alert error" id="alert-error"></div>
+                <form id="sug-form" novalidate>
+                    <div class="field">
+                        <label for="tema">Tu sugerencia</label>
+                        <textarea id="tema" name="tema" maxlength="500" required
+                                  placeholder="Ej: Perspectivas del mercado de granos para la próxima campaña"></textarea>
+                    </div>
+                    <button type="submit" class="btn" id="submit-btn">Enviar sugerencia</button>
+                </form>
+            </section>
+
+            <section class="card" id="success-card" style="display:none;">
+                <div class="success-state">
+                    <div class="check">✓</div>
+                    <h2>¡Gracias!</h2>
+                    <p>Recibimos tu sugerencia. La vamos a tener en cuenta para los próximos conversatorios.</p>
+                    <button class="link-btn" id="another-btn">Enviar otra</button>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script>
@@ -334,13 +339,6 @@
                 return;
             }
 
-            const payload = {
-                tema,
-                comentarios: document.getElementById('comentarios').value.trim(),
-                nombre: document.getElementById('nombre').value.trim(),
-                email: document.getElementById('email').value.trim(),
-            };
-
             submitBtn.disabled = true;
             submitBtn.textContent = 'Enviando…';
 
@@ -348,7 +346,7 @@
                 const res = await fetch('/api/conversatorio/sugerencias', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify({ tema }),
                 });
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
