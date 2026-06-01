@@ -1,4 +1,4 @@
-import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities, loadEfemerides } from './state.js';
+import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities, loadEfemerides, loadNewsletterSettings } from './state.js';
 import { renderList } from './components/List.js';
 import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
@@ -191,7 +191,7 @@ state.activities = state.activities.map(a => ({
 
 // Initial Render
 subscribe(updateUI);
-Promise.all([loadActivities(), loadEfemerides()]).then(() => {
+Promise.all([loadActivities(), loadEfemerides(), loadNewsletterSettings()]).then(() => {
     updateUI();
     startPolling();
 });
@@ -220,6 +220,7 @@ function pollIfSafe() {
     if (isUserEditing()) return;
     loadActivities({ silent: true });
     loadEfemerides({ silent: true });
+    loadNewsletterSettings({ silent: true });
 }
 
 let pollingStarted = false;

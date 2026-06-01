@@ -137,3 +137,33 @@ class EfemerideOut(EfemerideBase):
 
     class Config:
         from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Newsletter Conectados — settings de "edición actual" (singleton).
+# Define el rango temporal que enmarca la edición que se está armando.
+# Las actividades del canal Conectados que caen en [start_at, end_at] se
+# muestran en la pestaña; las que quedan afuera, no. Bloques fijos y
+# variables (is_custom) no se filtran por rango.
+# ---------------------------------------------------------------------------
+class NewsletterSettings(Base):
+    __tablename__ = "newsletter_settings"
+
+    # id fijo en 1 — solo hay una fila. Más simple que un kv genérico.
+    id = Column(Integer, primary_key=True, default=1)
+    # ISO 8601: "YYYY-MM-DDTHH:MM" (compatible con datetime-local del browser).
+    edition_start_at = Column(String, nullable=False)
+    edition_end_at = Column(String, nullable=False)
+
+
+class NewsletterSettingsOut(BaseModel):
+    edition_start_at: str
+    edition_end_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class NewsletterSettingsUpdate(BaseModel):
+    edition_start_at: str
+    edition_end_at: str

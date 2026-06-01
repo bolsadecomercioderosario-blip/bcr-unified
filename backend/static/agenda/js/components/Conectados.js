@@ -1,29 +1,35 @@
-import { state, updateActivity, addActivity, deleteActivity } from '../state.js';
+import { state, updateActivity, addActivity, deleteActivity, saveNewsletterSettings } from '../state.js';
 // Nota: la generación con IA (botón "Generar con IA" en cada bloque) se sacó
 // porque los resultados no eran lo suficientemente buenos. Por ahora los copys
 // se redactan a mano o en ChatGPT externo. La función generateNewsletterBlock
 // sigue exportada en utils/ai-engine.js por si querés re-habilitarlo.
 import { generateNewsletterHTML } from '../utils/NewsletterGenerator.js';
 
-// --- Helpers de fecha (semana de newsletter = sábado a viernes) ---
-function isCurrentNewsletterWeek(dateStr) {
-    if (!dateStr) return false;
-    const actDate = new Date(dateStr + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+// ---------------------------------------------------------
+// Filtro por rango de "edición actual" (lo guardado en state.newsletterSettings).
+// Combina date (YYYY-MM-DD) + time (HH:MM o "A definir") en un Date local.
+// Si time = "A definir", usa 00:00.
+// ---------------------------------------------------------
+function inCurrentEdition(act) {
+    const { edition_start_at, edition_end_at } = state.newsletterSettings || {};
+    if (!edition_start_at || !edition_end_at) return false;
+    if (!act.date) return false;
 
-    const day = today.getDay();
-    // Sábado=6: arranca hoy. Otro día: retrocede al último sábado.
-    const diff = day === 6 ? 0 : -(day + 1);
+    const time = (act.time && act.time !== 'A definir') ? act.time : '00:00';
+    const actAt = new Date(`${act.date}T${time}`);
+    const start = new Date(edition_start_at);
+    const end = new Date(edition_end_at);
+    return actAt >= start && actAt <= end;
+}
 
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-
-    const nextFriday = new Date(saturday);
-    nextFriday.setDate(saturday.getDate() + 6);
-    nextFriday.setHours(23, 59, 59, 999);
-
-    return actDate >= saturday && actDate <= nextFriday;
+// Formato corto, español: "16 may 00:00".
+function fmtEditionLabel(isoLocal) {
+    if (!isoLocal) return '—';
+    const d = new Date(isoLocal);
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getDate()} ${months[d.getMonth()]} ${hh}:${mm}`;
 }
 
 /**
@@ -74,23 +80,51 @@ export function renderConectados(container) {
     const conectadosActivities = state.activities
         .filter(a => {
             if (!a.channels.includes('Conectados')) return false;
-            // Los bloques fijos persisten siempre, sin importar la fecha.
-            if (a.block_type === 'fixed') return true;
-            // Compat: si vino un legacy con observations='FIXED_BLOCK' (no
-            // debería pasar tras la migración, pero por las dudas)
+            // Fijos y variables se muestran siempre — no se filtran por rango.
+            // Los fijos persisten edición a edición; los variables son
+            // específicos a la edición actual y los borrás vos cuando termina.
+            if (a.block_type === 'fixed' || a.block_type === 'variable') return true;
+            // Compat: legacy con observations='FIXED_BLOCK' (post-migración no
+            // debería pasar, pero por las dudas)
             if (a.is_custom && a.observations === 'FIXED_BLOCK') return true;
-            return isCurrentNewsletterWeek(a.date);
+            // Actividades reales: se filtran por el rango de la edición actual.
+            return inCurrentEdition(a);
         })
         .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'content-wrapper';
 
+    const { edition_start_at, edition_end_at } = state.newsletterSettings || {};
+    const editionLabel = `${fmtEditionLabel(edition_start_at)} → ${fmtEditionLabel(edition_end_at)}`;
+
     const header = document.createElement('div');
     header.className = 'conectados-header-bar';
     header.innerHTML = `
         <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
         <div class="conectados-header-actions">
+            <div id="edition-control" style="position: relative;">
+                <button id="btn-edition" type="button" title="Definí qué actividades entran en esta edición"
+                    style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem 0.85rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem;">
+                    <i data-lucide="calendar-range" style="width: 15px; height: 15px;"></i>
+                    <span>Edición: ${editionLabel}</span>
+                    <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                </button>
+                <div id="edition-popover" style="display: none; position: absolute; top: calc(100% + 0.4rem); right: 0; background: white; border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.85rem; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 50; min-width: 320px;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Las actividades dentro de este rango se muestran en Conectados. Los bloques fijos y variables se muestran siempre.</div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">Desde</label>
+                    <input id="edition-start" type="datetime-local" value="${edition_start_at || ''}"
+                        style="width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 0.65rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">Hasta</label>
+                    <input id="edition-end" type="datetime-local" value="${edition_end_at || ''}"
+                        style="width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 0.75rem;">
+                    <div id="edition-err" style="display: none; color: #b91c1c; font-size: 0.75rem; margin-bottom: 0.5rem;"></div>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                        <button id="btn-edition-cancel" type="button" style="background: white; border: 1px solid var(--border); padding: 0.4rem 0.9rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer;">Cancelar</button>
+                        <button id="btn-edition-save" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.9rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">Guardar</button>
+                    </div>
+                </div>
+            </div>
             <button id="btn-gen-newsletter" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0742ab;">
                 <i data-lucide="mail"></i> Generar Newsletter
             </button>
@@ -103,6 +137,53 @@ export function renderConectados(container) {
         </div>
     `;
     wrapper.appendChild(header);
+
+    // --- Wire del popover de edición ---
+    const editionBtn = header.querySelector('#btn-edition');
+    const editionPop = header.querySelector('#edition-popover');
+    const inputStart = header.querySelector('#edition-start');
+    const inputEnd = header.querySelector('#edition-end');
+    const errBox = header.querySelector('#edition-err');
+
+    const closePop = () => { editionPop.style.display = 'none'; };
+    const openPop = () => {
+        editionPop.style.display = 'block';
+        inputStart.value = state.newsletterSettings.edition_start_at || '';
+        inputEnd.value = state.newsletterSettings.edition_end_at || '';
+        errBox.style.display = 'none';
+    };
+
+    editionBtn.onclick = (e) => {
+        e.stopPropagation();
+        editionPop.style.display === 'none' ? openPop() : closePop();
+    };
+    // Click fuera del popover lo cierra
+    document.addEventListener('click', (e) => {
+        if (!header.querySelector('#edition-control').contains(e.target)) closePop();
+    });
+    header.querySelector('#btn-edition-cancel').onclick = closePop;
+    header.querySelector('#btn-edition-save').onclick = async () => {
+        const start = inputStart.value;
+        const end = inputEnd.value;
+        if (!start || !end) {
+            errBox.textContent = 'Completá las dos fechas.';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (end <= start) {
+            errBox.textContent = 'La fecha "Hasta" tiene que ser posterior a "Desde".';
+            errBox.style.display = 'block';
+            return;
+        }
+        const result = await saveNewsletterSettings({ edition_start_at: start, edition_end_at: end });
+        if (result.ok) {
+            closePop();
+            // El save dispara notify() en state — la lista se re-renderiza automático
+        } else {
+            errBox.textContent = result.error || 'No se pudo guardar.';
+            errBox.style.display = 'block';
+        }
+    };
 
     if (conectadosActivities.length === 0) {
         const empty = document.createElement('div');
