@@ -3,305 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot BCR — Test | __VERSION__</title>
+    <title>Bot BCR | __VERSION__</title>
     <script src="/static/auth.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /*
+         * Paleta inspirada en WhatsApp Web dark mode. La idea es que el
+         * usuario que prueba esto desde desktop vea algo lo más parecido a
+         * la experiencia real del WhatsApp del celular.
+         */
         :root {
-            --primary: #4f46e5;
-            --primary-light: #6366f1;
-            --bg: #0f172a;
-            --bg-card: #1e293b;
-            --bg-elev: #273548;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #334155;
-            --accent: #34d399;
-            --accent-dim: rgba(52, 211, 153, 0.12);
-            --user-bubble: #4f46e5;
-            --bot-bubble: #1e293b;
-            --error: #f87171;
+            --wa-bg: #0b141a;
+            --wa-topbar: #1f2c34;
+            --wa-input-bar: #1f2c34;
+            --wa-input-field: #2a3942;
+            --wa-bubble-bot: #1f2c34;
+            --wa-bubble-user: #005c4b;
+            --wa-text-primary: #e9edef;
+            --wa-text-secondary: #8696a0;
+            --wa-border: rgba(134, 150, 160, 0.15);
+            --wa-green: #00a884;
+            --wa-error: #f15c6d;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--wa-bg);
+            color: var(--wa-text-primary);
             display: flex;
             flex-direction: column;
         }
+
+        /* ---- Top bar (estilo WhatsApp: header del contacto) ---- */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 0.85rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(8px);
+            gap: 0.75rem;
+            padding: 0.6rem 1rem;
+            background: var(--wa-topbar);
+            border-bottom: 1px solid var(--wa-border);
             position: sticky;
             top: 0;
             z-index: 10;
         }
         .topbar a.back {
-            color: var(--text-muted);
+            color: var(--wa-text-secondary);
             text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 500;
-            display: inline-flex;
+            font-size: 1.1rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 50%;
+            line-height: 1;
+            transition: background 0.15s;
+        }
+        .topbar a.back:hover { background: rgba(255, 255, 255, 0.05); }
+        .topbar .avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--wa-green);
+            display: flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.4rem 0.75rem;
-            border-radius: 0.5rem;
-            transition: all 0.2s;
-        }
-        .topbar a.back:hover {
-            background: var(--bg-elev);
-            color: var(--text);
-        }
-        .topbar h1 {
+            justify-content: center;
             font-size: 1rem;
             font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
         }
-        .topbar .badge {
-            font-size: 0.65rem;
+        .topbar .who {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            line-height: 1.2;
+            flex: 1;
+        }
+        .topbar .who .name {
+            font-size: 0.95rem;
             font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.25rem 0.6rem;
-            border-radius: 999px;
-            background: var(--accent-dim);
-            color: var(--accent);
+            color: var(--wa-text-primary);
         }
-        .container {
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 1.5rem;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+        .topbar .who .status {
+            font-size: 0.75rem;
+            color: var(--wa-text-secondary);
         }
-        .intro {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 1rem 1.25rem;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-        .intro strong { color: var(--text); }
-        .intro ul { margin: 0.5rem 0 0 1.25rem; }
-        .intro li { margin-bottom: 0.2rem; }
-        .chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 0.85rem;
-            min-height: 200px;
-        }
-        .bubble {
-            max-width: 85%;
-            padding: 0.75rem 1rem;
+        .topbar button.reset {
+            background: transparent;
+            color: var(--wa-text-secondary);
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0.4rem 0.7rem;
             border-radius: 1rem;
-            font-size: 0.92rem;
-            line-height: 1.5;
+            transition: background 0.15s;
+        }
+        .topbar button.reset:hover { background: rgba(255, 255, 255, 0.05); }
+
+        /* ---- Área de chat ---- */
+        .chat-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem 1rem 1.5rem;
+            /* Sutil patrón geométrico para imitar el fondo de WhatsApp */
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.012) 0, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.012) 0, transparent 50%);
+        }
+        .chat {
+            max-width: 760px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        /* ---- Bubbles ---- */
+        .bubble {
+            max-width: 78%;
+            padding: 0.55rem 0.75rem 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.93rem;
+            line-height: 1.4;
             white-space: pre-wrap;
             word-wrap: break-word;
+            position: relative;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
         }
         .bubble.user {
-            background: var(--user-bubble);
-            color: white;
+            background: var(--wa-bubble-user);
+            color: var(--wa-text-primary);
             align-self: flex-end;
-            border-bottom-right-radius: 0.25rem;
+            border-top-right-radius: 0.15rem;
         }
         .bubble.bot {
-            background: var(--bot-bubble);
-            border: 1px solid var(--border);
+            background: var(--wa-bubble-bot);
+            color: var(--wa-text-primary);
             align-self: flex-start;
-            border-bottom-left-radius: 0.25rem;
+            border-top-left-radius: 0.15rem;
         }
         .bubble.bot.loading {
-            color: var(--text-muted);
+            color: var(--wa-text-secondary);
             font-style: italic;
         }
         .bubble.bot.error {
-            border-color: var(--error);
-            color: var(--error);
+            color: var(--wa-error);
         }
-        .debug {
-            margin-top: 0.5rem;
-            font-size: 0.7rem;
-            color: var(--text-muted);
+        .bubble .timestamp {
+            display: block;
+            font-size: 0.65rem;
+            color: var(--wa-text-secondary);
+            text-align: right;
+            margin-top: 0.2rem;
+            opacity: 0.75;
+        }
+
+        /* ---- Input bar abajo ---- */
+        .input-bar {
+            padding: 0.65rem 0.75rem;
+            background: var(--wa-input-bar);
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.6rem;
+            align-items: flex-end;
+            border-top: 1px solid var(--wa-border);
         }
-        .debug .tag {
-            background: var(--bg-elev);
-            padding: 0.2rem 0.55rem;
-            border-radius: 0.4rem;
-            font-family: ui-monospace, SFMono-Regular, monospace;
-        }
-        .input-row {
-            position: sticky;
-            bottom: 1rem;
-            display: flex;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 0.85rem;
-            margin-top: auto;
-        }
-        textarea {
+        .input-bar textarea {
             flex: 1;
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 0.6rem;
-            padding: 0.65rem 0.85rem;
-            font-family: inherit;
-            font-size: 0.92rem;
-            resize: none;
-            outline: none;
-            min-height: 44px;
-            max-height: 160px;
-        }
-        textarea:focus { border-color: var(--primary-light); }
-        button.send {
-            background: var(--primary);
-            color: white;
+            background: var(--wa-input-field);
+            color: var(--wa-text-primary);
             border: none;
-            padding: 0 1.25rem;
-            border-radius: 0.6rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: background 0.2s;
-            white-space: nowrap;
+            outline: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 0.7rem 0.9rem;
+            border-radius: 1.5rem;
+            resize: none;
+            min-height: 42px;
+            max-height: 140px;
+            line-height: 1.3;
         }
-        button.send:hover:not(:disabled) { background: var(--primary-light); }
-        button.send:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.reset {
-            background: transparent;
-            color: var(--text-muted);
-            border: 1px solid var(--border);
-            padding: 0.4rem 0.85rem;
-            border-radius: 999px;
-            font-size: 0.75rem;
+        .input-bar textarea::placeholder { color: var(--wa-text-secondary); }
+        .input-bar button.send {
+            background: var(--wa-green);
+            color: #fff;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             cursor: pointer;
-            transition: all 0.2s;
-        }
-        button.reset:hover { background: var(--bg-elev); color: var(--text); }
-        .conv-status {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 0.25rem;
-            padding: 0 0.25rem;
+            justify-content: center;
+            transition: filter 0.15s;
+            flex-shrink: 0;
         }
-        .conv-status .dot {
-            display: inline-block;
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 50%;
-            background: var(--text-muted);
-            margin-right: 0.4rem;
-            vertical-align: middle;
-        }
-        .conv-status.active .dot { background: var(--accent); }
-        .examples {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-            margin-top: 0.5rem;
-        }
-        .example-chip {
-            font-size: 0.75rem;
-            background: var(--bg-elev);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 0.35rem 0.7rem;
-            border-radius: 999px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .example-chip:hover {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
+        .input-bar button.send:hover:not(:disabled) { filter: brightness(1.08); }
+        .input-bar button.send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .input-bar button.send svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
         }
     </style>
 </head>
 <body>
     <div class="topbar">
-        <a href="/" class="back">← Hub</a>
-        <h1>Bot BCR</h1>
-        <span class="badge">TEST</span>
+        <a href="/" class="back" title="Volver al hub">←</a>
+        <div class="avatar">BCR</div>
+        <div class="who">
+            <span class="name">Bot BCR</span>
+            <span class="status" id="conv-label">disponible</span>
+        </div>
+        <button class="reset" id="reset" style="display:none">Reiniciar</button>
     </div>
 
-    <div class="container">
-        <div class="intro">
-            <strong>Página de prueba del bot.</strong> Escribí una consulta y mirá cómo responde. Por debajo el bot va a usar las herramientas que correspondan:
-            <ul>
-                <li>📅 <strong>consultar_agenda</strong> — para preguntas con fecha</li>
-                <li>🏛 <strong>buscar_institucional</strong> — para áreas, autoridades, mercados, etc.</li>
-                <li>📰 <strong>buscar_informativo</strong> — para análisis del informativo semanal</li>
-                <li>📈 <strong>buscar_comentario_diario</strong> — para coyuntura del mercado</li>
-            </ul>
-        </div>
-
+    <div class="chat-wrap">
         <div class="chat" id="chat"></div>
+    </div>
 
-        <div>
-            <div class="conv-status" id="conv-status">
-                <span><span class="dot"></span><span id="conv-label">Conversación nueva</span></span>
-                <button class="reset" id="reset" style="display:none">Reiniciar conversación</button>
-            </div>
-            <div class="input-row">
-                <textarea id="msg" placeholder="Escribí tu consulta…" rows="1"></textarea>
-                <button class="send" id="send">Enviar</button>
-            </div>
-            <div class="examples" id="examples">
-                <span class="example-chip" data-q="¿Qué actividades hay esta semana?">¿Qué actividades hay esta semana?</span>
-                <span class="example-chip" data-q="¿Quién es el presidente de la BCR?">¿Quién es el presidente?</span>
-                <span class="example-chip" data-q="¿Qué es BCRlabs?">¿Qué es BCRlabs?</span>
-                <span class="example-chip" data-q="¿Cómo me asocio a la BCR?">¿Cómo me asocio?</span>
-                <span class="example-chip" data-q="¿Qué pasó con la soja hoy?">¿Qué pasó con la soja hoy?</span>
-                <span class="example-chip" data-q="¿Qué dice el último informativo sobre exportaciones?">Últimas exportaciones</span>
-            </div>
-        </div>
+    <div class="input-bar">
+        <textarea id="msg" placeholder="Escribí un mensaje" rows="1"></textarea>
+        <button class="send" id="send" title="Enviar">
+            <svg viewBox="0 0 24 24"><path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/></svg>
+        </button>
     </div>
 
     <script>
         const chatEl = document.getElementById('chat');
+        const chatWrapEl = document.querySelector('.chat-wrap');
         const msgEl = document.getElementById('msg');
         const sendBtn = document.getElementById('send');
         const resetBtn = document.getElementById('reset');
-        const convStatus = document.getElementById('conv-status');
         const convLabel = document.getElementById('conv-label');
 
-        // Memoria conversacional: guardamos el último response_id que devolvió
-        // el bot y lo mandamos como previous_response_id en el siguiente turno.
-        // Así OpenAI mantiene el contexto server-side y no tenemos que
-        // reconstruir la conversación de cero.
+        // Memoria conversacional: guardamos el response_id del último turno
+        // del bot y lo enviamos como previous_response_id en el siguiente.
+        // OpenAI mantiene el contexto server-side.
         let lastResponseId = null;
+
+        function nowTimestamp() {
+            const d = new Date();
+            return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        }
 
         function updateConvStatus() {
             if (lastResponseId) {
-                convStatus.classList.add('active');
-                convLabel.textContent = 'Conversación activa — el bot recuerda lo anterior';
+                convLabel.textContent = 'conversando…';
                 resetBtn.style.display = '';
             } else {
-                convStatus.classList.remove('active');
-                convLabel.textContent = 'Conversación nueva';
+                convLabel.textContent = 'disponible';
                 resetBtn.style.display = 'none';
             }
         }
@@ -313,32 +263,21 @@
             msgEl.focus();
         }
 
-        function addBubble(text, who, debug) {
+        function addBubble(text, who) {
             const b = document.createElement('div');
             b.className = 'bubble ' + who;
-            b.textContent = text;
-            if (who === 'bot' && debug) {
-                const d = document.createElement('div');
-                d.className = 'debug';
-                const tools = (debug.tools_used || []);
-                if (tools.length) {
-                    tools.forEach(t => {
-                        const tag = document.createElement('span');
-                        tag.className = 'tag';
-                        tag.textContent = '🛠 ' + t;
-                        d.appendChild(tag);
-                    });
-                }
-                if (debug.iterations) {
-                    const tag = document.createElement('span');
-                    tag.className = 'tag';
-                    tag.textContent = '⟲ ' + debug.iterations + ' iter';
-                    d.appendChild(tag);
-                }
-                b.appendChild(d);
-            }
+            // Text + timestamp dentro del bubble (estilo WhatsApp).
+            const textNode = document.createTextNode(text);
+            b.appendChild(textNode);
+            const ts = document.createElement('span');
+            ts.className = 'timestamp';
+            ts.textContent = nowTimestamp();
+            b.appendChild(ts);
             chatEl.appendChild(b);
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            // Auto-scroll a lo último.
+            requestAnimationFrame(() => {
+                chatWrapEl.scrollTop = chatWrapEl.scrollHeight;
+            });
             return b;
         }
 
@@ -350,7 +289,7 @@
             sendBtn.disabled = true;
 
             addBubble(text, 'user');
-            const loading = addBubble('Pensando…', 'bot');
+            const loading = addBubble('escribiendo…', 'bot');
             loading.classList.add('loading');
 
             try {
@@ -362,24 +301,21 @@
                         previous_response_id: lastResponseId,
                     }),
                 });
-                // Leemos como texto primero — si el server devuelve un 500
-                // con body plain ("Internal Server Error"), res.json() rompe.
+                // Leemos como texto primero — si el server tira 500 con body
+                // plain ("Internal Server Error"), JSON.parse rompe.
                 const raw = await res.text();
                 let data;
                 try { data = JSON.parse(raw); } catch (_) { data = null; }
                 loading.remove();
                 if (!res.ok) {
                     const detail = (data && (data.detail || data.reply)) || raw || ('HTTP ' + res.status);
-                    const b = addBubble('Server respondió ' + res.status + ': ' + detail, 'bot');
+                    const b = addBubble('Error ' + res.status + ': ' + detail, 'bot');
                     b.classList.add('error');
                 } else if (!data) {
-                    const b = addBubble('Respuesta no-JSON del server: ' + raw, 'bot');
+                    const b = addBubble('Respuesta no-JSON: ' + raw, 'bot');
                     b.classList.add('error');
                 } else {
-                    addBubble(data.reply || '(sin respuesta)', 'bot', {
-                        tools_used: data.tools_used,
-                        iterations: data.debug && data.debug.iterations,
-                    });
+                    addBubble(data.reply || '(sin respuesta)', 'bot');
                     if (data.response_id) {
                         lastResponseId = data.response_id;
                         updateConvStatus();
@@ -405,13 +341,7 @@
         });
         msgEl.addEventListener('input', () => {
             msgEl.style.height = 'auto';
-            msgEl.style.height = Math.min(msgEl.scrollHeight, 160) + 'px';
-        });
-        document.getElementById('examples').addEventListener('click', (e) => {
-            if (e.target.classList.contains('example-chip')) {
-                msgEl.value = e.target.dataset.q;
-                send();
-            }
+            msgEl.style.height = Math.min(msgEl.scrollHeight, 140) + 'px';
         });
     </script>
 </body>
