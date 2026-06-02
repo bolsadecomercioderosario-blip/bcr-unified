@@ -24,10 +24,13 @@ from migrate import migrate
 # antes de create_all (side effect del import).
 import agenda_models  # noqa: F401
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
+import conversatorio.models  # noqa: F401  — registra Sugerencia
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
 from bot.router import router as bot_api
+from buscador.router import router as buscador_api
+from conversatorio.router import router as conversatorio_api
 from lluvias.router import router as lluvias_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
@@ -78,6 +81,8 @@ app.include_router(social_api)
 app.include_router(agenda_api)
 app.include_router(semana_datos_api)
 app.include_router(bot_api)
+app.include_router(buscador_api)
+app.include_router(conversatorio_api)
 
 
 # ---------------------------------------------------------
@@ -121,6 +126,33 @@ for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot"):
     app.get(f"/{_mod}/")(_idx)
 
 
+# Conversatorio a la carta — dos páginas: form público (/conversatorio/) y
+# admin (/conversatorio/admin). No usan __VERSION__ porque todo el CSS/JS
+# vive inline en cada HTML, así que vamos directo con FileResponse.
+_CONV_DIR = os.path.join(STATIC_DIR, "conversatorio")
+
+
+@app.get("/conversatorio")
+async def _conv_redirect():
+    return RedirectResponse(url="/conversatorio/", status_code=307)
+
+
+@app.get("/conversatorio/")
+async def _conv_index():
+    return FileResponse(
+        os.path.join(_CONV_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
+@app.get("/conversatorio/admin")
+async def _conv_admin():
+    return FileResponse(
+        os.path.join(_CONV_DIR, "admin.html"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 # ---------------------------------------------------------
 # Frontends estáticos. NoCacheStaticFiles fuerza al browser a revalidar.
 # html=False en todos porque los endpoints de arriba sirven el index.html
@@ -131,6 +163,7 @@ app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "soci
 app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
+app.mount("/conversatorio", NoCacheStaticFiles(directory=_CONV_DIR, html=False), name="conversatorio_ui")
 
 
 @app.get("/")

@@ -5,7 +5,11 @@ export const state = {
     activities: [],
     efemerides: [],
     currentActivity: null,
-    searchQuery: ''
+    searchQuery: '',
+    // Rango temporal de la "edición actual" del newsletter Conectados.
+    // Lo cargamos al arrancar la app desde /api/agenda/newsletter-settings.
+    // Es global — todos los usuarios ven el mismo rango (lo guarda el último que tocó).
+    newsletterSettings: { edition_start_at: null, edition_end_at: null },
 };
 
 // ---------------------------------------------------------
@@ -126,6 +130,41 @@ export async function deleteEfemeride(id) {
             notify();
         }
     } catch (e) { console.error("deleteEfemeride", e); }
+}
+
+// ---------------------------------------------------------
+// Newsletter settings (rango de la edición actual de Conectados)
+// ---------------------------------------------------------
+export async function loadNewsletterSettings({ silent = false } = {}) {
+    try {
+        const res = await fetch('/api/agenda/newsletter-settings');
+        if (res.ok) {
+            const data = await res.json();
+            const changed = JSON.stringify(state.newsletterSettings) !== JSON.stringify(data);
+            state.newsletterSettings = data;
+            if (!silent || changed) notify();
+        }
+    } catch (e) { console.error("loadNewsletterSettings", e); }
+}
+
+export async function saveNewsletterSettings({ edition_start_at, edition_end_at }) {
+    try {
+        const res = await trackedFetch('/api/agenda/newsletter-settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ edition_start_at, edition_end_at }),
+        });
+        if (res.ok) {
+            state.newsletterSettings = await res.json();
+            notify();
+            return { ok: true };
+        }
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, error: err.detail || 'No se pudo guardar' };
+    } catch (e) {
+        console.error("saveNewsletterSettings", e);
+        return { ok: false, error: 'Error de red' };
+    }
 }
 
 export const listeners = [];

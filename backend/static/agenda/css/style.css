@@ -943,17 +943,33 @@ body[data-view="santi"] #btn-new-activity {
     }
     .conectados-header-actions {
         width: 100%;
+        /* En mobile apilamos los controles (chip de Edición + botón Bloque)
+           uno abajo del otro, ocupando el ancho completo. */
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .conectados-header-actions > *,
+    .conectados-header-actions #edition-control {
+        width: 100%;
+    }
+    .conectados-header-actions #btn-edition {
+        width: 100%;
+        justify-content: space-between;
     }
     #btn-gen-newsletter {
         display: none !important;
     }
-    #btn-add-fixed-block,
-    #btn-add-var-block {
-        flex: 1;
-        width: auto !important;
-        padding: 0.6rem 0.5rem !important;
-        font-size: 0.85rem !important;
+    #btn-add-block {
+        width: 100% !important;
+        padding: 0.7rem 0.5rem !important;
+        font-size: 0.9rem !important;
         white-space: nowrap;
+    }
+    /* El popover del control de Edición en mobile: full-width, ancho al chip */
+    .conectados-header-actions #edition-popover {
+        right: 0;
+        left: 0;
+        min-width: 0;
     }
 
     /* Save status toast en mobile: arriba de la tab bar */

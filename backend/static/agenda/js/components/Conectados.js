@@ -1,48 +1,52 @@
-import { state, updateActivity, addActivity, deleteActivity } from '../state.js';
+import { state, updateActivity, addActivity, deleteActivity, saveNewsletterSettings } from '../state.js';
 // Nota: la generación con IA (botón "Generar con IA" en cada bloque) se sacó
 // porque los resultados no eran lo suficientemente buenos. Por ahora los copys
 // se redactan a mano o en ChatGPT externo. La función generateNewsletterBlock
 // sigue exportada en utils/ai-engine.js por si querés re-habilitarlo.
 import { generateNewsletterHTML } from '../utils/NewsletterGenerator.js';
 
-// --- Helpers de fecha (semana de newsletter = sábado a viernes) ---
-function isCurrentNewsletterWeek(dateStr) {
-    if (!dateStr) return false;
-    const actDate = new Date(dateStr + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+// ---------------------------------------------------------
+// Filtro por rango de "edición actual" (lo guardado en state.newsletterSettings).
+// Combina date (YYYY-MM-DD) + time (HH:MM o "A definir") en un Date local.
+// Si time = "A definir", usa 00:00.
+// ---------------------------------------------------------
+function inCurrentEdition(act) {
+    const { edition_start_at, edition_end_at } = state.newsletterSettings || {};
+    if (!edition_start_at || !edition_end_at) return false;
+    if (!act.date) return false;
 
-    const day = today.getDay();
-    // Sábado=6: arranca hoy. Otro día: retrocede al último sábado.
-    const diff = day === 6 ? 0 : -(day + 1);
+    const time = (act.time && act.time !== 'A definir') ? act.time : '00:00';
+    const actAt = new Date(`${act.date}T${time}`);
+    const start = new Date(edition_start_at);
+    const end = new Date(edition_end_at);
+    return actAt >= start && actAt <= end;
+}
 
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-
-    const nextFriday = new Date(saturday);
-    nextFriday.setDate(saturday.getDate() + 6);
-    nextFriday.setHours(23, 59, 59, 999);
-
-    return actDate >= saturday && actDate <= nextFriday;
+// Formato corto, español: "16 may 00:00".
+function fmtEditionLabel(isoLocal) {
+    if (!isoLocal) return '—';
+    const d = new Date(isoLocal);
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getDate()} ${months[d.getMonth()]} ${hh}:${mm}`;
 }
 
 /**
  * Decide el tipo de bloque a partir del activity:
- *   - block_type === 'fixed'    → bloque fijo (persistente)
- *   - block_type === 'variable' → bloque variable (sólo esta semana, pero
- *                                 el is_custom lo mantiene si volvés a
- *                                 abrir Conectados antes de borrarlo)
- *   - sin block_type            → bloque de actividad (la actividad real)
+ *   - is_custom: true  → bloque (creado a mano, persiste hasta que lo borrás)
+ *   - is_custom: false → actividad real (filtrada por el rango de edición)
+ *
+ * Nota: existían los tipos 'fixed' y 'variable' que se unificaron acá. Los
+ * registros viejos con block_type='fixed' o 'variable' siguen mostrándose
+ * como "bloque" porque tienen is_custom: true. No requieren migración.
  */
 function blockKind(act) {
-    if (act.block_type === 'fixed') return 'fixed';
-    if (act.block_type === 'variable') return 'variable';
-    return 'activity';
+    return act.is_custom ? 'block' : 'activity';
 }
 
 const BLOCK_BADGE = {
-    fixed:    { icon: '📌', label: 'Fijo',      color: '#7c3aed', bg: '#ede9fe' },
-    variable: { icon: '🔄', label: 'Variable',  color: '#0891b2', bg: '#cffafe' },
+    block:    { icon: '📋', label: 'Bloque',    color: '#0891b2', bg: '#cffafe' },
     activity: { icon: '📅', label: 'Actividad', color: '#0742ab', bg: '#dbeafe' },
 };
 
@@ -74,35 +78,104 @@ export function renderConectados(container) {
     const conectadosActivities = state.activities
         .filter(a => {
             if (!a.channels.includes('Conectados')) return false;
-            // Los bloques fijos persisten siempre, sin importar la fecha.
-            if (a.block_type === 'fixed') return true;
-            // Compat: si vino un legacy con observations='FIXED_BLOCK' (no
-            // debería pasar tras la migración, pero por las dudas)
-            if (a.is_custom && a.observations === 'FIXED_BLOCK') return true;
-            return isCurrentNewsletterWeek(a.date);
+            // Bloques (cualquier is_custom) se muestran siempre hasta que el
+            // user los borra explícitamente. La distinción vieja
+            // fijo/variable quedó deprecada — ahora hay un solo "Bloque".
+            if (a.is_custom) return true;
+            // Actividades reales: se filtran por el rango de la edición actual.
+            return inCurrentEdition(a);
         })
         .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'content-wrapper';
 
+    const { edition_start_at, edition_end_at } = state.newsletterSettings || {};
+    const editionLabel = `${fmtEditionLabel(edition_start_at)} → ${fmtEditionLabel(edition_end_at)}`;
+
     const header = document.createElement('div');
     header.className = 'conectados-header-bar';
     header.innerHTML = `
         <h2 style="font-weight: 700; margin: 0;">Newsletter Conectados</h2>
         <div class="conectados-header-actions">
+            <div id="edition-control" style="position: relative;">
+                <button id="btn-edition" type="button" title="Definí qué actividades entran en esta edición"
+                    style="background: white; border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem 0.85rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem;">
+                    <i data-lucide="calendar-range" style="width: 15px; height: 15px;"></i>
+                    <span>Edición: ${editionLabel}</span>
+                    <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                </button>
+                <div id="edition-popover" style="display: none; position: absolute; top: calc(100% + 0.4rem); right: 0; background: white; border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.85rem; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 50; min-width: 320px;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Las actividades dentro de este rango se muestran en Conectados. Los bloques se muestran siempre hasta que los borres.</div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">Desde</label>
+                    <input id="edition-start" type="datetime-local" value="${edition_start_at || ''}"
+                        style="width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 0.65rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">Hasta</label>
+                    <input id="edition-end" type="datetime-local" value="${edition_end_at || ''}"
+                        style="width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 0.75rem;">
+                    <div id="edition-err" style="display: none; color: #b91c1c; font-size: 0.75rem; margin-bottom: 0.5rem;"></div>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                        <button id="btn-edition-cancel" type="button" style="background: white; border: 1px solid var(--border); padding: 0.4rem 0.9rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 500; cursor: pointer;">Cancelar</button>
+                        <button id="btn-edition-save" type="button" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.9rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">Guardar</button>
+                    </div>
+                </div>
+            </div>
             <button id="btn-gen-newsletter" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0742ab;">
                 <i data-lucide="mail"></i> Generar Newsletter
             </button>
-            <button id="btn-add-fixed-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #7c3aed;">
-                <i data-lucide="pin"></i> Bloque Fijo
-            </button>
-            <button id="btn-add-var-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0891b2;">
-                <i data-lucide="plus-circle"></i> Bloque Variable
+            <button id="btn-add-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0891b2;">
+                <i data-lucide="plus-circle"></i> Bloque
             </button>
         </div>
     `;
     wrapper.appendChild(header);
+
+    // --- Wire del popover de edición ---
+    const editionBtn = header.querySelector('#btn-edition');
+    const editionPop = header.querySelector('#edition-popover');
+    const inputStart = header.querySelector('#edition-start');
+    const inputEnd = header.querySelector('#edition-end');
+    const errBox = header.querySelector('#edition-err');
+
+    const closePop = () => { editionPop.style.display = 'none'; };
+    const openPop = () => {
+        editionPop.style.display = 'block';
+        inputStart.value = state.newsletterSettings.edition_start_at || '';
+        inputEnd.value = state.newsletterSettings.edition_end_at || '';
+        errBox.style.display = 'none';
+    };
+
+    editionBtn.onclick = (e) => {
+        e.stopPropagation();
+        editionPop.style.display === 'none' ? openPop() : closePop();
+    };
+    // Click fuera del popover lo cierra
+    document.addEventListener('click', (e) => {
+        if (!header.querySelector('#edition-control').contains(e.target)) closePop();
+    });
+    header.querySelector('#btn-edition-cancel').onclick = closePop;
+    header.querySelector('#btn-edition-save').onclick = async () => {
+        const start = inputStart.value;
+        const end = inputEnd.value;
+        if (!start || !end) {
+            errBox.textContent = 'Completá las dos fechas.';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (end <= start) {
+            errBox.textContent = 'La fecha "Hasta" tiene que ser posterior a "Desde".';
+            errBox.style.display = 'block';
+            return;
+        }
+        const result = await saveNewsletterSettings({ edition_start_at: start, edition_end_at: end });
+        if (result.ok) {
+            closePop();
+            // El save dispara notify() en state — la lista se re-renderiza automático
+        } else {
+            errBox.textContent = result.error || 'No se pudo guardar.';
+            errBox.style.display = 'block';
+        }
+    };
 
     if (conectadosActivities.length === 0) {
         const empty = document.createElement('div');
@@ -215,29 +288,20 @@ export function renderConectados(container) {
     }
 
     // --- Botones del header ---
-    wrapper.querySelector('#btn-add-var-block').onclick = () => {
+    wrapper.querySelector('#btn-add-block').onclick = () => {
+        // Un único tipo de bloque. is_custom=true alcanza para que persista
+        // edición a edición (el filtro lo deja siempre visible). date='2099-12-31'
+        // y time='00:00' para que no aparezca por accidente en otras vistas si
+        // un día cambia el filtro.
         addActivity({
-            title: 'Bloque Variable',
+            title: 'Nuevo bloque',
             copy_linkedin: '',
             description: '',
             channels: ['Conectados'],
-            date: new Date().toISOString().split('T')[0],
+            date: '2099-12-31',
             time: '00:00',
             is_custom: true,
-            block_type: 'variable'
-        });
-    };
-
-    wrapper.querySelector('#btn-add-fixed-block').onclick = () => {
-        addActivity({
-            title: 'Bloque Fijo',
-            copy_linkedin: '',
-            description: '',
-            channels: ['Conectados'],
-            date: '2099-12-31',  // far future para que no aparezca en otras vistas
-            time: '00:00',
-            is_custom: true,
-            block_type: 'fixed'
+            block_type: 'block'
         });
     };
 

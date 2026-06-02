@@ -396,3 +396,70 @@ def drive_callback(code: str, state: str = None):
         token.write(creds.to_json())
 
     return {"message": "✅ Autenticación exitosa. Se guardó token.json en el servidor. Ya podés cerrar esta pestaña."}
+
+
+# ---------------------------------------------------------
+# Newsletter Conectados — "edición actual" (singleton global)
+# Define el rango temporal [start, end] que enmarca la edición que se está
+# armando. Frontend lo usa para filtrar qué actividades aparecen en Conectados.
+# ---------------------------------------------------------
+def _default_edition_range() -> dict:
+    """Sábado pasado 00:00 → viernes próximo 23:59 (semana newsletter clásica).
+    Se devuelve cuando no hay ningún registro guardado todavía."""
+    from datetime import datetime, timedelta
+    today = datetime.now()
+    # Semana newsletter: sábado a viernes. dow: lun=0..dom=6, sáb=5.
+    days_since_saturday = (today.weekday() - 5) % 7
+    saturday = (today - timedelta(days=days_since_saturday)).replace(hour=0, minute=0, second=0, microsecond=0)
+    friday = (saturday + timedelta(days=6)).replace(hour=23, minute=59)
+    return {
+        "edition_start_at": saturday.strftime("%Y-%m-%dT%H:%M"),
+        "edition_end_at": friday.strftime("%Y-%m-%dT%H:%M"),
+    }
+
+
+@router.get("/newsletter-settings")
+def get_newsletter_settings(db: Session = Depends(get_db)):
+    """Devuelve la edición actual del Conectados. Si nadie la setó nunca,
+    devuelve un default razonable sin persistir nada (el primer PUT lo crea)."""
+    row = db.query(agenda_models.NewsletterSettings).filter(
+        agenda_models.NewsletterSettings.id == 1
+    ).first()
+    if row:
+        return {
+            "edition_start_at": row.edition_start_at,
+            "edition_end_at": row.edition_end_at,
+        }
+    return _default_edition_range()
+
+
+@router.put("/newsletter-settings")
+def update_newsletter_settings(
+    payload: agenda_models.NewsletterSettingsUpdate,
+    db: Session = Depends(get_db),
+):
+    """Upsert del singleton — siempre id=1. Valida que end > start."""
+    if payload.edition_end_at <= payload.edition_start_at:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha/hora de fin tiene que ser posterior a la de inicio.",
+        )
+    row = db.query(agenda_models.NewsletterSettings).filter(
+        agenda_models.NewsletterSettings.id == 1
+    ).first()
+    if row:
+        row.edition_start_at = payload.edition_start_at
+        row.edition_end_at = payload.edition_end_at
+    else:
+        row = agenda_models.NewsletterSettings(
+            id=1,
+            edition_start_at=payload.edition_start_at,
+            edition_end_at=payload.edition_end_at,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "edition_start_at": row.edition_start_at,
+        "edition_end_at": row.edition_end_at,
+    }
