@@ -34,21 +34,19 @@ function fmtEditionLabel(isoLocal) {
 
 /**
  * Decide el tipo de bloque a partir del activity:
- *   - block_type === 'fixed'    → bloque fijo (persistente)
- *   - block_type === 'variable' → bloque variable (sólo esta semana, pero
- *                                 el is_custom lo mantiene si volvés a
- *                                 abrir Conectados antes de borrarlo)
- *   - sin block_type            → bloque de actividad (la actividad real)
+ *   - is_custom: true  → bloque (creado a mano, persiste hasta que lo borrás)
+ *   - is_custom: false → actividad real (filtrada por el rango de edición)
+ *
+ * Nota: existían los tipos 'fixed' y 'variable' que se unificaron acá. Los
+ * registros viejos con block_type='fixed' o 'variable' siguen mostrándose
+ * como "bloque" porque tienen is_custom: true. No requieren migración.
  */
 function blockKind(act) {
-    if (act.block_type === 'fixed') return 'fixed';
-    if (act.block_type === 'variable') return 'variable';
-    return 'activity';
+    return act.is_custom ? 'block' : 'activity';
 }
 
 const BLOCK_BADGE = {
-    fixed:    { icon: '📌', label: 'Fijo',      color: '#7c3aed', bg: '#ede9fe' },
-    variable: { icon: '🔄', label: 'Variable',  color: '#0891b2', bg: '#cffafe' },
+    block:    { icon: '📋', label: 'Bloque',    color: '#0891b2', bg: '#cffafe' },
     activity: { icon: '📅', label: 'Actividad', color: '#0742ab', bg: '#dbeafe' },
 };
 
@@ -80,13 +78,10 @@ export function renderConectados(container) {
     const conectadosActivities = state.activities
         .filter(a => {
             if (!a.channels.includes('Conectados')) return false;
-            // Fijos y variables se muestran siempre — no se filtran por rango.
-            // Los fijos persisten edición a edición; los variables son
-            // específicos a la edición actual y los borrás vos cuando termina.
-            if (a.block_type === 'fixed' || a.block_type === 'variable') return true;
-            // Compat: legacy con observations='FIXED_BLOCK' (post-migración no
-            // debería pasar, pero por las dudas)
-            if (a.is_custom && a.observations === 'FIXED_BLOCK') return true;
+            // Bloques (cualquier is_custom) se muestran siempre hasta que el
+            // user los borra explícitamente. La distinción vieja
+            // fijo/variable quedó deprecada — ahora hay un solo "Bloque".
+            if (a.is_custom) return true;
             // Actividades reales: se filtran por el rango de la edición actual.
             return inCurrentEdition(a);
         })
@@ -111,7 +106,7 @@ export function renderConectados(container) {
                     <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                 </button>
                 <div id="edition-popover" style="display: none; position: absolute; top: calc(100% + 0.4rem); right: 0; background: white; border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.85rem; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 50; min-width: 320px;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Las actividades dentro de este rango se muestran en Conectados. Los bloques fijos y variables se muestran siempre.</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Las actividades dentro de este rango se muestran en Conectados. Los bloques se muestran siempre hasta que los borres.</div>
                     <label style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">Desde</label>
                     <input id="edition-start" type="datetime-local" value="${edition_start_at || ''}"
                         style="width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 0.65rem;">
@@ -128,11 +123,8 @@ export function renderConectados(container) {
             <button id="btn-gen-newsletter" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0742ab;">
                 <i data-lucide="mail"></i> Generar Newsletter
             </button>
-            <button id="btn-add-fixed-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #7c3aed;">
-                <i data-lucide="pin"></i> Bloque Fijo
-            </button>
-            <button id="btn-add-var-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0891b2;">
-                <i data-lucide="plus-circle"></i> Bloque Variable
+            <button id="btn-add-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0891b2;">
+                <i data-lucide="plus-circle"></i> Bloque
             </button>
         </div>
     `;
@@ -296,29 +288,20 @@ export function renderConectados(container) {
     }
 
     // --- Botones del header ---
-    wrapper.querySelector('#btn-add-var-block').onclick = () => {
+    wrapper.querySelector('#btn-add-block').onclick = () => {
+        // Un único tipo de bloque. is_custom=true alcanza para que persista
+        // edición a edición (el filtro lo deja siempre visible). date='2099-12-31'
+        // y time='00:00' para que no aparezca por accidente en otras vistas si
+        // un día cambia el filtro.
         addActivity({
-            title: 'Bloque Variable',
+            title: 'Nuevo bloque',
             copy_linkedin: '',
             description: '',
             channels: ['Conectados'],
-            date: new Date().toISOString().split('T')[0],
+            date: '2099-12-31',
             time: '00:00',
             is_custom: true,
-            block_type: 'variable'
-        });
-    };
-
-    wrapper.querySelector('#btn-add-fixed-block').onclick = () => {
-        addActivity({
-            title: 'Bloque Fijo',
-            copy_linkedin: '',
-            description: '',
-            channels: ['Conectados'],
-            date: '2099-12-31',  // far future para que no aparezca en otras vistas
-            time: '00:00',
-            is_custom: true,
-            block_type: 'fixed'
+            block_type: 'block'
         });
     };
 
