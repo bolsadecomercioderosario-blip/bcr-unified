@@ -85,6 +85,12 @@ Para preguntas de coyuntura: '¿qué pasó con la soja hoy?', 'cómo cerró el m
 - buscar_informe_gea: informes mensuales de Estimación Nacional de Producción de \
 GEA (Guía Estratégica para el Agro). Para preguntas sobre el porqué de los cambios \
 en estimaciones, condiciones climáticas, decisiones de siembra, ajustes de producción.
+- buscar_novedades_innova: novedades de BCR Innova (innova.bcr.com.ar) — \
+convocatorias para startups, programas (BCR Startup Network, AgBioTech, \
+GULFOOD, Start-Up Chile, etc.), capacitaciones específicas, charlas, \
+mesas de innovación, ferias internacionales, ecosistema agtech/fintech/biotech. \
+Para info estructural sobre el área Innova como tal (qué es, contacto, \
+verticales), usá buscar_institucional.
 
 C. DATA ESTRUCTURADA (números exactos)
 - get_precios_pizarra: precios de soja/trigo/maíz/otros del Mercado Físico de Rosario. \

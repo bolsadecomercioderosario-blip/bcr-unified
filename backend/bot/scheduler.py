@@ -167,6 +167,24 @@ def _run_scrape_capacita() -> None:
         db.close()
 
 
+def _run_scrape_innova_novedades() -> None:
+    """Wrapper para el job semanal de novedades de BCR Innova."""
+    from bot.scraper_innova_novedades import scrape_innova_novedades
+
+    db = SessionLocal()
+    try:
+        result = scrape_innova_novedades(db)
+        print(f"[bot.scheduler] scrape_innova_novedades → "
+              f"new_found={result.get('new_found', 0)} "
+              f"uploaded={len(result.get('uploaded', []))} "
+              f"failed={len(result.get('failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_innova_novedades falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -229,6 +247,14 @@ def _startup_catchup() -> None:
                 _run_scrape_capacita,
                 "catchup_capacita",
                 "capacita",
+            ),
+            (
+                db.query(db_models.IngestedNovedadInnova.ingested_at)
+                .order_by(db_models.IngestedNovedadInnova.ingested_at.desc()).first(),
+                timedelta(days=8),  # semanal
+                _run_scrape_innova_novedades,
+                "catchup_innova_novedades",
+                "innova_novedades",
             ),
         ]
 
@@ -342,6 +368,18 @@ def start() -> None:
         _run_scrape_capacita,
         CronTrigger(day_of_week="mon", hour=10, minute=0),
         id="scrape_capacita_semanal",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Novedades de BCR Innova: semanal los lunes 10:15 ART. Espaciado del
+    # job de capacita para no abrir 2 sockets HTTP a BCR a la vez.
+    scheduler.add_job(
+        _run_scrape_innova_novedades,
+        CronTrigger(day_of_week="mon", hour=10, minute=15),
+        id="scrape_innova_novedades_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

@@ -333,7 +333,7 @@ def trigger_scrape_gea_informes(
 )
 def trigger_scrape_capacita(
     fetch_details: bool = True,
-    max_detail_fetches: int = 25,
+    max_detail_fetches: int = 60,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Dispara manualmente el scraper del catálogo de BCR Capacita. Útil
@@ -341,6 +341,21 @@ def trigger_scrape_capacita(
     from bot.scraper_capacita import scrape_capacita
 
     return scrape_capacita(db, fetch_details=fetch_details, max_detail_fetches=max_detail_fetches)
+
+
+@router.post(
+    "/admin/scrape-innova-novedades",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_innova_novedades(
+    max_upload: int = 15,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper de novedades de BCR Innova. Útil
+    para backfill inicial."""
+    from bot.scraper_innova_novedades import scrape_innova_novedades
+
+    return scrape_innova_novedades(db, max_upload_per_run=max_upload)
 
 
 @router.get(

@@ -269,6 +269,31 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "type": "function",
+        "name": "buscar_novedades_innova",
+        "description": (
+            "Busca en las NOVEDADES de BCR Innova (innova.bcr.com.ar/novedades). "
+            "Contiene anuncios de programas, convocatorias para startups (BCR "
+            "Startup Network, AgBioTech Challenge, GULFOOD, Start-Up Chile, etc.), "
+            "capacitaciones específicas, charlas, mesas de innovación, ferias "
+            "internacionales y demás novedades del ecosistema agtech/fintech/"
+            "biotech impulsado por BCR Innova. Usá esta tool para preguntas como "
+            "'¿qué novedades hay en Innova?', '¿qué convocatorias están abiertas?', "
+            "'¿qué programa hay para startups agtech?'. Para info estructural del "
+            "área Innova (qué es, contacto, verticales) usá buscar_institucional."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Tema a buscar en las novedades de Innova.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
         "name": "consultar_cursos_capacita",
         "description": (
             "Catálogo de cursos y charlas de BCR Capacita (capacitacion.bcr.com.ar). "
@@ -591,6 +616,40 @@ def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     )
 
 
+def buscar_novedades_innova(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    result = _search_in_vector_store(
+        ctx,
+        vector_store_id=get_vector_store_id(ctx.db, "novedades_innova"),
+        consulta=consulta,
+        fuente_nombre="novedades_innova",
+        hint=(
+            "Los documentos son novedades de BCR Innova (innova.bcr.com.ar): "
+            "convocatorias para startups, programas, capacitaciones, eventos, "
+            "ferias internacionales, novedades del ecosistema agtech/fintech/"
+            "biotech. Si encontrás fecha, incluila."
+        ),
+    )
+    # Igual que para informativo/comentarios: sumamos metadata por fecha
+    # para que el agente sepa cuál es el novedad más reciente.
+    from bot.db_models import IngestedNovedadInnova
+    recientes = (
+        ctx.db.query(IngestedNovedadInnova)
+        .order_by(IngestedNovedadInnova.fecha.desc())
+        .limit(6)
+        .all()
+    )
+    result["recientes_por_fecha"] = [
+        {
+            "node_id": r.node_id,
+            "fecha": r.fecha,
+            "titulo": r.titulo,
+            "url": r.url,
+        }
+        for r in recientes
+    ]
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Implementación: data estructurada (placeholders hasta que existan scrapers).
 #
@@ -852,6 +911,7 @@ _TOOL_REGISTRY = {
     "buscar_informativo": buscar_informativo,
     "buscar_comentario_diario": buscar_comentario_diario,
     "buscar_informe_gea": buscar_informe_gea,
+    "buscar_novedades_innova": buscar_novedades_innova,
     "get_precios_pizarra": get_precios_pizarra,
     "get_estimaciones_gea": get_estimaciones_gea,
     "consultar_cursos_capacita": consultar_cursos_capacita,
