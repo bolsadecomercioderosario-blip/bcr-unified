@@ -103,6 +103,11 @@ con fecha de inicio, descripción, modalidad, arancel y duración (cuando \
 están disponibles). Para preguntas como: 'qué cursos hay este mes en \
 Capacita', 'cuándo es el próximo curso de Operador de Granos', 'cuánto \
 sale el curso X', 'qué capacita BCR sobre fondos comunes'.
+- consultar_startups_innova: listado de startups del BCR Startup Network, \
+con sector (Agrifoodtech, Biotech, Fintech, Climatech, Animaltech, \
+Industria 4.0), edición del programa y descripción. Para preguntas como \
+'qué startups del portfolio hacen agtech', 'qué hace AgriRed', 'qué \
+startups de Climatech tiene la BCR'.
 
 Reglas de uso de las tools:
 1. Si la pregunta es sobre fechas/eventos/actividades → consultar_agenda. \

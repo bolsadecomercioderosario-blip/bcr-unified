@@ -358,6 +358,17 @@ def trigger_scrape_innova_novedades(
     return scrape_innova_novedades(db, max_upload_per_run=max_upload)
 
 
+@router.post(
+    "/admin/scrape-startups-innova",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_startups_innova(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Dispara manualmente el scraper del Startup Network."""
+    from bot.scraper_startups import scrape_startups_innova
+
+    return scrape_startups_innova(db)
+
+
 @router.get(
     "/admin/ingested",
     dependencies=[Depends(require_auth)],

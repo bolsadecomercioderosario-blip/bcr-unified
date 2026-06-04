@@ -294,6 +294,47 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "type": "function",
+        "name": "consultar_startups_innova",
+        "description": (
+            "Listado de startups del BCR Startup Network (innova.bcr.com.ar/"
+            "startupnetwork). Cada startup tiene nombre, sector/vertical "
+            "(Agrifoodtech, Animaltech, Biotech, Climatech, Fintech, Industria 4.0), "
+            "edición del programa (BCR SN 1.0 — 6.0 según corresponda), una "
+            "descripción breve y website externo. Usá esta tool para preguntas "
+            "como '¿qué startups hay de agtech?', '¿qué hace AgriRed?', '¿qué "
+            "startups del portfolio se dedican a IA para el agro?'. NO usar "
+            "para info sobre el programa Startup Network en sí (cómo postularse, "
+            "cronograma) — eso va por buscar_novedades_innova o buscar_institucional."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filtro_nombre": {
+                    "type": "string",
+                    "description": (
+                        "Texto a buscar en el nombre o descripción de la startup "
+                        "(ej. 'satelital', 'polinización', 'fintech'). Vacío trae todas."
+                    ),
+                },
+                "sector": {
+                    "type": "string",
+                    "description": (
+                        "Filtra por sector: 'Agrifoodtech', 'Animaltech', 'Biotech', "
+                        "'Climatech', 'Fintech', 'Industria 4.0', o vacío para todos."
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Cuántas startups devolver como máximo (default 30). "
+                        "Subilo si el usuario pide 'todas las startups de X sector'."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
         "name": "consultar_cursos_capacita",
         "description": (
             "Catálogo de cursos y charlas de BCR Capacita (capacitacion.bcr.com.ar). "
@@ -847,6 +888,56 @@ def get_estimaciones_gea(
 # ---------------------------------------------------------------------------
 # Implementación: consultar_cursos_capacita (DB).
 # ---------------------------------------------------------------------------
+def consultar_startups_innova(
+    ctx: ToolContext,
+    filtro_nombre: str | None = None,
+    sector: str | None = None,
+    limit: int = 30,
+) -> dict[str, Any]:
+    """Lista startups del BCR Startup Network con filtros por nombre/sector."""
+    from bot.db_models import StartupInnova
+
+    query = ctx.db.query(StartupInnova)
+
+    if sector:
+        # Match case-insensitive — el agente puede pasar 'agtech' y queremos
+        # matchear 'Agrifoodtech'/'Animaltech' aunque no sean exactos.
+        query = query.filter(StartupInnova.sector.ilike(f"%{sector.strip()}%"))
+
+    if filtro_nombre:
+        pattern = f"%{filtro_nombre.strip()}%"
+        query = query.filter(
+            or_(
+                StartupInnova.nombre.ilike(pattern),
+                StartupInnova.descripcion.ilike(pattern),
+            )
+        )
+
+    limit = max(1, min(int(limit or 30), 150))
+    rows = (
+        query.order_by(StartupInnova.sector.asc(), StartupInnova.nombre.asc())
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "fuente": "startups_innova",
+        "filtro_nombre": filtro_nombre or None,
+        "sector": sector or None,
+        "total_devueltas": len(rows),
+        "startups": [
+            {
+                "nombre": r.nombre,
+                "sector": r.sector,
+                "edicion": r.edicion,
+                "descripcion": (r.descripcion or "")[:300] or None,
+                "website": r.website_url,
+            }
+            for r in rows
+        ],
+    }
+
+
 def consultar_cursos_capacita(
     ctx: ToolContext,
     filtro_titulo: str | None = None,
@@ -915,6 +1006,7 @@ _TOOL_REGISTRY = {
     "get_precios_pizarra": get_precios_pizarra,
     "get_estimaciones_gea": get_estimaciones_gea,
     "consultar_cursos_capacita": consultar_cursos_capacita,
+    "consultar_startups_innova": consultar_startups_innova,
 }
 
 

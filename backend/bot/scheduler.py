@@ -185,6 +185,23 @@ def _run_scrape_innova_novedades() -> None:
         db.close()
 
 
+def _run_scrape_startups_innova() -> None:
+    """Wrapper para el job semanal del Startup Network."""
+    from bot.scraper_startups import scrape_startups_innova
+
+    db = SessionLocal()
+    try:
+        result = scrape_startups_innova(db)
+        print(f"[bot.scheduler] scrape_startups_innova → status={result.get('status')} "
+              f"upserted={result.get('upserted', 0)} "
+              f"sectors={result.get('sectors_seen', {})}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_startups_innova falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -255,6 +272,14 @@ def _startup_catchup() -> None:
                 _run_scrape_innova_novedades,
                 "catchup_innova_novedades",
                 "innova_novedades",
+            ),
+            (
+                db.query(db_models.StartupInnova.scraped_at)
+                .order_by(db_models.StartupInnova.scraped_at.desc()).first(),
+                timedelta(days=8),  # semanal
+                _run_scrape_startups_innova,
+                "catchup_startups_innova",
+                "startups_innova",
             ),
         ]
 
@@ -380,6 +405,18 @@ def start() -> None:
         _run_scrape_innova_novedades,
         CronTrigger(day_of_week="mon", hour=10, minute=15),
         id="scrape_innova_novedades_semanal",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Startup Network: semanal los lunes 10:30 ART. Una sola request a BCR,
+    # ~120-150 upserts en DB; barato.
+    scheduler.add_job(
+        _run_scrape_startups_innova,
+        CronTrigger(day_of_week="mon", hour=10, minute=30),
+        id="scrape_startups_innova_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
