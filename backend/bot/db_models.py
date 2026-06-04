@@ -184,3 +184,61 @@ class IngestedGeaReport(Base):
     url = Column(String, nullable=False)
     openai_file_id = Column(String, nullable=True)
     ingested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CursoCapacita(Base):
+    """Cada fila es un curso/charla del catálogo de BCR Capacita.
+
+    `curso_id_externo` es el ID del CMS (numérico, ej. 842) que aparece en
+    la URL del detalle (/capacitacion/cursos-charlas/{ID}). UNIQUE para
+    permitir upsert: si la BCR cambia fecha/descripcion/arancel, la fila se
+    actualiza en lugar de duplicar.
+    """
+    __tablename__ = "cursos_capacita"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    curso_id_externo = Column(Integer, nullable=False, unique=True, index=True)
+    titulo = Column(Text, nullable=False)
+    fecha_inicio = Column(String, nullable=True, index=True)  # YYYY-MM-DD
+    fecha_inicio_legible = Column(String, nullable=True)  # 05/06/2026
+    descripcion = Column(Text, nullable=True)
+    modalidad = Column(String, nullable=True)  # presencial / online / mixta
+    arancel = Column(Text, nullable=True)
+    duracion = Column(Text, nullable=True)
+    url = Column(String, nullable=False)
+    scraped_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class IngestedNovedadInnova(Base):
+    """Tracking de novedades de BCR Innova (/novedades) que ya subimos al
+    vector store. node_id del URL Drupal es la key estable."""
+    __tablename__ = "ingested_novedades_innova"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    node_id = Column(Integer, nullable=False, unique=True, index=True)
+    titulo = Column(Text, nullable=False)
+    fecha = Column(String, nullable=True, index=True)  # YYYY-MM-DD
+    fecha_legible = Column(String, nullable=True)
+    descripcion_breve = Column(Text, nullable=True)
+    url = Column(String, nullable=False)
+    openai_file_id = Column(String, nullable=True)
+    ingested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class StartupInnova(Base):
+    """Cada fila es una startup del Startup Network. UNIQUE por (nombre,
+    edicion) — la misma startup puede aparecer en varias ediciones de la red.
+    """
+    __tablename__ = "startups_innova"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nombre = Column(String, nullable=False, index=True)
+    sector = Column(String, nullable=True, index=True)  # Agrifoodtech, Biotech, Fintech, etc.
+    edicion = Column(String, nullable=True)  # 'BCR SN 6.0' por ejemplo
+    descripcion = Column(Text, nullable=True)
+    website_url = Column(String, nullable=True)
+    scraped_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("nombre", "edicion", name="uix_startup_nombre_edicion"),
+    )

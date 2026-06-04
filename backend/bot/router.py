@@ -327,6 +327,22 @@ def trigger_scrape_gea_informes(
     return scrape_gea_informes(db, max_pages=max_pages, max_upload_per_run=max_upload)
 
 
+@router.post(
+    "/admin/scrape-capacita",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_capacita(
+    fetch_details: bool = True,
+    max_detail_fetches: int = 25,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara manualmente el scraper del catálogo de BCR Capacita. Útil
+    para llenar la tabla la primera vez sin esperar el cron del lunes."""
+    from bot.scraper_capacita import scrape_capacita
+
+    return scrape_capacita(db, fetch_details=fetch_details, max_detail_fetches=max_detail_fetches)
+
+
 @router.get(
     "/admin/ingested",
     dependencies=[Depends(require_auth)],

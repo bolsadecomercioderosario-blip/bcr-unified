@@ -33,7 +33,7 @@ from config import (
 from bot.db_models import BotConfig
 
 
-SourceKey = Literal["institucional", "informativo", "comentarios", "gea"]
+SourceKey = Literal["institucional", "informativo", "comentarios", "gea", "novedades_innova"]
 
 
 # Mapeo a las env vars existentes — si están seteadas, ganan.
@@ -42,6 +42,7 @@ _ENV_VAR_OVERRIDES: dict[SourceKey, str | None] = {
     "informativo": BOT_VS_INFORMATIVO,
     "comentarios": BOT_VS_COMENTARIOS,
     "gea": BOT_VS_GEA,
+    "novedades_innova": None,  # No env var — siempre auto-bootstrap por DB.
 }
 
 # Nombres human-friendly para los vector stores que el bot auto-crea en OpenAI.
@@ -50,6 +51,7 @@ _AUTO_CREATE_NAMES: dict[SourceKey, str] = {
     "informativo": "BCR Bot — Informativo Semanal",
     "comentarios": "BCR Bot — Comentarios Diarios",
     "gea": "BCR Bot — Informes GEA",
+    "novedades_innova": "BCR Bot — Novedades Innova",
 }
 
 

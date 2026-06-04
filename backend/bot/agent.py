@@ -92,6 +92,11 @@ Para preguntas con respuesta numérica: 'cuánto está la soja', 'precio del tri
 - get_estimaciones_gea: estimaciones de producción nacional (área, rinde, producción) \
 para soja/trigo/maíz, campaña vigente y anterior. Para preguntas de magnitud: \
 'cuánto se va a producir de soja', 'qué área tiene el trigo esta campaña'.
+- consultar_cursos_capacita: catálogo de cursos y charlas de BCR Capacita \
+con fecha de inicio, descripción, modalidad, arancel y duración (cuando \
+están disponibles). Para preguntas como: 'qué cursos hay este mes en \
+Capacita', 'cuándo es el próximo curso de Operador de Granos', 'cuánto \
+sale el curso X', 'qué capacita BCR sobre fondos comunes'.
 
 Reglas de uso de las tools:
 1. Si la pregunta es sobre fechas/eventos/actividades → consultar_agenda. \

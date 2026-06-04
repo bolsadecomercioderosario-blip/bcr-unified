@@ -267,6 +267,45 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "required": ["consulta"],
         },
     },
+    {
+        "type": "function",
+        "name": "consultar_cursos_capacita",
+        "description": (
+            "Catálogo de cursos y charlas de BCR Capacita (capacitacion.bcr.com.ar). "
+            "Incluye título, fecha de inicio, descripción, y cuando está disponible "
+            "modalidad (presencial/online), arancel y duración. Usá esta tool para "
+            "preguntas como '¿qué cursos hay este mes?', '¿cuándo es el próximo "
+            "curso de Operador del Mercado de Granos?', '¿cuánto sale el curso "
+            "de Back Office?', '¿qué capacita BCR sobre fondos comunes?'. "
+            "NO usar para info institucional sobre BCRcapacita como área "
+            "(esa va en buscar_institucional)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filtro_titulo": {
+                    "type": "string",
+                    "description": (
+                        "Texto a buscar en el título o descripción del curso "
+                        "(ej. 'granos', 'mercado de capitales'). Vacío trae todos."
+                    ),
+                },
+                "fecha_desde": {
+                    "type": "string",
+                    "description": (
+                        "Fecha mínima de inicio YYYY-MM-DD. Si se omite, usa hoy. "
+                        "Para preguntas sobre cursos PRÓXIMOS, dejá hoy."
+                    ),
+                },
+                "fecha_hasta": {
+                    "type": "string",
+                    "description": (
+                        "Fecha máxima de inicio YYYY-MM-DD. Si se omite, no limita."
+                    ),
+                },
+            },
+        },
+    },
 ]
 
 
@@ -747,6 +786,64 @@ def get_estimaciones_gea(
 
 
 # ---------------------------------------------------------------------------
+# Implementación: consultar_cursos_capacita (DB).
+# ---------------------------------------------------------------------------
+def consultar_cursos_capacita(
+    ctx: ToolContext,
+    filtro_titulo: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
+) -> dict[str, Any]:
+    """Devuelve cursos de BCR Capacita filtrados por título y/o rango de
+    fechas de inicio."""
+    from bot.db_models import CursoCapacita
+
+    today_iso = date.today().isoformat()
+    desde = fecha_desde or today_iso
+
+    query = ctx.db.query(CursoCapacita).filter(
+        # fecha_inicio puede ser NULL (curso sin fecha): lo excluimos cuando
+        # filtramos por fecha porque no podemos compararlo.
+        CursoCapacita.fecha_inicio.isnot(None),
+        CursoCapacita.fecha_inicio >= desde,
+    )
+
+    if fecha_hasta:
+        query = query.filter(CursoCapacita.fecha_inicio <= fecha_hasta)
+
+    if filtro_titulo:
+        pattern = f"%{filtro_titulo.strip()}%"
+        query = query.filter(
+            or_(
+                CursoCapacita.titulo.ilike(pattern),
+                CursoCapacita.descripcion.ilike(pattern),
+            )
+        )
+
+    rows = query.order_by(CursoCapacita.fecha_inicio.asc()).all()
+
+    return {
+        "fuente": "cursos_capacita",
+        "rango_consultado": {"desde": desde, "hasta": fecha_hasta},
+        "filtro_titulo": filtro_titulo or None,
+        "total_encontradas": len(rows),
+        "cursos": [
+            {
+                "titulo": r.titulo,
+                "fecha_inicio": r.fecha_inicio,
+                "fecha_inicio_legible": r.fecha_inicio_legible,
+                "modalidad": r.modalidad,
+                "arancel": r.arancel,
+                "duracion": r.duracion,
+                "descripcion": (r.descripcion or "")[:400] or None,
+                "url": r.url,
+            }
+            for r in rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher.
 # ---------------------------------------------------------------------------
 _TOOL_REGISTRY = {
@@ -757,6 +854,7 @@ _TOOL_REGISTRY = {
     "buscar_informe_gea": buscar_informe_gea,
     "get_precios_pizarra": get_precios_pizarra,
     "get_estimaciones_gea": get_estimaciones_gea,
+    "consultar_cursos_capacita": consultar_cursos_capacita,
 }
 
 

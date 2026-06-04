@@ -150,6 +150,23 @@ def _run_scrape_gea_informes() -> None:
         db.close()
 
 
+def _run_scrape_capacita() -> None:
+    """Wrapper para el job semanal del catálogo de BCR Capacita."""
+    from bot.scraper_capacita import scrape_capacita
+
+    db = SessionLocal()
+    try:
+        result = scrape_capacita(db)
+        print(f"[bot.scheduler] scrape_capacita → status={result.get('status')} "
+              f"upserted={result.get('upserted', 0)} "
+              f"detail_failed={len(result.get('detail_failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_capacita falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -204,6 +221,14 @@ def _startup_catchup() -> None:
                 _run_scrape_gea_informes,
                 "catchup_gea_informes",
                 "gea_informes",
+            ),
+            (
+                db.query(db_models.CursoCapacita.scraped_at)
+                .order_by(db_models.CursoCapacita.scraped_at.desc()).first(),
+                timedelta(days=8),  # semanal
+                _run_scrape_capacita,
+                "catchup_capacita",
+                "capacita",
             ),
         ]
 
@@ -305,6 +330,18 @@ def start() -> None:
         _run_scrape_gea_informes,
         CronTrigger(day_of_week="mon", hour=9, minute=30),
         id="scrape_gea_informes_semanal",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Cursos de BCR Capacita: semanal los lunes 10:00 ART. El catálogo se
+    # actualiza esporádicamente; semanal es suficiente y barato.
+    scheduler.add_job(
+        _run_scrape_capacita,
+        CronTrigger(day_of_week="mon", hour=10, minute=0),
+        id="scrape_capacita_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
