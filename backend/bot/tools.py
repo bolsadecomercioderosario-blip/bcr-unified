@@ -475,9 +475,14 @@ def consultar_agenda(
 _FILE_SEARCH_MAX_RESULTS = 50
 
 # Peso del bonus de recencia al re-rankear chunks. 0 = solo relevancia
-# semántica; 1 = solo fecha. 0.35 es un compromiso: un chunk con score 0.7
-# de un mes atrás puede ser superado por uno con score 0.55 de hoy.
-_RECENCY_ALPHA = 0.35
+# semántica; 1 = solo fecha. 0.5 + decay exponencial con half-life ~31 días
+# logra que un chunk de hace ~45 días pierda contra uno de hace ~12 días
+# con score semántico hasta 0.4 más alto. Calibrado contra el caso real
+# observado (Informativo 10/04 vs 15/05).
+_RECENCY_ALPHA = 0.5
+# Half-life (en días) de la curva exponencial de recencia. Más chico = más
+# castigo a lo viejo. 45 es la sweet spot empírica para informativo semanal.
+_RECENCY_HALF_LIFE_DAYS = 45.0
 
 # Match para extraer fecha YYYY-MM-DD del nombre del archivo subido.
 # Nuestros TXTs tienen prefijo: "2026-05-22_informativo_2244_...". Si la
@@ -563,12 +568,15 @@ def _search_in_vector_store(
         if m:
             fecha_iso = m.group(1)
 
-        # Bonus de recencia: 1.0 para hoy, decae linealmente hasta 0 en 365 días.
+        # Bonus de recencia: decae exponencialmente desde 1.0 (hoy) con
+        # half-life de _RECENCY_HALF_LIFE_DAYS. A los 45 días vale 0.5,
+        # a los 90 días vale 0.25, etc. Mucho más agresivo que el decay
+        # lineal a 1 año, que en la práctica no llegaba a flipear chunks.
         recency = 0.0
         if fecha_iso:
             try:
-                days_old = (today - date.fromisoformat(fecha_iso)).days
-                recency = max(0.0, 1.0 - days_old / 365.0)
+                days_old = max(0, (today - date.fromisoformat(fecha_iso)).days)
+                recency = 2.0 ** (-days_old / _RECENCY_HALF_LIFE_DAYS)
             except ValueError:
                 pass
 
