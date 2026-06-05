@@ -17,6 +17,7 @@ Tools registradas:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -473,6 +474,16 @@ def consultar_agenda(
 # menudo. 50 es seguro respecto a tokens del prompt y mejora el recall.
 _FILE_SEARCH_MAX_RESULTS = 50
 
+# Peso del bonus de recencia al re-rankear chunks. 0 = solo relevancia
+# semántica; 1 = solo fecha. 0.35 es un compromiso: un chunk con score 0.7
+# de un mes atrás puede ser superado por uno con score 0.55 de hoy.
+_RECENCY_ALPHA = 0.35
+
+# Match para extraer fecha YYYY-MM-DD del nombre del archivo subido.
+# Nuestros TXTs tienen prefijo: "2026-05-22_informativo_2244_...". Si la
+# convención cambia, agregar otro patrón acá.
+_FILENAME_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})_")
+
 
 def _search_in_vector_store(
     ctx: ToolContext,
@@ -529,27 +540,62 @@ def _search_in_vector_store(
             "chunks_devueltos": 0,
         }
 
-    # Devolvemos los chunks crudos, ordenados por score descendente que ya
-    # viene del API. Truncamos cada chunk a ~700 chars para no inflar el
-    # prompt del agente principal con texto repetido (el header de cada TXT
-    # se repite igual entre chunks del mismo archivo).
-    chunks: list[dict[str, Any]] = []
-    for item in items[:8]:  # top 8 al agente — suficiente para sintetizar respuesta
+    # Construimos chunks crudos con score y fecha (parseada del filename).
+    # Después re-rankeamos con un compromiso relevancia × recencia: un chunk
+    # de un mes atrás pierde frente a uno reciente con score similar. Esto
+    # resuelve el caso "informativo de abril que matchea más fuerte que el
+    # informativo de mayo con datos actualizados" sin depender de que el LLM
+    # razone sobre fechas.
+    today = date.today()
+    raw_chunks: list[dict[str, Any]] = []
+    for item in items:
         content_text = ""
         if getattr(item, "content", None):
             content_text = "\n".join(
                 getattr(c, "text", "") for c in item.content if getattr(c, "text", "")
             )
-        chunks.append({
-            "archivo": getattr(item, "filename", None) or getattr(item, "file_id", "?"),
-            "score": getattr(item, "score", None),
+        filename = getattr(item, "filename", None) or getattr(item, "file_id", "?")
+        score = getattr(item, "score", None) or 0.0
+
+        # Fecha desde el filename (formato YYYY-MM-DD_*).
+        fecha_iso: str | None = None
+        m = _FILENAME_DATE_RE.search(filename or "")
+        if m:
+            fecha_iso = m.group(1)
+
+        # Bonus de recencia: 1.0 para hoy, decae linealmente hasta 0 en 365 días.
+        recency = 0.0
+        if fecha_iso:
+            try:
+                days_old = (today - date.fromisoformat(fecha_iso)).days
+                recency = max(0.0, 1.0 - days_old / 365.0)
+            except ValueError:
+                pass
+
+        rerank_score = (1.0 - _RECENCY_ALPHA) * score + _RECENCY_ALPHA * recency
+
+        raw_chunks.append({
+            "archivo": filename,
+            "fecha": fecha_iso,
+            "score_semantico": round(score, 4),
+            "score_recencia": round(recency, 4),
+            "score_final": round(rerank_score, 4),
             "texto": content_text[:700],
         })
+
+    # Top 8 por score final (relevancia + recencia).
+    raw_chunks.sort(key=lambda c: c["score_final"], reverse=True)
+    chunks = raw_chunks[:8]
 
     return {
         "fuente": fuente_nombre,
         "consulta": consulta,
         "chunks_devueltos": len(items),
+        "ranking_nota": (
+            "Los chunks vienen re-rankeados con bonus de recencia "
+            f"(alpha={_RECENCY_ALPHA}). Para tu respuesta, citá los de "
+            "FECHA más reciente cuando cubran el mismo tema."
+        ),
         "resultado": chunks,
         "hint": hint,
     }
