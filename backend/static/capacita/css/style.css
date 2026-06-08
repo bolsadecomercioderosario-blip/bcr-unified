@@ -1,0 +1,356 @@
+/* ==========================================================================
+   BCR Capacita — formulario de captación de leads
+   Identidad BCR Capacita: navy (#002E5F) + magenta (#A90067), tipografía Inter.
+   El acento magenta toma el color del logotipo "BCRcapacita".
+   ========================================================================== */
+
+:root {
+    --ink: #002E5F;          /* navy de la marca BCR Capacita */
+    --ink-soft: #1f3a5f;
+    --accent: #A90067;       /* magenta de la marca BCR Capacita */
+    --accent-strong: #850050;
+    --accent-soft: rgba(169, 0, 103, 0.12);   /* relleno suave para chips */
+    --accent-glow: rgba(169, 0, 103, 0.22);   /* halo de foco */
+    --bg: #F4F6F9;
+    --card: #ffffff;
+    --border: #E2E8F0;
+    --muted: #5B6B82;
+    --input-bg: #F8FAFC;
+    --error: #b91c1c;
+    --success: #047857;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* --- Banda superior navy con el logo ----------------------------------- */
+.topbar {
+    width: 100%;
+    background: var(--ink);
+    padding: 1.5rem 1rem 2.25rem;
+    display: flex;
+    justify-content: center;
+    border-radius: 0 0 28px 28px;
+}
+
+.topbar img {
+    height: 100px;         /* logo institucional BCR (escudo) */
+    width: auto;
+    max-width: 90%;
+    display: block;
+}
+
+/* Wordmark BCR Capacita en color, secundario: identifica la campaña sin
+   competir con el logo institucional de la banda. */
+.brand-logo {
+    height: 38px;
+    width: auto;
+    max-width: 80%;
+    display: block;
+    margin-bottom: 1.5rem;
+}
+
+/* --- Contenido principal ----------------------------------------------- */
+.container {
+    width: 100%;
+    max-width: 620px;
+    padding: 2.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Título resaltado sobre fondo magenta, estilo "highlighter" de los flyers. */
+.title-wrap {
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.title-hl {
+    display: inline-block;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 2.2rem;
+    font-weight: 800;
+    padding: 0.25rem 1.1rem 0.35rem;
+    line-height: 1.15;
+    border-radius: 4px;
+    letter-spacing: -0.01em;
+}
+
+.subtitle {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    line-height: 1.55;
+    max-width: 520px;
+    margin: 1.25rem auto 0;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* --- Tarjeta del formulario -------------------------------------------- */
+.card {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    margin-top: 2rem;
+    box-shadow: 0 10px 30px -18px rgba(14, 42, 71, 0.25);
+}
+
+/* Bloques temáticos del form (contacto, intereses) */
+.block {
+    border: none;
+    margin-bottom: 1.6rem;
+}
+
+.block-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 0;
+    margin-bottom: 0.2rem;
+}
+
+.block-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.9rem;
+}
+
+/* --- Campos de texto --------------------------------------------------- */
+.field { margin-bottom: 0.9rem; }
+.field:last-child { margin-bottom: 0; }
+
+.field label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.4rem;
+}
+
+.field input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--input-bg);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.field input::placeholder { color: #94a3b8; }
+
+.field input:focus {
+    border-color: var(--accent-strong);
+    background: #ffffff;
+    box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+/* Estado de error en un input concreto */
+.field input.invalid {
+    border-color: var(--error);
+    background: #FEF2F2;
+}
+
+/* --- Áreas de interés (chips con checkbox) ----------------------------- */
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+}
+
+.option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.8rem 0.9rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    cursor: pointer;
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ink-soft);
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+    user-select: none;
+}
+
+.option input {
+    margin-top: 0.1rem;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-strong);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.option:hover { border-color: var(--accent-strong); }
+
+/* Resaltado de la opción seleccionada (usa :has, con fallback por hover) */
+.option:has(input:checked) {
+    border-color: var(--accent-strong);
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* --- Consentimiento ---------------------------------------------------- */
+.consent {
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0.95rem 1rem;
+    margin-top: 1.1rem;   /* separa del botón "Quiero recibir información" */
+}
+
+.consent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    cursor: pointer;
+}
+
+.consent-row input {
+    margin-top: 0.15rem;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-strong);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.consent-row span {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--muted);
+    text-align: justify;
+}
+
+/* --- Botón de envío ---------------------------------------------------- */
+.btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s ease, transform 0.05s ease;
+}
+
+.btn:hover:not(:disabled) { background: var(--accent-strong); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* --- Alertas ----------------------------------------------------------- */
+.alert {
+    padding: 0.75rem 0.95rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    display: none;
+}
+
+.alert.error {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: var(--error);
+}
+
+.alert.show { display: block; }
+
+/* --- Estado "gracias" -------------------------------------------------- */
+.success-state {
+    text-align: center;
+    padding: 0.75rem 0.25rem 0.25rem;
+}
+
+.success-state .check {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0 auto 1.25rem;
+}
+
+.success-state h2 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+}
+
+.success-state p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin-bottom: 1.5rem;
+}
+
+.link-btn {
+    background: transparent;
+    border: 1.5px solid var(--accent-strong);
+    color: var(--ink);
+    padding: 0.7rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.link-btn:hover { background: var(--accent-soft); }
+
+/* --- Pie --------------------------------------------------------------- */
+.foot {
+    margin-top: 1.75rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+}
+
+/* --- Responsive -------------------------------------------------------- */
+@media (max-width: 520px) {
+    .topbar { padding: 1.25rem 1rem 2rem; }
+    .topbar img { height: 76px; }
+    .container { padding: 2rem 1rem 2.5rem; }
+    .brand-logo { height: 32px; margin-bottom: 1.25rem; }
+    .title-hl { font-size: 1.7rem; padding: 0.2rem 0.85rem 0.3rem; }
+    .subtitle { font-size: 0.95rem; }
+    .card { padding: 1.35rem; }
+    .options { grid-template-columns: 1fr; }  /* una columna en móvil */
+}

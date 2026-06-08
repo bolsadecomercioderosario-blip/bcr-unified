@@ -25,6 +25,7 @@ from migrate import migrate
 import agenda_models  # noqa: F401
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 import conversatorio.models  # noqa: F401  — registra Sugerencia
+import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
 
 # Routers de cada módulo
@@ -32,6 +33,7 @@ from agenda.router import router as agenda_api
 from bot.router import router as bot_api
 from buscador.router import router as buscador_api
 from conversatorio.router import router as conversatorio_api
+from capacita.router import router as capacita_api
 from lluvias.router import router as lluvias_api
 from metricas.router import router as metricas_api
 from social.router import router as social_api
@@ -85,6 +87,7 @@ app.include_router(semana_datos_api)
 app.include_router(bot_api)
 app.include_router(buscador_api)
 app.include_router(conversatorio_api)
+app.include_router(capacita_api)
 app.include_router(metricas_api)
 
 
@@ -156,6 +159,32 @@ async def _conv_admin():
     )
 
 
+# BCR Capacita — formulario público de campaña (/capacita/). CSS/JS en archivos
+# separados dentro de la carpeta, así que servimos el index.html con FileResponse.
+_CAPACITA_DIR = os.path.join(STATIC_DIR, "capacita")
+
+
+@app.get("/capacita")
+async def _capacita_redirect():
+    return RedirectResponse(url="/capacita/", status_code=307)
+
+
+@app.get("/capacita/")
+async def _capacita_index():
+    return FileResponse(
+        os.path.join(_CAPACITA_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
+@app.get("/capacita/admin")
+async def _capacita_admin():
+    return FileResponse(
+        os.path.join(_CAPACITA_DIR, "admin.html"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 # Métricas FBCR — dashboard público (/metricas/) + admin de carga
 # (/metricas/admin). CSS/JS inline en cada HTML, así que FileResponse directo.
 _METRICAS_DIR = os.path.join(STATIC_DIR, "metricas")
@@ -193,6 +222,7 @@ app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agen
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
 app.mount("/conversatorio", NoCacheStaticFiles(directory=_CONV_DIR, html=False), name="conversatorio_ui")
+app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
 
 

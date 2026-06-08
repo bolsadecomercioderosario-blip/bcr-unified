@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCR Capacita — Quiero recibir información</title>
+    <meta name="description" content="Dejanos tus datos y recibí información sobre cursos, capacitaciones y actividades de BCR Capacita, el área de formación de la Bolsa de Comercio de Rosario.">
+
+    <!-- Tipografía institucional (misma que el resto de las apps BCR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Estilos (separados de la estructura) -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page">
+        <!-- Banda superior navy con el logo institucional BCR (protagonista) -->
+        <header class="topbar">
+            <img src="logo_bcr.png" alt="Bolsa de Comercio de Rosario">
+        </header>
+
+        <main class="container">
+            <!-- Marca secundaria: wordmark BCR Capacita (color), tamaño chico -->
+            <img class="brand-logo" src="logo_capacita.png" alt="BCR Capacita">
+
+            <div class="title-wrap">
+                <span class="title-hl">Quiero capacitarme</span>
+                <p class="subtitle">
+                    Dejanos tus datos y recibí información sobre cursos, capacitaciones
+                    y actividades del área de formación de la Bolsa de Comercio de Rosario.
+                </p>
+            </div>
+
+            <!-- Tarjeta del formulario -->
+            <section class="card" id="form-card">
+                <div class="alert error" id="alert-error" role="alert"></div>
+
+                <!-- novalidate: validamos por JS para dar mensajes propios y en español -->
+                <form id="lead-form" novalidate>
+
+                    <!-- 1. Datos de contacto (al menos uno) -->
+                    <fieldset class="block">
+                        <legend class="block-title">¿Cómo querés que te contactemos?</legend>
+                        <p class="block-hint">Completá al menos uno de los dos.</p>
+
+                        <div class="field">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" autocomplete="email"
+                                   inputmode="email" maxlength="200"
+                                   placeholder="nombre@ejemplo.com">
+                        </div>
+
+                        <div class="field">
+                            <label for="whatsapp">WhatsApp</label>
+                            <input type="tel" id="whatsapp" name="whatsapp" autocomplete="tel"
+                                   inputmode="tel" maxlength="40"
+                                   placeholder="Ej: +54 341 555 1234">
+                        </div>
+                    </fieldset>
+
+                    <!-- 2. Áreas de interés (selección múltiple) -->
+                    <fieldset class="block">
+                        <legend class="block-title">¿Sobre qué temas querés recibir información?</legend>
+                        <p class="block-hint">Elegí una o varias opciones.</p>
+
+                        <div class="options" id="intereses">
+                            <!-- Cada label envuelve un checkbox; se estiliza como "chip" -->
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Mercado de Capitales y Finanzas">
+                                <span>Mercado de Capitales y Finanzas</span>
+                            </label>
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Mercado de Granos">
+                                <span>Mercado de Granos</span>
+                            </label>
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Futuros y Opciones">
+                                <span>Futuros y Opciones</span>
+                            </label>
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Logística y Operaciones Agroindustriales">
+                                <span>Logística y Operaciones Agroindustriales</span>
+                            </label>
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Innovación, Tecnología y Datos">
+                                <span>Innovación, Tecnología y Datos</span>
+                            </label>
+                            <label class="option">
+                                <input type="checkbox" name="intereses" value="Aspectos Legales, Normativos y Compliance">
+                                <span>Aspectos Legales, Normativos y Compliance</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <!-- 3. Botón de envío -->
+                    <button type="submit" class="btn" id="submit-btn">Quiero recibir información</button>
+
+                    <!-- 4. Autorización de contacto (debajo del botón, marcada por defecto) -->
+                    <div class="consent">
+                        <label class="consent-row">
+                            <input type="checkbox" id="autorizacion" name="autorizacion" checked>
+                            <span>
+                                La información brindada en este formulario será utilizada exclusivamente
+                                para fines institucionales vinculados a las actividades de Bolsa de Comercio
+                                de Rosario. En este marco, autorizo a la BCR a recolectar, usar, almacenar y,
+                                cuando resulte necesario para dichos fines, compartir mis datos personales y
+                                la información provista en el presente formulario, conforme a su Política de
+                                Privacidad y Protección de Datos Personales, para su utilización en la
+                                planificación, ejecución y evaluación de actividades mencionadas.
+                            </span>
+                        </label>
+                    </div>
+                </form>
+            </section>
+
+            <!-- 5. Mensaje de confirmación (se muestra tras el envío) -->
+            <section class="card" id="success-card" style="display:none;">
+                <div class="success-state">
+                    <div class="check">✓</div>
+                    <h2>¡Gracias!</h2>
+                    <p>Registramos tus datos para enviarte información sobre las capacitaciones de BCR Capacita.</p>
+                    <button class="link-btn" id="another-btn">Cargar otro contacto</button>
+                </div>
+            </section>
+
+            <footer class="foot">Bolsa de Comercio de Rosario · BCR Capacita</footer>
+        </main>
+    </div>
+
+    <!-- Lógica (separada de la estructura y los estilos) -->
+    <script src="js/app.js"></script>
+</body>
+</html>
