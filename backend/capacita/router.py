@@ -50,6 +50,7 @@ AREAS_VALIDAS = {
     "Logística y Operaciones Agroindustriales",
     "Innovación, Tecnología y Datos",
     "Aspectos Legales, Normativos y Compliance",
+    "Gestión de las organizaciones y habilidades blandas",
 }
 
 
