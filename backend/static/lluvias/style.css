@@ -165,6 +165,52 @@ textarea {
 .btn-copy { background: #e1e8ed; color: #1c1e21; }
 .btn-download { background: #27ae60; color: white; margin-top: 10px; }
 
+/* Selector de cantidad de localidades para el texto del tweet */
+.text-count-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+.text-count-row.hidden { display: none; }
+.text-count-label {
+    color: #475569;
+    font-weight: 500;
+}
+.text-count-btn {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+.text-count-btn:hover:not(:disabled) { background: #e0e7ff; }
+.text-count-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.text-count-value {
+    min-width: 1.5rem;
+    text-align: center;
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1rem;
+}
+.text-count-max {
+    color: #94a3b8;
+    font-size: 0.75rem;
+    margin-left: auto;
+}
+
 .hint {
     font-size: 0.8rem;
     color: #65676b;

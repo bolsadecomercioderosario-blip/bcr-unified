@@ -30,8 +30,15 @@
                         <h3>Opciones para X</h3>
                         <span class="badge">Texto</span>
                     </div>
+                    <div id="textCountRow" class="text-count-row hidden">
+                        <span class="text-count-label">Cantidad de localidades:</span>
+                        <button id="textCountMinus" type="button" class="text-count-btn" title="Menos">−</button>
+                        <span id="textCountValue" class="text-count-value">5</span>
+                        <button id="textCountPlus" type="button" class="text-count-btn" title="Más">+</button>
+                        <span id="textCountMax" class="text-count-max"></span>
+                    </div>
                     <textarea id="textoResultado"></textarea>
-                    <p class="hint">Editá el texto si necesitás. Al publicar, va con la imagen del mapa adjunta.</p>
+                    <p class="hint">Editá el texto si necesitás. Al publicar, va con la imagen del mapa adjunta. El video siempre incluye las 5 mayores.</p>
                     <div class="actions-row">
                         <button id="copiarBtn" class="btn-copy">Copiar texto</button>
                         <button id="publicarBtn" class="btn-publish">📤 Publicar en X</button>

@@ -13,6 +13,27 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 FONT_PATH = os.path.join(ASSETS_DIR, "Adobe Garamond Pro Semibold.otf")
 
+
+# Normalización de nombres de localidades: el BCR a veces publica abreviaturas
+# raras como "C ALMADA" que conviene mostrar como su nombre completo. La key
+# se compara case-insensitive sobre el texto crudo del HTML.
+LOCALIDAD_OVERRIDES = {
+    "C ALMADA": "Colonia Almada",
+    "C. ALMADA": "Colonia Almada",
+}
+
+
+def normalize_localidad(raw: str) -> str:
+    """Si el nombre crudo cae en LOCALIDAD_OVERRIDES, lo reemplazamos.
+    Si no, lo devolvemos tal cual (limpiando whitespace múltiple)."""
+    if not raw:
+        return raw
+    # Colapsa cualquier whitespace múltiple a un solo espacio. Tolera tabs,
+    # newlines y doble espacio.
+    cleaned = " ".join(raw.split())
+    key = cleaned.upper()
+    return LOCALIDAD_OVERRIDES.get(key, cleaned)
+
 def get_day_labels():
     is_monday = datetime.now().weekday() == 0
     if is_monday:
@@ -153,7 +174,30 @@ def create_animated_video_legacy(top_5, map_path, output_mp4):
     clip.close()
     return output_mp4
 
-def get_rainfall_metadata():
+def build_tweet_text(localidades, labels):
+    """Arma el texto que va a Twitter dado un array de localidades ya recortado.
+    Si está vacío, devuelve el mensaje de 'no lluvias'."""
+    if not localidades:
+        return "No se registraron precipitaciones en la red de estaciones de la BCR durante el período relevado."
+    text = f"{labels['tweet_header']}\n\n"
+    for d in localidades:
+        text += f"- {d['localidad']}: {d['mm']} mm\n"
+    text += "\nMapas y más info en:\nhttps://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
+    return text
+
+
+def get_rainfall_metadata(text_count: int = 5):
+    """Scrappea las precipitaciones de la red de estaciones BCR.
+
+    Devuelve:
+      - top_video: las 5 mayores (para el video, siempre fijo en 5)
+      - texto_tweet: texto con `text_count` localidades (default 5)
+      - imagen_url: URL local de la imagen del mapa
+      - no_lluvias: True si nadie registró lluvia
+      - todas_localidades: lista completa de localidades con lluvia ordenada
+        desc por mm — la usa el frontend para recalcular el texto al cambiar
+        el contador sin re-scrapear.
+    """
     url_lluvias = "https://www.bcr.com.ar/es/mercados/gea/estaciones-meteorologicas/red-de-estaciones-meteorologicas"
     r = requests.get(url_lluvias, headers={'User-Agent': 'Mozilla/5.0'})
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -164,29 +208,25 @@ def get_rainfall_metadata():
     for row in rows[2:]:
         cols = row.find_all('td')
         if len(cols) >= 8:
-            estacion = cols[0].text.strip()
+            estacion = normalize_localidad(cols[0].text)
             precip_str = cols[4].text.strip()
             try:
                 precip_val = float(precip_str.replace(',', '.'))
-                if precip_val > 0: 
+                if precip_val > 0:
                     data.append({'localidad': estacion, 'mm': precip_val})
             except ValueError:
                 pass
     data.sort(key=lambda x: x['mm'], reverse=True)
-    top5 = data[:5]
-    
-    no_lluvias = len(top5) == 0
-    
+
+    # Video: siempre top-5 fijo. Texto: configurable, default 5.
+    top_video = data[:5]
+    text_count = max(1, int(text_count or 5))
+    top_text = data[:text_count]
+
+    no_lluvias = len(data) == 0
     labels = get_day_labels()
-    
-    if no_lluvias:
-        texto_tweet = "No se registraron precipitaciones en la red de estaciones de la BCR durante el período relevado."
-    else:
-        texto_tweet = f"{labels['tweet_header']}\n\n"
-        for d in top5:
-            texto_tweet += f"- {d['localidad']}: {d['mm']} mm\n"
-        texto_tweet += "\nMapas y más info en:\nhttps://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
-    
+    texto_tweet = build_tweet_text(top_text, labels)
+
     url_mapa_base = "https://www.bcr.com.ar/es/mercados/gea/clima/clima-gea/lluvias"
     r_img = requests.get(url_mapa_base, headers={'User-Agent': 'Mozilla/5.0'})
     soup_img = BeautifulSoup(r_img.text, 'html.parser')
@@ -198,7 +238,6 @@ def get_rainfall_metadata():
                 src = "https://www.bcr.com.ar" + src
             imagen_url = src
             break
-    imagen_local_path = None
     if imagen_url:
         os.makedirs(STATIC_DIR, exist_ok=True)
         r_down = requests.get(imagen_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -206,5 +245,5 @@ def get_rainfall_metadata():
         imagen_local_path = os.path.join(STATIC_DIR, 'uploads', imagen_local_name)
         with open(imagen_local_path, 'wb') as f:
             f.write(r_down.content)
-        return top5, texto_tweet, f"/static/uploads/{imagen_local_name}", no_lluvias
-    return top5, texto_tweet, None, no_lluvias
+        return top_video, texto_tweet, f"/static/uploads/{imagen_local_name}", no_lluvias, data
+    return top_video, texto_tweet, None, no_lluvias, data

@@ -45,8 +45,17 @@ def _video_generation_task(top_5, map_path):
 
 
 @router.get("/generar_pieza")
-async def generar_lluvias(background_tasks: BackgroundTasks):
-    top_5, texto, imagen_url, no_lluvias = get_rainfall_metadata()
+async def generar_lluvias(background_tasks: BackgroundTasks, text_count: int = 5):
+    """Genera la pieza completa.
+
+    Query params:
+      - text_count: cantidad de localidades a incluir en el texto del tweet
+        (default 5). El video siempre va con 5 fijo. Útil cuando se quiere
+        más detalle en el tweet sin re-renderizar el video.
+    """
+    top_5, texto, imagen_url, no_lluvias, todas_localidades = get_rainfall_metadata(
+        text_count=text_count
+    )
 
     video_enabled = not no_lluvias
 
@@ -59,6 +68,9 @@ async def generar_lluvias(background_tasks: BackgroundTasks):
         "imagen_url": imagen_url,
         "video_status": "processing" if video_enabled else "disabled",
         "no_lluvias": no_lluvias,
+        # Lista entera ordenada desc para que el frontend recalcule el texto
+        # al vuelo si el user cambia el contador sin re-scrapear.
+        "localidades": todas_localidades,
     }
 
 
