@@ -17,6 +17,11 @@ backend/agenda.db
 backend/agenda.db-journal
 backend/agenda.db-wal
 backend/agenda.db-shm
+# DBs locales de desarrollo/preview (ej. la que arma .claude/launch.json)
+backend/_*.db
+backend/_*.db-journal
+backend/_*.db-wal
+backend/_*.db-shm
 
 # Logs/artefactos transientes que aparecen al correr la app local
 .pip-install.log

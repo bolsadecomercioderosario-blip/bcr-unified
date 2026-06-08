@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Métricas de Impacto · Fundación BCR</title>
+    <meta name="description" content="Métricas de impacto de los programas de la Fundación de la Bolsa de Comercio de Rosario.">
+    <script src="/static/auth.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0f2a52;
+            --navy-soft: #1e3a64;
+            --bg: #f4f6fb;
+            --card: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 1px 3px rgba(15, 42, 82, 0.06), 0 8px 24px -12px rgba(15, 42, 82, 0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* ---- Header ---- */
+        .topbar {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+            color: #fff;
+            padding: 1.5rem 1.5rem 2.5rem;
+        }
+        .topbar-inner { max-width: 1080px; margin: 0 auto; }
+        .brand { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.75rem; }
+        .brand img { height: 38px; width: auto; }
+        .brand .brand-text { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+        .topbar h1 { font-size: 2.1rem; font-weight: 900; letter-spacing: -0.02em; }
+        .topbar .lead { margin-top: 0.4rem; font-size: 0.98rem; opacity: 0.8; max-width: 620px; }
+        .topbar .admin-link {
+            float: right; color: #fff; opacity: 0.7; text-decoration: none;
+            font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.25);
+            padding: 0.4rem 0.8rem; border-radius: 0.5rem; transition: opacity 0.2s;
+        }
+        .topbar .admin-link:hover { opacity: 1; }
+
+        .wrap { max-width: 1080px; margin: -1.5rem auto 4rem; padding: 0 1.5rem; }
+
+        /* ---- KPIs ---- */
+        .kpi-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 1rem; margin-bottom: 2.5rem;
+        }
+        .kpi {
+            background: var(--card); border: 1px solid var(--border); border-radius: 1rem;
+            padding: 1.4rem 1.5rem; box-shadow: var(--shadow);
+        }
+        .kpi .num { font-size: 2.2rem; font-weight: 900; letter-spacing: -0.03em; color: var(--navy); line-height: 1; }
+        .kpi .label { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+
+        .section-title { font-size: 1.05rem; font-weight: 800; margin: 0 0 1rem; color: var(--navy); }
+        .section { margin-bottom: 2.75rem; }
+
+        /* ---- Bar chart ---- */
+        .chart {
+            background: var(--card); border: 1px solid var(--border); border-radius: 1rem;
+            padding: 1.5rem; box-shadow: var(--shadow);
+        }
+        .bars { display: flex; align-items: flex-end; gap: 0.6rem; height: 200px; padding-top: 0.5rem; }
+        .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+        .bar {
+            width: 100%; max-width: 46px; border-radius: 6px 6px 0 0;
+            background: linear-gradient(180deg, #3b82f6 0%, var(--navy) 100%);
+            transition: height 0.6s cubic-bezier(0.22,1,0.36,1); position: relative;
+        }
+        .bar-val { font-size: 0.7rem; font-weight: 700; color: var(--navy); margin-bottom: 0.25rem; white-space: nowrap; }
+        .bar-year { margin-top: 0.45rem; font-size: 0.72rem; color: var(--text-muted); font-weight: 600; }
+
+        /* ---- Programas ---- */
+        .prog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .prog-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 1rem;
+            padding: 1.4rem; box-shadow: var(--shadow); cursor: pointer; text-align: left;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; position: relative; overflow: hidden;
+        }
+        .prog-card::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: var(--accent); }
+        .prog-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px -12px rgba(15,42,82,0.25); border-color: var(--accent); }
+        .prog-card .ico { font-size: 1.7rem; }
+        .prog-card h3 { font-size: 1.02rem; font-weight: 800; margin: 0.6rem 0 0.2rem; }
+        .prog-card .desc { font-size: 0.8rem; color: var(--text-muted); min-height: 2.4em; }
+        .prog-card .mini { display: flex; gap: 1.2rem; margin-top: 0.9rem; }
+        .prog-card .mini b { display: block; font-size: 1.15rem; font-weight: 800; color: var(--navy); }
+        .prog-card .mini span { font-size: 0.68rem; color: var(--text-muted); font-weight: 600; }
+
+        /* ---- Detail (timeline) ---- */
+        .detail { display: none; margin-top: 1.5rem; }
+        .detail.open { display: block; }
+        .detail-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.2rem; }
+        .detail-head .ico { font-size: 1.6rem; }
+        .detail-head h2 { font-size: 1.4rem; font-weight: 900; color: var(--navy); }
+        .detail-close {
+            margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 0.5rem;
+            padding: 0.4rem 0.8rem; font-family: inherit; font-size: 0.8rem; font-weight: 600;
+            color: var(--text-muted); cursor: pointer;
+        }
+        .detail-close:hover { color: var(--text); border-color: var(--text-muted); }
+
+        .inst {
+            background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+            border-radius: 0.75rem; padding: 1.1rem 1.3rem; margin-bottom: 0.85rem; box-shadow: var(--shadow);
+        }
+        .inst-top { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+        .inst-top h4 { font-size: 1rem; font-weight: 800; }
+        .inst-date { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+        .inst-mod { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+            background: #eef2ff; color: #4338ca; padding: 0.15rem 0.55rem; border-radius: 999px; }
+        .metrics { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
+        .metric { background: #f1f5f9; border-radius: 0.5rem; padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+        .metric b { color: var(--navy); }
+        .inst .loc { margin-top: 0.6rem; font-size: 0.82rem; color: var(--text-muted); }
+        .inst .win { margin-top: 0.55rem; font-size: 0.84rem; }
+        .inst .win .tag { font-weight: 700; color: var(--navy); }
+        .inst .notes { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
+        .inst a { color: #2563eb; word-break: break-word; }
+
+        .loading, .empty { text-align: center; color: var(--text-muted); padding: 2rem; font-size: 0.9rem; }
+
+        @media (max-width: 640px) {
+            .topbar h1 { font-size: 1.6rem; }
+            .topbar .admin-link { float: none; display: inline-block; margin-bottom: 1rem; }
+            .kpi .num { font-size: 1.8rem; }
+            .bar-val { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a href="/metricas/admin" class="admin-link">⚙ Cargar datos</a>
+            <div class="brand">
+                <img src="/static/conversatorio/logo_bcr.png" alt="BCR" onerror="this.style.display='none'">
+                <span class="brand-text">Fundación Bolsa de Comercio de Rosario</span>
+            </div>
+            <h1>Métricas de Impacto</h1>
+            <p class="lead">Trayectoria de los programas de la Fundación BCR a lo largo de los años — personas alcanzadas, organizaciones acompañadas y proyectos generados.</p>
+        </div>
+    </header>
+
+    <main class="wrap">
+        <div class="kpi-grid" id="kpis"><div class="loading">Cargando métricas…</div></div>
+
+        <section class="section">
+            <h2 class="section-title">Personas alcanzadas por año</h2>
+            <div class="chart"><div class="bars" id="chart"></div></div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">Programas</h2>
+            <div class="prog-grid" id="programas"></div>
+            <div class="detail" id="detail">
+                <div class="detail-head">
+                    <span class="ico" id="d-ico"></span>
+                    <h2 id="d-nombre"></h2>
+                    <button class="detail-close" onclick="cerrarDetalle()">Cerrar ✕</button>
+                </div>
+                <div id="d-instancias"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const nf = new Intl.NumberFormat('es-AR');
+        const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        let PROGRAMAS = [];
+        let INSTANCIAS = [];
+
+        function fmtFecha(inst) {
+            if (inst.fecha) {
+                const [y, m, d] = inst.fecha.split('-').map(Number);
+                return `${MESES[m - 1]} ${y}`;
+            }
+            return inst.fecha_texto || (inst.anio ? String(inst.anio) : '');
+        }
+
+        async function cargar() {
+            try {
+                const [kpis, progs, insts] = await Promise.all([
+                    fetch('/api/metricas/kpis').then(r => r.json()),
+                    fetch('/api/metricas/programas').then(r => r.json()),
+                    fetch('/api/metricas/instancias').then(r => r.json()),
+                ]);
+                PROGRAMAS = progs;
+                INSTANCIAS = insts;
+                renderKpis(kpis);
+                renderChart(kpis.por_anio || []);
+                renderProgramas(progs);
+            } catch (e) {
+                document.getElementById('kpis').innerHTML = '<div class="empty">No se pudieron cargar las métricas.</div>';
+            }
+        }
+
+        function renderKpis(k) {
+            const items = [
+                { num: k.total_personas, label: 'Personas alcanzadas' },
+                { num: k.total_osc, label: 'OSC acompañadas' },
+                { num: k.total_proyectos, label: 'Proyectos presentados' },
+                { num: k.total_instancias, label: 'Instancias realizadas' },
+                { num: k.anios_trayectoria, label: 'Años de trayectoria' },
+            ];
+            document.getElementById('kpis').innerHTML = items.map(i =>
+                `<div class="kpi"><div class="num">${nf.format(i.num || 0)}</div><div class="label">${i.label}</div></div>`
+            ).join('');
+        }
+
+        function renderChart(data) {
+            const el = document.getElementById('chart');
+            if (!data.length) { el.innerHTML = '<div class="empty">Sin datos por año.</div>'; return; }
+            const max = Math.max(...data.map(d => d.personas), 1);
+            el.innerHTML = data.map(d => {
+                const h = Math.max((d.personas / max) * 100, d.personas ? 3 : 0);
+                return `<div class="bar-col">
+                    <div class="bar-val">${d.personas ? nf.format(d.personas) : ''}</div>
+                    <div class="bar" style="height:${h}%"></div>
+                    <div class="bar-year">${d.anio}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderProgramas(progs) {
+            document.getElementById('programas').innerHTML = progs.map(p => {
+                const rango = p.anio_min ? (p.anio_min === p.anio_max ? p.anio_min : `${p.anio_min}–${p.anio_max}`) : '';
+                return `<div class="prog-card" style="--accent:${p.color}" onclick="abrirDetalle('${p.slug}')">
+                    <div class="ico">${p.icono}</div>
+                    <h3>${p.nombre}</h3>
+                    <div class="desc">${p.descripcion || ''}</div>
+                    <div class="mini">
+                        <div><b>${nf.format(p.total_personas)}</b><span>personas</span></div>
+                        <div><b>${p.total_instancias}</b><span>instancias</span></div>
+                        ${rango ? `<div><b style="font-size:0.92rem">${rango}</b><span>período</span></div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function abrirDetalle(slug) {
+            const p = PROGRAMAS.find(x => x.slug === slug);
+            const insts = INSTANCIAS.filter(i => i.programa_id === p.id);
+            document.getElementById('d-ico').textContent = p.icono;
+            document.getElementById('d-nombre').textContent = p.nombre;
+            document.documentElement.style.setProperty('--accent', p.color);
+            const cont = document.getElementById('d-instancias');
+            if (!insts.length) {
+                cont.innerHTML = '<div class="empty">Todavía no hay instancias cargadas.</div>';
+            } else {
+                cont.innerHTML = insts.map(i => instHTML(i, p.color)).join('');
+            }
+            const det = document.getElementById('detail');
+            det.classList.add('open');
+            det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function cerrarDetalle() { document.getElementById('detail').classList.remove('open'); }
+
+        function metricBadge(label, val) {
+            return (val !== null && val !== undefined) ? `<span class="metric">${label}: <b>${nf.format(val)}</b></span>` : '';
+        }
+        function linkify(t) {
+            return (t || '').replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+        }
+
+        function instHTML(i, color) {
+            const metrics = [
+                metricBadge('Personas', i.personas),
+                metricBadge('Proyectos', i.proyectos),
+                metricBadge('OSC', i.osc),
+                metricBadge('Escuelas', i.escuelas),
+                metricBadge('Mentores', i.mentores),
+                (i.monto ? `<span class="metric">Aporte: <b>$${nf.format(i.monto)}</b></span>` : ''),
+            ].filter(Boolean).join('');
+            const fecha = fmtFecha(i);
+            return `<div class="inst" style="--accent:${color}">
+                <div class="inst-top">
+                    <h4>${i.titulo}</h4>
+                    ${fecha ? `<span class="inst-date">${fecha}</span>` : ''}
+                    ${i.modalidad ? `<span class="inst-mod">${i.modalidad}</span>` : ''}
+                </div>
+                ${metrics ? `<div class="metrics">${metrics}</div>` : ''}
+                ${i.localidades ? `<div class="loc">📍 ${i.localidades}</div>` : ''}
+                ${i.ganadores ? `<div class="win"><span class="tag">Ganadores:</span> ${i.ganadores}</div>` : ''}
+                ${i.reconocimiento ? `<div class="notes">🏅 ${linkify(i.reconocimiento)}</div>` : ''}
+                ${i.notas ? `<div class="notes">${linkify(i.notas)}</div>` : ''}
+            </div>`;
+        }
+
+        cargar();
+    </script>
+</body>
+</html>

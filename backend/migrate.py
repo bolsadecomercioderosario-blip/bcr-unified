@@ -65,6 +65,7 @@ def migrate():
     )
 
     seed_efemerides_if_empty()
+    seed_metricas_if_empty()
 
 
 def seed_efemerides_if_empty():
@@ -84,6 +85,39 @@ def seed_efemerides_if_empty():
             print(f"Seed de efemérides saltado (ya hay {count} entradas).")
     except Exception as e:
         print(f"Error al sembrar efemérides: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def seed_metricas_if_empty():
+    """Siembra programas + instancias de Métricas FBCR si las tablas están vacías.
+    Idempotente: una vez sembrado, las altas se cargan desde el admin."""
+    from metricas.models import Instancia, Programa
+    from metricas.seed_data import INSTANCIAS, PROGRAMAS
+
+    db = SessionLocal()
+    try:
+        if db.query(Programa).count() > 0:
+            print("Seed de métricas saltado (ya hay programas cargados).")
+            return
+
+        slug_to_id = {}
+        for p in PROGRAMAS:
+            prog = Programa(**p)
+            db.add(prog)
+            db.flush()  # para tener el id antes del commit
+            slug_to_id[prog.slug] = prog.id
+
+        for row in INSTANCIAS:
+            data = dict(row)
+            slug = data.pop("programa")
+            db.add(Instancia(programa_id=slug_to_id[slug], **data))
+
+        db.commit()
+        print(f"Seed de métricas: {len(PROGRAMAS)} programas y {len(INSTANCIAS)} instancias insertadas.")
+    except Exception as e:
+        print(f"Error al sembrar métricas: {e}")
         db.rollback()
     finally:
         db.close()

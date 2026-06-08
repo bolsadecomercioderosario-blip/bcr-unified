@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Métricas FBCR · Carga de datos</title>
+    <script src="/static/auth.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #34d399;
+            --primary-dark: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #273548;
+            --bg-input: #0f172a;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --danger: #f87171;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem 4rem; }
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.4rem; }
+        .back-link:hover { color: var(--text); }
+        .actions { display: flex; gap: 0.6rem; }
+        .btn { padding: 0.6rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
+        .btn:hover { border-color: var(--primary); background: var(--bg-card-hover); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); color: #052e1f; }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+        .btn-danger { color: var(--danger); border-color: transparent; background: transparent; }
+        .btn-danger:hover { border-color: var(--danger); background: rgba(248,113,113,0.1); }
+
+        .header { margin-bottom: 1.75rem; }
+        .header .eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .header h1 { font-size: 1.8rem; font-weight: 800; }
+
+        .layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: 1.5rem; align-items: start; }
+        @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.4rem; }
+        .panel h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+
+        label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; }
+        input, select, textarea {
+            width: 100%; padding: 0.55rem 0.7rem; border-radius: 0.5rem; border: 1px solid var(--border);
+            background: var(--bg-input); color: var(--text); font-family: inherit; font-size: 0.9rem; outline: none; margin-bottom: 0.85rem;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 60px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+        .form-actions { display: flex; gap: 0.6rem; margin-top: 0.5rem; }
+
+        .filter-bar { display: flex; gap: 0.6rem; margin-bottom: 1rem; align-items: center; }
+        .filter-bar select { margin-bottom: 0; }
+
+        .inst-list { max-height: 70vh; overflow-y: auto; }
+        .inst-item { border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.7rem 0.85rem; margin-bottom: 0.6rem; cursor: pointer; transition: all 0.15s; }
+        .inst-item:hover { border-color: var(--primary); background: var(--bg-card-hover); }
+        .inst-item.active { border-color: var(--primary); background: var(--bg-card-hover); }
+        .inst-item .it-title { font-weight: 700; font-size: 0.9rem; }
+        .inst-item .it-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; display: flex; gap: 0.7rem; flex-wrap: wrap; }
+        .it-prog { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.3rem; vertical-align: middle; }
+
+        .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--primary); color: #052e1f; padding: 0.7rem 1.3rem; border-radius: 0.6rem; font-weight: 700; font-size: 0.88rem; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 1000; }
+        .toast.show { opacity: 1; }
+        .toast.err { background: var(--danger); color: #fff; }
+        .hint { font-size: 0.72rem; color: var(--text-muted); margin: -0.6rem 0 0.85rem; }
+        .empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <a href="/metricas/" class="back-link">← Volver al dashboard</a>
+            <div class="actions">
+                <a href="/api/metricas/export.csv" class="btn">⬇ Exportar CSV</a>
+                <button class="btn btn-primary" onclick="nuevo()">+ Nueva instancia</button>
+            </div>
+        </div>
+
+        <div class="header">
+            <div class="eyebrow">Fundación BCR · Métricas</div>
+            <h1>Carga de datos</h1>
+        </div>
+
+        <div class="layout">
+            <!-- Lista -->
+            <div class="panel">
+                <div class="filter-bar">
+                    <label style="margin:0;">Filtrar:</label>
+                    <select id="filtro" onchange="renderLista()"><option value="">Todos los programas</option></select>
+                </div>
+                <div class="inst-list" id="lista"><div class="empty">Cargando…</div></div>
+            </div>
+
+            <!-- Formulario -->
+            <div class="panel">
+                <h2 id="form-title">Nueva instancia</h2>
+                <form id="form" onsubmit="guardar(event)">
+                    <input type="hidden" id="f-id">
+
+                    <label>Programa *</label>
+                    <select id="f-programa" required></select>
+
+                    <label>Título *</label>
+                    <input id="f-titulo" required placeholder="Ej: 11ª Edición Programa de Aceleración">
+
+                    <div class="row-3">
+                        <div><label>Año</label><input id="f-anio" type="number" placeholder="2026"></div>
+                        <div><label>Fecha exacta</label><input id="f-fecha" type="date"></div>
+                        <div><label>Fecha (texto)</label><input id="f-fecha_texto" placeholder="mayo 2026"></div>
+                    </div>
+                    <p class="hint">Usá "Fecha exacta" si la sabés; si no, dejá año y/o fecha en texto.</p>
+
+                    <div class="row">
+                        <div><label>Modalidad</label><input id="f-modalidad" placeholder="Presencial / Virtual / Híbrido"></div>
+                        <div><label>Localidades</label><input id="f-localidades" placeholder="Rosario, Casilda…"></div>
+                    </div>
+
+                    <div class="row-3">
+                        <div><label>Personas</label><input id="f-personas" type="number"></div>
+                        <div><label>Proyectos</label><input id="f-proyectos" type="number"></div>
+                        <div><label>OSC</label><input id="f-osc" type="number"></div>
+                    </div>
+                    <div class="row-3">
+                        <div><label>Escuelas</label><input id="f-escuelas" type="number"></div>
+                        <div><label>Mentores</label><input id="f-mentores" type="number"></div>
+                        <div><label>Aporte ($)</label><input id="f-monto" type="number" step="any"></div>
+                    </div>
+                    <p class="hint">Dejá vacío cualquier número que no aplique — no se cuenta en los KPI.</p>
+
+                    <label>Ganadores</label>
+                    <textarea id="f-ganadores"></textarea>
+                    <label>Reconocimiento (premios, declaraciones, links)</label>
+                    <textarea id="f-reconocimiento"></textarea>
+                    <label>Notas</label>
+                    <textarea id="f-notas"></textarea>
+                    <label>Orden (dentro del año)</label>
+                    <input id="f-orden" type="number" value="0">
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <button type="button" class="btn" onclick="nuevo()">Limpiar</button>
+                        <button type="button" class="btn btn-danger" id="btn-del" style="display:none;" onclick="borrar()">Eliminar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let PROGRAMAS = [];
+        let INSTANCIAS = [];
+        const $ = id => document.getElementById(id);
+
+        function toast(msg, err) {
+            const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+            setTimeout(() => t.className = 'toast', 2200);
+        }
+
+        async function cargar() {
+            const [progs, insts] = await Promise.all([
+                fetch('/api/metricas/programas').then(r => r.json()),
+                fetch('/api/metricas/instancias').then(r => r.json()),
+            ]);
+            PROGRAMAS = progs; INSTANCIAS = insts;
+            const opts = progs.map(p => `<option value="${p.id}">${p.icono} ${p.nombre}</option>`).join('');
+            $('f-programa').innerHTML = opts;
+            $('filtro').innerHTML = '<option value="">Todos los programas</option>' + opts;
+            renderLista();
+        }
+
+        function progById(id) { return PROGRAMAS.find(p => p.id === id) || {}; }
+
+        function renderLista() {
+            const f = $('filtro').value;
+            let list = INSTANCIAS.slice();
+            if (f) list = list.filter(i => String(i.programa_id) === f);
+            list.sort((a, b) => (b.anio || 0) - (a.anio || 0) || a.orden - b.orden);
+            const el = $('lista');
+            if (!list.length) { el.innerHTML = '<div class="empty">Sin instancias.</div>'; return; }
+            el.innerHTML = list.map(i => {
+                const p = progById(i.programa_id);
+                const fecha = i.fecha ? i.fecha : (i.fecha_texto || i.anio || '');
+                return `<div class="inst-item" data-id="${i.id}" onclick="editar(${i.id})">
+                    <div class="it-title">${i.titulo}</div>
+                    <div class="it-meta">
+                        <span><span class="it-prog" style="background:${p.color}"></span>${p.nombre}</span>
+                        <span>${fecha}</span>
+                        ${i.personas != null ? `<span>👥 ${i.personas}</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function setVal(id, v) { $(id).value = (v === null || v === undefined) ? '' : v; }
+
+        function nuevo() {
+            $('form').reset();
+            $('f-id').value = '';
+            $('f-orden').value = 0;
+            $('form-title').textContent = 'Nueva instancia';
+            $('btn-del').style.display = 'none';
+            document.querySelectorAll('.inst-item').forEach(e => e.classList.remove('active'));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function editar(id) {
+            const i = INSTANCIAS.find(x => x.id === id);
+            if (!i) return;
+            setVal('f-id', i.id); setVal('f-programa', i.programa_id); setVal('f-titulo', i.titulo);
+            setVal('f-anio', i.anio); setVal('f-fecha', i.fecha); setVal('f-fecha_texto', i.fecha_texto);
+            setVal('f-modalidad', i.modalidad); setVal('f-localidades', i.localidades);
+            setVal('f-personas', i.personas); setVal('f-proyectos', i.proyectos); setVal('f-osc', i.osc);
+            setVal('f-escuelas', i.escuelas); setVal('f-mentores', i.mentores); setVal('f-monto', i.monto);
+            setVal('f-ganadores', i.ganadores); setVal('f-reconocimiento', i.reconocimiento);
+            setVal('f-notas', i.notas); setVal('f-orden', i.orden);
+            $('form-title').textContent = 'Editar instancia';
+            $('btn-del').style.display = 'inline-flex';
+            document.querySelectorAll('.inst-item').forEach(e => e.classList.toggle('active', e.dataset.id == id));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        const numOrNull = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+        const strVal = id => $(id).value.trim();
+
+        async function guardar(ev) {
+            ev.preventDefault();
+            const id = $('f-id').value;
+            const payload = {
+                programa_id: Number($('f-programa').value),
+                titulo: strVal('f-titulo'),
+                anio: numOrNull('f-anio'),
+                fecha: strVal('f-fecha') || null,
+                fecha_texto: strVal('f-fecha_texto'),
+                modalidad: strVal('f-modalidad'),
+                localidades: strVal('f-localidades'),
+                personas: numOrNull('f-personas'),
+                proyectos: numOrNull('f-proyectos'),
+                osc: numOrNull('f-osc'),
+                escuelas: numOrNull('f-escuelas'),
+                mentores: numOrNull('f-mentores'),
+                monto: numOrNull('f-monto'),
+                ganadores: strVal('f-ganadores'),
+                reconocimiento: strVal('f-reconocimiento'),
+                notas: strVal('f-notas'),
+                orden: numOrNull('f-orden') || 0,
+            };
+            const url = id ? `/api/metricas/instancias/${id}` : '/api/metricas/instancias';
+            const method = id ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Error al guardar'); }
+                toast(id ? 'Instancia actualizada' : 'Instancia creada');
+                await cargar(); nuevo();
+            } catch (e) { toast(e.message, true); }
+        }
+
+        async function borrar() {
+            const id = $('f-id').value;
+            if (!id || !confirm('¿Eliminar esta instancia? No se puede deshacer.')) return;
+            try {
+                const res = await fetch(`/api/metricas/instancias/${id}`, { method: 'DELETE' });
+                if (!res.ok && res.status !== 204) throw new Error('Error al eliminar');
+                toast('Instancia eliminada');
+                await cargar(); nuevo();
+            } catch (e) { toast(e.message, true); }
+        }
+
+        cargar();
+    </script>
+</body>
+</html>

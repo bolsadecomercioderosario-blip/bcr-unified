@@ -27,6 +27,7 @@
             --accent-bot: #fbbf24;
             --accent-web: #fb923c;
             --accent-conv: #f59e0b;
+            --accent-metricas: #34d399;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -156,6 +157,7 @@
         .tool-card.bot::before { background: var(--accent-bot); }
         .tool-card.web::before { background: var(--accent-web); }
         .tool-card.conv::before { background: var(--accent-conv); }
+        .tool-card.metricas::before { background: var(--accent-metricas); }
 
         .tool-card.rain:hover { border-color: rgba(56, 189, 248, 0.3); }
         .tool-card.social:hover { border-color: rgba(244, 114, 182, 0.3); }
@@ -164,6 +166,7 @@
         .tool-card.bot:hover { border-color: rgba(251, 191, 36, 0.3); }
         .tool-card.web:hover { border-color: rgba(251, 146, 60, 0.3); }
         .tool-card.conv:hover { border-color: rgba(245, 158, 11, 0.3); }
+        .tool-card.metricas:hover { border-color: rgba(52, 211, 153, 0.3); }
 
         .tool-icon {
             width: 56px;
@@ -187,6 +190,7 @@
         .tool-card.bot .tool-icon { background: rgba(251, 191, 36, 0.15); }
         .tool-card.web .tool-icon { background: rgba(251, 146, 60, 0.15); }
         .tool-card.conv .tool-icon { background: rgba(245, 158, 11, 0.15); }
+        .tool-card.metricas .tool-icon { background: rgba(52, 211, 153, 0.15); }
 
         .tool-card h3 {
             font-size: 1.15rem;
@@ -237,6 +241,7 @@
         .tool-card:nth-child(5) { animation-delay: 0.5s; }
         .tool-card:nth-child(6) { animation-delay: 0.6s; }
         .tool-card:nth-child(7) { animation-delay: 0.7s; }
+        .tool-card:nth-child(8) { animation-delay: 0.8s; }
 
         @keyframes cardIn {
             to { opacity: 1; transform: translateY(0); }
@@ -292,6 +297,11 @@
             <a href="/conversatorio/admin" class="tool-card conv" id="tool-conversatorio">
                 <div class="tool-icon">🎤</div>
                 <h3>Conversatorio a la carta</h3>
+            </a>
+
+            <a href="/metricas" class="tool-card metricas" id="tool-metricas">
+                <div class="tool-icon">📈</div>
+                <h3>Métricas FBCR</h3>
             </a>
 
             <a href="https://bcr-portal-poc.onrender.com/" target="_blank" rel="noopener noreferrer" class="tool-card web" id="tool-web">
