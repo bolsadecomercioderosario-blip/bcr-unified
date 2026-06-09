@@ -1,0 +1,259 @@
+/* Agenda de Compromisos — vista pública para autoridades BCR.
+   Diseño limpio, sobrio, mobile-first. Tipografía Inter. */
+
+:root {
+    --bcr-primary: #0742ab;
+    --bcr-primary-dark: #052f7a;
+    --bcr-bg: #f7f8fb;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-accent: #334155;
+    --chip-bg: #eef2ff;
+    --chip-text: #3730a3;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bcr-bg);
+    color: var(--text-main);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+}
+
+/* --- Topbar --- */
+.topbar {
+    background: linear-gradient(135deg, var(--bcr-primary) 0%, var(--bcr-primary-dark) 100%);
+    color: white;
+    padding: 1.5rem 1.25rem;
+    box-shadow: var(--shadow-lg);
+}
+.topbar-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+.brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.brand-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.brand-sub {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-top: 0.15rem;
+    letter-spacing: 0.3px;
+}
+.updated-at {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* --- Filtros --- */
+.filters {
+    max-width: 900px;
+    margin: 1.25rem auto 0;
+    padding: 0 1.25rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.filter-btn {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-accent);
+    padding: 0.45rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.filter-btn:hover {
+    border-color: var(--bcr-primary);
+    color: var(--bcr-primary);
+}
+.filter-btn.active {
+    background: var(--bcr-primary);
+    color: white;
+    border-color: var(--bcr-primary);
+}
+
+/* --- Content --- */
+.content {
+    max-width: 900px;
+    margin: 1.5rem auto;
+    padding: 0 1.25rem 2rem;
+}
+.loader, .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+.error {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #b91c1c;
+}
+.error h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+}
+
+/* --- Day group --- */
+.day-group {
+    margin-bottom: 2rem;
+}
+.day-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--bcr-primary);
+    letter-spacing: 1.2px;
+    margin: 0 0 0.85rem;
+    padding-left: 0.25rem;
+    border-left: 3px solid var(--bcr-primary);
+    padding-left: 0.65rem;
+}
+.day-header .day-date {
+    font-size: 0.9rem;
+    color: var(--text-accent);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 0.5rem;
+}
+
+/* --- Activity card --- */
+.activity {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 0.75rem;
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 1rem;
+}
+.activity-time {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--bcr-primary);
+    line-height: 1.1;
+    padding-top: 0.15rem;
+}
+.activity-time .tbd {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+.activity-body { min-width: 0; }
+.activity-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    color: var(--text-main);
+}
+.activity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 0.55rem;
+}
+.activity-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.activity-meta-item strong {
+    color: var(--text-accent);
+    font-weight: 600;
+}
+.activity-description {
+    font-size: 0.92rem;
+    color: var(--text-accent);
+    line-height: 1.55;
+    margin-top: 0.3rem;
+    white-space: pre-wrap;
+}
+
+/* --- Footer --- */
+.footer {
+    text-align: center;
+    padding: 1.5rem 1.25rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    background: white;
+}
+
+/* --- Mobile ajustes --- */
+@media (max-width: 640px) {
+    .topbar { padding: 1.1rem 1rem; }
+    .brand-title { font-size: 1rem; }
+    .updated-at { width: 100%; text-align: left; }
+    .filters {
+        margin-top: 0.85rem;
+        padding: 0 1rem;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    .filter-btn {
+        flex-shrink: 0;
+        padding: 0.4rem 0.85rem;
+        font-size: 0.78rem;
+    }
+    .content {
+        padding: 0 1rem 2rem;
+        margin-top: 1rem;
+    }
+    .activity {
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
+        padding: 1rem;
+    }
+    .activity-time {
+        font-size: 0.95rem;
+    }
+    .activity-title {
+        font-size: 1rem;
+    }
+}

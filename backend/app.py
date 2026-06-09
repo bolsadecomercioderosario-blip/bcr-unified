@@ -32,6 +32,7 @@ import metricas.models  # noqa: F401  — registra Programa + Instancia
 from agenda.router import router as agenda_api
 from bot.router import router as bot_api
 from buscador.router import router as buscador_api
+from compromisos.router import router as compromisos_api
 from conversatorio.router import router as conversatorio_api
 from capacita.router import router as capacita_api
 from lluvias.router import router as lluvias_api
@@ -89,6 +90,7 @@ app.include_router(buscador_api)
 app.include_router(conversatorio_api)
 app.include_router(capacita_api)
 app.include_router(metricas_api)
+app.include_router(compromisos_api)
 
 
 # ---------------------------------------------------------
@@ -130,6 +132,20 @@ for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
+
+
+# ---------------------------------------------------------
+# Agenda de Compromisos institucionales (vista pública para autoridades BCR).
+# URL: /compromisos/{token}  — el token se valida en el frontend contra el API.
+# Servimos el mismo HTML para cualquier token: el JS lee el token del path y
+# pega al /api/compromisos/{token} que sí valida y devuelve 404 si no coincide.
+# ---------------------------------------------------------
+@app.get("/compromisos/{token}")
+async def _compromisos_page(token: str):  # noqa: ARG001 — token usado por el JS, no acá
+    return HTMLResponse(
+        content=get_module_html("compromisos"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
 
 
 # Conversatorio a la carta — dos páginas: form público (/conversatorio/) y

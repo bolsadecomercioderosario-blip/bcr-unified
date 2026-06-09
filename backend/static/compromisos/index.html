@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda de Compromisos · BCR</title>
+    <link rel="stylesheet" href="/static/compromisos/style.css?v=__VERSION__">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <div class="brand-mark">BCR</div>
+                <div class="brand-text">
+                    <div class="brand-title">Agenda de Compromisos</div>
+                    <div class="brand-sub">Bolsa de Comercio de Rosario</div>
+                </div>
+            </div>
+            <div id="updated-at" class="updated-at"></div>
+        </div>
+    </header>
+
+    <nav class="filters">
+        <button class="filter-btn active" data-filter="proximas">Próximas</button>
+        <button class="filter-btn" data-filter="hoy">Hoy</button>
+        <button class="filter-btn" data-filter="semana">Esta semana</button>
+        <button class="filter-btn" data-filter="todas">Todas</button>
+    </nav>
+
+    <main id="content" class="content">
+        <div id="loader" class="loader">Cargando agenda…</div>
+    </main>
+
+    <footer class="footer">
+        <small>Actualizado automáticamente. La información es de uso interno.</small>
+    </footer>
+
+    <script src="/static/compromisos/script.js?v=__VERSION__"></script>
+</body>
+</html>

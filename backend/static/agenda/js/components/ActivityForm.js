@@ -102,7 +102,7 @@ export function renderActivityForm(container, preData = null) {
                     <div style="margin-top: 1rem;">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem;">Canales de Difusión</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                            ${['Instagram Story', 'Instagram Feed', 'LinkedIn', 'X', 'YouTube', 'Facebook', 'Más BCR', 'Envíalo Simple', 'Mail a asociados', 'Conectados', 'Bot'].map(ch => `
+                            ${['Instagram Story', 'Instagram Feed', 'LinkedIn', 'X', 'YouTube', 'Facebook', 'Más BCR', 'Envíalo Simple', 'Mail a asociados', 'Conectados', 'Bot', 'Agenda Compromisos'].map(ch => `
                                 <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
                                     <input type="checkbox" name="channels" value="${ch}" ${act.channels.includes(ch) ? 'checked' : ''}>
                                     ${ch}
