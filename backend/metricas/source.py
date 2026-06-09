@@ -37,7 +37,16 @@ import urllib.request
 from .seed_data import PROGRAMAS as PROGRAMAS_CATALOG
 
 
-SHEET_CSV_URL = os.environ.get("METRICAS_SHEET_CSV_URL", "").strip()
+# Google Sheet de Métricas FBCR publicado como CSV (Archivo → Publicar en la web).
+# Es un link público de solo lectura, por eso puede vivir en el código. La env var
+# METRICAS_SHEET_CSV_URL lo sobreescribe si alguna vez hay que cambiarlo sin deploy.
+DEFAULT_SHEET_CSV_URL = (
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vRylCZNmR6nhTMiBjU6zmCmRKjTd"
+    "F1vq0YJbo4H8ic0cgAO6zOirExd7vgshKyzHElbR1v-2ioC-A25/pub"
+    "?gid=115741142&single=true&output=csv"
+)
+
+SHEET_CSV_URL = os.environ.get("METRICAS_SHEET_CSV_URL", "").strip() or DEFAULT_SHEET_CSV_URL
 SHEET_EDIT_URL = os.environ.get("METRICAS_SHEET_EDIT_URL", "").strip()
 SHEET_TTL = int(os.environ.get("METRICAS_SHEET_TTL", "120"))  # segundos
 
