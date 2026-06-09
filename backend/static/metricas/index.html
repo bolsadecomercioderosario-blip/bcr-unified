@@ -140,7 +140,7 @@
 <body>
     <header class="topbar">
         <div class="topbar-inner">
-            <a href="/metricas/admin" class="admin-link">⚙ Cargar datos</a>
+            <a href="/metricas/admin" class="admin-link" id="admin-link">⚙ Cargar datos</a>
             <div class="brand">
                 <img src="/static/conversatorio/logo_bcr.png" alt="BCR" onerror="this.style.display='none'">
                 <span class="brand-text">Fundación Bolsa de Comercio de Rosario</span>
@@ -186,7 +186,26 @@
             return inst.fecha_texto || (inst.anio ? String(inst.anio) : '');
         }
 
+        async function ajustarLinkCarga() {
+            // Si la fuente es un Google Sheet, el botón "Cargar datos" apunta al Sheet.
+            try {
+                const cfg = await fetch('/api/metricas/config').then(r => r.json());
+                const link = document.getElementById('admin-link');
+                if (cfg.read_only) {
+                    if (cfg.edit_url) {
+                        link.href = cfg.edit_url;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = '✏️ Editar en Google Sheets';
+                    } else {
+                        link.style.display = 'none';
+                    }
+                }
+            } catch (e) { /* sin config: dejamos el link por defecto */ }
+        }
+
         async function cargar() {
+            ajustarLinkCarga();
             try {
                 const [kpis, progs, insts] = await Promise.all([
                     fetch('/api/metricas/kpis').then(r => r.json()),

@@ -22,12 +22,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth import require_auth
 from database import get_db
 
+from . import source
 from .models import Instancia, Programa
 
 
@@ -94,44 +94,43 @@ class ProgramaOut(BaseModel):
     anio_max: Optional[int] = None
 
 
-# --- Helpers --------------------------------------------------------------
-def _sum(db: Session, column, **filters) -> int:
-    q = db.query(func.coalesce(func.sum(column), 0))
-    if filters.get("programa_id"):
-        q = q.filter(Instancia.programa_id == filters["programa_id"])
-    return int(q.scalar() or 0)
-
-
 # --- Endpoints públicos ---------------------------------------------------
-@router.get("/programas", response_model=list[ProgramaOut])
-def listar_programas(db: Session = Depends(get_db)) -> list[ProgramaOut]:
-    programas = (
-        db.query(Programa)
-        .filter(Programa.activo == 1)
-        .order_by(Programa.orden, Programa.id)
-        .all()
-    )
+# Leen de source.load(): Google Sheet publicado (si está configurado) o la DB.
+@router.get("/config")
+def config() -> dict:
+    """Le dice al frontend de dónde salen los datos y dónde se editan."""
+    return {
+        "read_only": source.sheet_configured(),
+        "source": "sheet" if source.sheet_configured() else "db",
+        "edit_url": source.SHEET_EDIT_URL,
+    }
 
-    # Agregados por programa en una sola query.
-    agg = dict(
-        (row[0], row)
-        for row in db.query(
-            Instancia.programa_id,
-            func.count(Instancia.id),
-            func.coalesce(func.sum(Instancia.personas), 0),
-            func.min(Instancia.anio),
-            func.max(Instancia.anio),
-        ).group_by(Instancia.programa_id).all()
-    )
+
+@router.get("/programas", response_model=list[ProgramaOut])
+def listar_programas(
+    fresh: bool = False,
+    db: Session = Depends(get_db),
+) -> list[ProgramaOut]:
+    data = source.load(db, fresh=fresh)
+    # Agregados por programa.
+    agg: dict[int, dict] = {}
+    for i in data["instancias"]:
+        a = agg.setdefault(i["programa_id"], {"cnt": 0, "personas": 0, "amin": None, "amax": None})
+        a["cnt"] += 1
+        a["personas"] += i.get("personas") or 0
+        anio = i.get("anio")
+        if anio is not None:
+            a["amin"] = anio if a["amin"] is None else min(a["amin"], anio)
+            a["amax"] = anio if a["amax"] is None else max(a["amax"], anio)
 
     out: list[ProgramaOut] = []
-    for p in programas:
-        _, cnt, personas, amin, amax = agg.get(p.id, (p.id, 0, 0, None, None))
+    for p in data["programas"]:
+        a = agg.get(p["id"], {"cnt": 0, "personas": 0, "amin": None, "amax": None})
         out.append(ProgramaOut(
-            id=p.id, slug=p.slug, nombre=p.nombre, descripcion=p.descripcion or "",
-            icono=p.icono or "", color=p.color or "#0ea5e9", orden=p.orden or 0,
-            total_instancias=int(cnt), total_personas=int(personas or 0),
-            anio_min=amin, anio_max=amax,
+            id=p["id"], slug=p["slug"], nombre=p["nombre"], descripcion=p.get("descripcion", ""),
+            icono=p.get("icono", ""), color=p.get("color", "#0ea5e9"), orden=p.get("orden", 0),
+            total_instancias=a["cnt"], total_personas=a["personas"],
+            anio_min=a["amin"], anio_max=a["amax"],
         ))
     return out
 
@@ -139,61 +138,69 @@ def listar_programas(db: Session = Depends(get_db)) -> list[ProgramaOut]:
 @router.get("/instancias", response_model=list[InstanciaOut])
 def listar_instancias(
     programa: Optional[str] = None,
+    fresh: bool = False,
     db: Session = Depends(get_db),
-) -> list[Instancia]:
-    q = db.query(Instancia)
+) -> list[dict]:
+    data = source.load(db, fresh=fresh)
+    insts = data["instancias"]
     if programa:
-        prog = db.query(Programa).filter(Programa.slug == programa).first()
+        prog = next((p for p in data["programas"] if p["slug"] == programa), None)
         if not prog:
             raise HTTPException(status_code=404, detail="Programa no encontrado")
-        q = q.filter(Instancia.programa_id == prog.id)
-    return q.order_by(
-        Instancia.anio.asc().nullslast(),
-        Instancia.orden.asc(),
-        Instancia.id.asc(),
-    ).all()
+        insts = [i for i in insts if i["programa_id"] == prog["id"]]
+    return sorted(insts, key=lambda i: (i.get("anio") or 0, i.get("orden") or 0, i["id"]))
 
 
 @router.get("/kpis")
-def kpis(db: Session = Depends(get_db)) -> dict:
-    total_personas = _sum(db, Instancia.personas)
-    total_proyectos = _sum(db, Instancia.proyectos)
-    total_osc = _sum(db, Instancia.osc)
-    total_escuelas = _sum(db, Instancia.escuelas)
-    total_instancias = db.query(func.count(Instancia.id)).scalar() or 0
+def kpis(fresh: bool = False, db: Session = Depends(get_db)) -> dict:
+    data = source.load(db, fresh=fresh)
+    insts = data["instancias"]
 
-    anio_min = db.query(func.min(Instancia.anio)).scalar()
-    anio_max = db.query(func.max(Instancia.anio)).scalar()
+    def total(field):
+        return sum(i.get(field) or 0 for i in insts)
+
+    anios = [i["anio"] for i in insts if i.get("anio") is not None]
+    anio_min = min(anios) if anios else None
+    anio_max = max(anios) if anios else None
     anios_trayectoria = (anio_max - anio_min + 1) if (anio_min and anio_max) else 0
 
-    # Personas por año (para el gráfico de evolución).
-    por_anio = [
-        {"anio": row[0], "personas": int(row[1] or 0)}
-        for row in db.query(
-            Instancia.anio, func.coalesce(func.sum(Instancia.personas), 0)
-        ).filter(Instancia.anio.isnot(None)).group_by(Instancia.anio).order_by(Instancia.anio).all()
-    ]
+    por_anio_map: dict[int, int] = {}
+    for i in insts:
+        if i.get("anio") is not None:
+            por_anio_map[i["anio"]] = por_anio_map.get(i["anio"], 0) + (i.get("personas") or 0)
+    por_anio = [{"anio": a, "personas": por_anio_map[a]} for a in sorted(por_anio_map)]
 
     return {
-        "total_personas": total_personas,
-        "total_proyectos": total_proyectos,
-        "total_osc": total_osc,
-        "total_escuelas": total_escuelas,
-        "total_instancias": int(total_instancias),
+        "total_personas": total("personas"),
+        "total_proyectos": total("proyectos"),
+        "total_osc": total("osc"),
+        "total_escuelas": total("escuelas"),
+        "total_instancias": len(insts),
         "anio_min": anio_min,
         "anio_max": anio_max,
         "anios_trayectoria": anios_trayectoria,
         "por_anio": por_anio,
+        "data_source": data["source"],
     }
 
 
 # --- Endpoints admin ------------------------------------------------------
+def _guard_writable() -> None:
+    """Cuando el Google Sheet es la fuente, la edición va por el Sheet, no por acá."""
+    if source.sheet_configured():
+        raise HTTPException(
+            status_code=409,
+            detail="La fuente de datos es el Google Sheet. Editá ahí; el formulario está deshabilitado.",
+        )
+
+
 @router.post("/instancias", response_model=InstanciaOut, status_code=201)
 def crear_instancia(
     payload: InstanciaIn,
     db: Session = Depends(get_db),
     _: bool = Depends(require_auth),
 ) -> Instancia:
+    _guard_writable()
     if not db.get(Programa, payload.programa_id):
         raise HTTPException(status_code=400, detail="programa_id inválido")
     inst = Instancia(**payload.model_dump())
@@ -210,6 +217,7 @@ def editar_instancia(
     db: Session = Depends(get_db),
     _: bool = Depends(require_auth),
 ) -> Instancia:
+    _guard_writable()
     inst = db.get(Instancia, inst_id)
     if not inst:
         raise HTTPException(status_code=404, detail="No encontrada")
@@ -228,6 +236,7 @@ def borrar_instancia(
     db: Session = Depends(get_db),
     _: bool = Depends(require_auth),
 ) -> None:
+    _guard_writable()
     inst = db.get(Instancia, inst_id)
     if not inst:
         raise HTTPException(status_code=404, detail="No encontrada")
@@ -240,12 +249,18 @@ def exportar_csv(
     db: Session = Depends(get_db),
     _: bool = Depends(require_auth),
 ) -> StreamingResponse:
-    rows = (
-        db.query(Instancia, Programa)
-        .join(Programa, Instancia.programa_id == Programa.id)
-        .order_by(Programa.orden, Instancia.anio, Instancia.orden)
-        .all()
+    # Exporta lo que se está mostrando (Sheet si está configurado, o la DB).
+    data = source.load(db)
+    prog_nombre = {p["id"]: p["nombre"] for p in data["programas"]}
+    prog_orden = {p["id"]: p.get("orden", 0) for p in data["programas"]}
+    rows = sorted(
+        data["instancias"],
+        key=lambda i: (prog_orden.get(i["programa_id"], 0), i.get("anio") or 0, i.get("orden") or 0),
     )
+
+    def cell(v):
+        return "" if v is None else v
+
     buf = io.StringIO()
     buf.write("﻿")  # BOM para que Excel abra UTF-8 sin romper acentos
     writer = csv.writer(buf, delimiter=";")
@@ -254,18 +269,14 @@ def exportar_csv(
         "localidades", "personas", "proyectos", "osc", "escuelas", "mentores",
         "monto", "ganadores", "reconocimiento", "notas",
     ])
-    for inst, prog in rows:
+    for i in rows:
         writer.writerow([
-            prog.nombre, inst.titulo, inst.anio or "",
-            inst.fecha.isoformat() if inst.fecha else "", inst.fecha_texto or "",
-            inst.modalidad or "", inst.localidades or "",
-            inst.personas if inst.personas is not None else "",
-            inst.proyectos if inst.proyectos is not None else "",
-            inst.osc if inst.osc is not None else "",
-            inst.escuelas if inst.escuelas is not None else "",
-            inst.mentores if inst.mentores is not None else "",
-            inst.monto if inst.monto is not None else "",
-            inst.ganadores or "", inst.reconocimiento or "", inst.notas or "",
+            prog_nombre.get(i["programa_id"], ""), i["titulo"], cell(i.get("anio")),
+            cell(i.get("fecha")), i.get("fecha_texto", ""),
+            i.get("modalidad", ""), i.get("localidades", ""),
+            cell(i.get("personas")), cell(i.get("proyectos")), cell(i.get("osc")),
+            cell(i.get("escuelas")), cell(i.get("mentores")), cell(i.get("monto")),
+            i.get("ganadores", ""), i.get("reconocimiento", ""), i.get("notas", ""),
         ])
     buf.seek(0)
     fname = f"metricas-fbcr-{datetime.utcnow().strftime('%Y%m%d-%H%M')}.csv"
