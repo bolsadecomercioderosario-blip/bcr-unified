@@ -360,9 +360,14 @@ function openConectadosEditor(act) {
             </div>
 
             <!-- Footer fijo -->
-            <div style="padding: 0.75rem 1.1rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.6rem; background: #fafafa;">
-                <button id="btn-editor-cancel" style="background: white; border: 1px solid var(--border); padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
-                <button id="btn-editor-save" class="btn-primary" style="width: auto; padding: 0.55rem 1.4rem; background: var(--primary);">Guardar</button>
+            <div style="padding: 0.75rem 1.1rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; background: #fafafa;">
+                <button id="btn-editor-delete" style="background: none; border: 1px solid #fecaca; color: #ef4444; padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;" title="Eliminar bloque">
+                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Eliminar
+                </button>
+                <div style="display: flex; gap: 0.6rem;">
+                    <button id="btn-editor-cancel" style="background: white; border: 1px solid var(--border); padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
+                    <button id="btn-editor-save" class="btn-primary" style="width: auto; padding: 0.55rem 1.4rem; background: var(--primary);">Guardar</button>
+                </div>
             </div>
         </div>
     `;
@@ -447,6 +452,15 @@ function openConectadosEditor(act) {
     const close = () => overlay.remove();
     overlay.querySelector('#btn-editor-close').onclick = close;
     overlay.querySelector('#btn-editor-cancel').onclick = close;
+
+    // --- Eliminar --- (única forma de borrar en mobile, donde la tarjeta no
+    // muestra el botón de basura; en desktop también funciona)
+    overlay.querySelector('#btn-editor-delete').onclick = () => {
+        if (confirm('¿Estás seguro de que querés eliminar este bloque?')) {
+            deleteActivity(act.id);
+            close();
+        }
+    };
 
     // --- Guardar ---
     overlay.querySelector('#btn-editor-save').onclick = () => {
