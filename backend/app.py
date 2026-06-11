@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from auth import SESSION_TOKEN, require_auth, verify_password
+from auth import SESSION_TOKEN, require_auth, role_for_password
 from config import STATIC_DIR, NoCacheStaticFiles, get_module_html
 from database import Base, engine
 from migrate import migrate
@@ -60,8 +60,11 @@ async def health_check():
 # ---------------------------------------------------------
 @app.post("/api/auth/login")
 async def auth_login(payload: dict):
-    if verify_password(payload.get("password")):
-        return {"token": SESSION_TOKEN}
+    role = role_for_password(payload.get("password"))
+    if role:
+        # Mismo token para los dos roles (acceso idéntico a la API); el `role`
+        # lo usa el frontend para mostrar la UI que corresponde.
+        return {"token": SESSION_TOKEN, "role": role}
     raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
 

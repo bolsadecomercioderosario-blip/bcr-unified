@@ -33,6 +33,19 @@ class Activity(Base):
     # no un bloque de newsletter. Reemplaza el viejo flag observations='FIXED_BLOCK'
     # que era frágil (cualquier edit del form lo pisaba).
     block_type = Column(String, nullable=True, default=None)
+    # Origen / dueño de la actividad. Define en qué superficie aparece:
+    #   "secretaria"   → la carga Secretaría; es parte de la Agenda de
+    #                    Compromisos (se ve en la landing pública y la edita
+    #                    Secretaría). Comunicación la ve, pero los Datos
+    #                    Generales son solo-lectura para ella.
+    #   "comunicacion" → la crea Comunicación; vive sólo en la app de
+    #                    Comunicación, nunca en la landing ni para Secretaría.
+    # Reemplaza al viejo canal "Agenda Compromisos".
+    origen = Column(String, default="comunicacion")
+    # Notas internas de Comunicación sobre la actividad (ej: "va a haber mucha
+    # gente, llegar temprano"). Sólo las ve Comunicación — separadas de
+    # `observations`, que es un campo de Datos Generales (de Secretaría).
+    comunicacion_notes = Column(String, default="")
 
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
@@ -59,6 +72,8 @@ class ActivityBase(BaseModel):
     order_index: Optional[int] = 0
     image_url: Optional[str] = ""
     block_type: Optional[str] = None  # "fixed" | "variable" | None
+    origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion"
+    comunicacion_notes: Optional[str] = ""
 
 class ActivityCreate(ActivityBase):
     pass
@@ -86,8 +101,29 @@ class ActivityUpdate(BaseModel):
     order_index: Optional[int] = None
     image_url: Optional[str] = None
     block_type: Optional[str] = None
+    origen: Optional[str] = None
+    comunicacion_notes: Optional[str] = None
 
 class ActivityOut(ActivityBase):
+    class Config:
+        from_attributes = True
+
+
+# Salida acotada para la landing pública de la Agenda de Compromisos.
+# Sólo expone los Datos Generales — NO los campos operativos (responsable,
+# canales, copies, links, realizado) ni las notas internas de Comunicación.
+# Es deliberadamente angosto: la landing es pública (token en la URL) y no debe
+# filtrar nada de uso interno.
+class CompromisoPublicOut(BaseModel):
+    id: str
+    date: str
+    time: str
+    title: str
+    description: Optional[str] = ""
+    location: Optional[str] = ""
+    observations: Optional[str] = ""
+    participants: Optional[str] = ""
+
     class Config:
         from_attributes = True
 

@@ -36,14 +36,33 @@ PASSWORD_SECGRAL = os.environ.get("SECGRAL_PASSWORD", "secgral2026")
 SESSION_TOKEN = os.environ.get("SESSION_TOKEN") or secrets.token_urlsafe(32)
 
 
-def verify_password(password: Optional[str]) -> bool:
-    """Acepta cualquiera de los dos passwords. Constant-time para no filtrar
-    info por timing — siempre evaluamos los dos compare_digest."""
+# Roles. Las dos passwords dan el mismo token de sesión (mismo acceso a la API),
+# pero el login devuelve además QUÉ rol entró para que el frontend ajuste la
+# interfaz. v1: la separación de roles es sólo de UI (frontend), el backend no
+# la enforcea todavía — ver blueprint del rediseño de Agenda.
+ROLE_COMUNICACION = "comunicacion"
+ROLE_SECRETARIA = "secretaria"
+
+
+def role_for_password(password: Optional[str]) -> Optional[str]:
+    """Devuelve el rol asociado al password, o None si no matchea ninguno.
+    Constant-time: siempre evalúa los dos compare_digest para no filtrar por
+    timing cuál de las dos passwords se probó."""
     if not password:
-        return False
+        return None
     matches_agenda = secrets.compare_digest(password, PASSWORD_AGENDA)
     matches_secgral = secrets.compare_digest(password, PASSWORD_SECGRAL)
-    return matches_agenda or matches_secgral
+    if matches_secgral:
+        return ROLE_SECRETARIA
+    if matches_agenda:
+        return ROLE_COMUNICACION
+    return None
+
+
+def verify_password(password: Optional[str]) -> bool:
+    """Acepta cualquiera de los dos passwords. Se mantiene por compatibilidad;
+    internamente usa role_for_password (que ya es constant-time)."""
+    return role_for_password(password) is not None
 
 
 def require_auth(authorization: Optional[str] = Header(None)) -> bool:

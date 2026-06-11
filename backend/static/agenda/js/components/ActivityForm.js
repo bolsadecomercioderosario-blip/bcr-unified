@@ -1,4 +1,5 @@
 import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
+import { getRole } from '../role.js';
 // Nota: los botones de "Generar con IA" en este modal se sacaron por seguridad
 // (no exponer la API key de OpenAI desde un endpoint público). La generación
 // IA queda sólo en el botón del bloque de Conectados.
@@ -22,10 +23,27 @@ export function renderActivityForm(container, preData = null) {
         copy_instagram: (sourceAct.copy_instagram === 'undefined' || !sourceAct.copy_instagram) ? '' : sourceAct.copy_instagram,
         copy_linkedin: (sourceAct.copy_linkedin === 'undefined' || !sourceAct.copy_linkedin) ? '' : sourceAct.copy_linkedin,
         participants: sourceAct.participants || '',
-        story_type: sourceAct.story_type || 'Video'
+        story_type: sourceAct.story_type || 'Video',
+        comunicacion_notes: sourceAct.comunicacion_notes || ''
     };
 
     const isNew = !state.currentActivity;
+
+    // --- Rol / origen: deciden qué secciones se muestran y qué se guarda ---
+    const role = getRole();
+    const isSec = role === 'secretaria';
+    // Origen de la actividad. Para nuevas, lo define el rol que la crea.
+    const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : 'comunicacion') : 'comunicacion');
+    // Datos Generales: los edita el dueño (Secretaría siempre; Comunicación sólo
+    // en sus propias actividades). En las de Secretaría, Comunicación los ve en
+    // solo-lectura.
+    const generalsEditable = isSec || actOrigen === 'comunicacion';
+    const generalsReadOnly = !generalsEditable;
+    // Operativo (responsable, canales, links, copies) + notas internas: sólo
+    // Comunicación. Secretaría no ve nada de esto.
+    const showOperative = !isSec;
+    // Borrar la actividad entera es acción del dueño de los Datos Generales.
+    const showDelete = !isNew && generalsEditable;
     
     container.innerHTML = `
         <div class="sheet-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
@@ -39,7 +57,11 @@ export function renderActivityForm(container, preData = null) {
             <form id="form-activity" style="display: flex; flex-direction: column; gap: 1.5rem;">
                 
                 <section>
-                    <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Datos Generales</h3>
+                    <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        Datos Generales
+                        ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> Los carga Secretaría · solo lectura</span>` : ''}
+                    </h3>
+                    <fieldset ${generalsReadOnly ? 'disabled' : ''} style="border: none; padding: 0; margin: 0; min-inline-size: auto;">
                     <div class="form-grid-2">
                         <div class="form-group">
                             <label>Fecha</label>
@@ -78,6 +100,14 @@ export function renderActivityForm(container, preData = null) {
                         <label>Autoridades Presentes</label>
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>
+                    </fieldset>
+                </section>
+
+                ${showOperative ? `
+                <section>
+                    <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Notas internas · Comunicación</h3>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin: -0.5rem 0 0.6rem;">Sólo las ve Comunicación. No aparecen en la landing ni para Secretaría.</p>
+                    <textarea name="comunicacion_notes" rows="2" placeholder="Ej: va a haber mucha gente, conviene llegar temprano…" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.9rem; font-family: inherit; resize: vertical;">${act.comunicacion_notes}</textarea>
                 </section>
 
                 <section>
@@ -102,7 +132,7 @@ export function renderActivityForm(container, preData = null) {
                     <div style="margin-top: 1rem;">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem;">Canales de Difusión</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                            ${['Instagram Story', 'Instagram Feed', 'LinkedIn', 'X', 'YouTube', 'Facebook', 'Más BCR', 'Envíalo Simple', 'Mail a asociados', 'Conectados', 'Bot', 'Agenda Compromisos'].map(ch => `
+                            ${['Instagram Story', 'Instagram Feed', 'LinkedIn', 'X', 'YouTube', 'Facebook', 'Más BCR', 'Envíalo Simple', 'Mail a asociados', 'Conectados', 'Bot'].map(ch => `
                                 <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
                                     <input type="checkbox" name="channels" value="${ch}" ${act.channels.includes(ch) ? 'checked' : ''}>
                                     ${ch}
@@ -172,13 +202,14 @@ export function renderActivityForm(container, preData = null) {
                         </div>
                     </div>
                 </section>
+                ` : ''}
             </form>
         </div>
-        
+
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
             <button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>
             <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
-            ${!isNew ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
+            ${showDelete ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
     `;
 
@@ -203,41 +234,45 @@ export function renderActivityForm(container, preData = null) {
         });
     }
 
-    const updateVisibility = () => {
-        // Responsible Externo
-        groupExt.style.display = selectResp.value === 'Externo' ? 'block' : 'none';
-        
-        // Drive Santiago (Audiovisual channels)
-        const selectedChannels = Array.from(channelChecks).filter(i => i.checked).map(i => i.value);
-        const isAV = selectedChannels.some(ch => ['Instagram Story', 'YouTube'].includes(ch));
-        groupSant.style.display = isAV ? 'block' : 'none';
+    // Todo el wiring operativo sólo aplica a Comunicación (en modo Secretaría
+    // estos elementos no existen en el DOM).
+    if (showOperative) {
+        const updateVisibility = () => {
+            // Responsible Externo
+            groupExt.style.display = selectResp.value === 'Externo' ? 'block' : 'none';
 
-        // Story Type visibility
-        const isStory = selectedChannels.includes('Instagram Story');
-        container.querySelector('#group-story-type').style.display = isStory ? 'block' : 'none';
-    };
+            // Drive Santiago (Audiovisual channels)
+            const selectedChannels = Array.from(channelChecks).filter(i => i.checked).map(i => i.value);
+            const isAV = selectedChannels.some(ch => ['Instagram Story', 'YouTube'].includes(ch));
+            groupSant.style.display = isAV ? 'block' : 'none';
 
-    selectResp.onchange = updateVisibility;
-    channelChecks.forEach(c => c.onchange = updateVisibility);
-    updateVisibility();
-
-    const txtIg = container.querySelector('#copy-ig');
-    const txtLi = container.querySelector('#copy-li');
-
-    const copyToClipboard = (btnId, inputEl) => {
-        const btn = container.querySelector('#' + btnId);
-        btn.onclick = () => {
-            if (!inputEl.value) return;
-            navigator.clipboard.writeText(inputEl.value);
-            const orig = btn.innerHTML;
-            btn.innerHTML = '<i data-lucide="check" style="width: 14px; height: 14px;"></i> Copiado';
-            if (window.lucide) window.lucide.createIcons();
-            setTimeout(() => { btn.innerHTML = orig; if (window.lucide) window.lucide.createIcons(); }, 2000);
+            // Story Type visibility
+            const isStory = selectedChannels.includes('Instagram Story');
+            container.querySelector('#group-story-type').style.display = isStory ? 'block' : 'none';
         };
-    };
 
-    copyToClipboard('btn-copy-ig', txtIg);
-    copyToClipboard('btn-copy-li', txtLi);
+        selectResp.onchange = updateVisibility;
+        channelChecks.forEach(c => c.onchange = updateVisibility);
+        updateVisibility();
+
+        const txtIg = container.querySelector('#copy-ig');
+        const txtLi = container.querySelector('#copy-li');
+
+        const copyToClipboard = (btnId, inputEl) => {
+            const btn = container.querySelector('#' + btnId);
+            btn.onclick = () => {
+                if (!inputEl.value) return;
+                navigator.clipboard.writeText(inputEl.value);
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="check" style="width: 14px; height: 14px;"></i> Copiado';
+                if (window.lucide) window.lucide.createIcons();
+                setTimeout(() => { btn.innerHTML = orig; if (window.lucide) window.lucide.createIcons(); }, 2000);
+            };
+        };
+
+        copyToClipboard('btn-copy-ig', txtIg);
+        copyToClipboard('btn-copy-li', txtLi);
+    }
 
     // Drive Folder Creation logic
     const btnCreateFolder = container.querySelector('#btn-create-folder-bcr');
@@ -318,29 +353,45 @@ export function renderActivityForm(container, preData = null) {
     // Save logic
     container.querySelector('#btn-save-activity').onclick = async () => {
         const formData = new FormData(form);
-        
-        // Use a more robust way to get all checked channels
-        const selectedChannels = Array.from(form.querySelectorAll('input[name="channels"]:checked'))
-            .map(cb => cb.value);
 
-        const data = {
+        // Datos Generales (sólo se incluyen si el rol puede editarlos).
+        const generalsData = {
             date: formData.get('date'),
             time: (timeTbd && timeTbd.checked) ? 'A definir' : formData.get('time'),
             title: formData.get('title'),
             description: formData.get('description'),
             location: formData.get('location'),
             observations: formData.get('observations'),
-            responsible: formData.get('responsible'),
-            external_name: formData.get('external_name'),
-            channels: selectedChannels,
-            done: formData.get('done') === 'on',
-            drive_bcr: formData.get('drive_bcr'),
-            drive_santiago: formData.get('drive_santiago'),
-            copy_instagram: formData.get('copy_instagram'),
-            copy_linkedin: formData.get('copy_linkedin'),
             participants: formData.get('participants'),
-            story_type: formData.get('story_type')
         };
+
+        let data;
+        if (isSec) {
+            // Secretaría: sólo Datos Generales; la actividad es suya.
+            data = { ...generalsData, origen: 'secretaria' };
+        } else {
+            // Comunicación: siempre lo operativo + notas internas.
+            const selectedChannels = Array.from(form.querySelectorAll('input[name="channels"]:checked'))
+                .map(cb => cb.value);
+            data = {
+                responsible: formData.get('responsible'),
+                external_name: formData.get('external_name'),
+                channels: selectedChannels,
+                done: formData.get('done') === 'on',
+                drive_bcr: formData.get('drive_bcr'),
+                drive_santiago: formData.get('drive_santiago'),
+                copy_instagram: formData.get('copy_instagram'),
+                copy_linkedin: formData.get('copy_linkedin'),
+                story_type: formData.get('story_type'),
+                comunicacion_notes: formData.get('comunicacion_notes'),
+            };
+            // Los Datos Generales sólo se mandan si Comunicación es dueña de
+            // ellos (actividad propia o nueva). En las de Secretaría quedan
+            // intactos: no se incluyen, así el backend no los pisa.
+            if (generalsEditable) {
+                Object.assign(data, generalsData, { origen: 'comunicacion' });
+            }
+        }
 
         const btnSave = container.querySelector('#btn-save-activity');
         const originalText = btnSave.innerText;
@@ -361,7 +412,7 @@ export function renderActivityForm(container, preData = null) {
         }
     };
 
-    if (!isNew) {
+    if (showDelete) {
         container.querySelector('#btn-delete-activity-form').onclick = () => {
             if (confirm('¿Estás seguro de que querés eliminar esta actividad? Esta acción no se puede deshacer.')) {
                 deleteActivity(act.id);

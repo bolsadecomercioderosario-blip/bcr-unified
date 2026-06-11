@@ -13,6 +13,7 @@
  */
 (function () {
     const STORAGE_KEY = 'bcr_session_token';
+    const ROLE_KEY = 'bcr_session_role';
 
     function getToken() {
         return localStorage.getItem(STORAGE_KEY) || '';
@@ -24,6 +25,18 @@
 
     function clearToken() {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(ROLE_KEY);
+    }
+
+    // Rol del usuario logueado ('secretaria' | 'comunicacion'). El login lo
+    // devuelve según la password usada. Lo guardamos para que cada módulo
+    // ajuste su UI. v1: la separación es sólo de frontend.
+    function getRole() {
+        return localStorage.getItem(ROLE_KEY) || '';
+    }
+
+    function setRole(r) {
+        if (r) localStorage.setItem(ROLE_KEY, r);
     }
 
     // ---- Monkey patch de fetch -------------------------------------------
@@ -116,6 +129,7 @@
                 }
                 const data = await res.json();
                 setToken(data.token);
+                setRole(data.role);
                 if (currentOverlay && currentOverlay.parentNode) {
                     currentOverlay.parentNode.removeChild(currentOverlay);
                 }
@@ -157,5 +171,10 @@
     }
 
     // Exponer helpers por si algún módulo los necesita explícitamente
-    window.BCRAuth = { getToken: getToken, clearToken: clearToken, showLogin: showLoginOverlay };
+    window.BCRAuth = {
+        getToken: getToken,
+        clearToken: clearToken,
+        showLogin: showLoginOverlay,
+        getRole: getRole,
+    };
 })();

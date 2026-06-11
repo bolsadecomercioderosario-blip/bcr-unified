@@ -28,15 +28,19 @@
                         <span>Hub</span>
                     </a>
                     <nav class="top-nav">
-                        <button class="nav-item active" data-view="list">
+                        <button class="nav-item only-secretaria" data-view="compromisos">
+                            <i data-lucide="calendar-check"></i>
+                            <span>Agenda de Compromisos</span>
+                        </button>
+                        <button class="nav-item active only-comunicacion" data-view="list">
                             <i data-lucide="list"></i>
                             <span>Actividades</span>
                         </button>
-                        <button class="nav-item" data-view="conectados">
+                        <button class="nav-item only-comunicacion" data-view="conectados">
                             <i data-lucide="rss"></i>
                             <span>Conectados</span>
                         </button>
-                        <button class="nav-item" data-view="santi">
+                        <button class="nav-item only-comunicacion" data-view="santi">
                             <i data-lucide="video"></i>
                             <span>Santi</span>
                         </button>
@@ -92,11 +96,15 @@
 
         <!-- Mobile Bottom Tab Bar (visible solo en mobile via CSS) -->
         <nav class="mobile-bottom-tabs">
-            <button class="nav-item active" data-view="list">
+            <button class="nav-item active only-secretaria" data-view="compromisos">
+                <i data-lucide="calendar-check"></i>
+                <span>Compromisos</span>
+            </button>
+            <button class="nav-item active only-comunicacion" data-view="list">
                 <i data-lucide="calendar-days"></i>
                 <span>Agenda</span>
             </button>
-            <button class="nav-item" data-view="conectados">
+            <button class="nav-item only-comunicacion" data-view="conectados">
                 <i data-lucide="rss"></i>
                 <span>Conectados</span>
             </button>

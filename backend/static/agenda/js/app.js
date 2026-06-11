@@ -3,7 +3,22 @@ import { renderList } from './components/List.js';
 import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
 import { renderActivityForm } from './components/ActivityForm.js';
+import { renderAgendaCompromisos } from './components/AgendaCompromisos.js';
 import { renderEfemeridesModal } from './components/EfemeridesModal.js';
+import { getRole, isSecretaria } from './role.js';
+
+// Rol del usuario (secretaria | comunicacion). Lo exponemos en el <body> para
+// que el CSS muestre/oculte la nav que corresponde a cada rol.
+const ROLE = getRole();
+document.body.dataset.role = ROLE;
+
+// Vistas permitidas por rol. Secretaría sólo ve la Agenda de Compromisos.
+const ALLOWED_VIEWS = ROLE === 'secretaria'
+    ? ['compromisos']
+    : ['list', 'conectados', 'santi'];
+
+// La vista inicial depende del rol.
+state.view = ROLE === 'secretaria' ? 'compromisos' : 'list';
 
 const viewContainer = document.getElementById('view-container');
 const btnNewActivity = document.getElementById('btn-new-activity');
@@ -64,6 +79,9 @@ function updateUI() {
         case 'santi':
             renderSanti(viewContainer);
             break;
+        case 'compromisos':
+            renderAgendaCompromisos(viewContainer);
+            break;
     }
 
     // Update Lucide Icons
@@ -76,14 +94,23 @@ function updateUI() {
 document.addEventListener('click', (e) => {
     const navItem = e.target.closest('.nav-item');
     if (navItem) {
+        // Guard: Secretaría sólo puede ir a sus vistas permitidas.
+        if (!ALLOWED_VIEWS.includes(navItem.dataset.view)) return;
         setView(navItem.dataset.view);
     }
 });
 
 btnNewActivity.addEventListener('click', () => {
-    setCurrentActivity(null); 
+    setCurrentActivity(null);
     openActivitySheet();
 });
+
+// Abrir el form de "Nueva actividad" desde cualquier vista (lo usa el botón
+// de la Agenda de Compromisos del rol Secretaría).
+window.openNewActivity = () => {
+    setCurrentActivity(null);
+    openActivitySheet();
+};
 
 if (btnTogglePast) {
     btnTogglePast.addEventListener('click', () => {

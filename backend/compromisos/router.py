@@ -1,14 +1,15 @@
 """
 Vista pública de la Agenda de Compromisos institucionales BCR.
 
-El equipo de Secretaría General carga actividades en la app de Agenda normal,
-tildando el canal "Agenda Compromisos". Esas actividades aparecen acá, en una
-URL que se les comparte a las autoridades BCR.
+El equipo de Secretaría carga actividades en la app de Agenda. Las que tienen
+origen='secretaria' conforman la Agenda de Compromisos y aparecen acá, en una
+URL que se les comparte a las autoridades y al ecosistema BCR.
 
 Seguridad: la URL incluye un token (env var COMPROMISOS_PUBLIC_TOKEN). Si el
 token cambia, los links viejos dejan de funcionar — útil si se filtra. No hay
 auth fuerte, es "security through obscurity" intencional para que las
-autoridades no tengan que loguearse.
+autoridades no tengan que loguearse. La respuesta usa CompromisoPublicOut, que
+expone SÓLO los Datos Generales (nada operativo ni notas internas).
 """
 import os
 import secrets
@@ -35,9 +36,9 @@ def _check_token(token: str) -> None:
         raise HTTPException(status_code=404, detail="No encontrado")
 
 
-@router.get("/{token}", response_model=List[agenda_models.ActivityOut])
+@router.get("/{token}", response_model=List[agenda_models.CompromisoPublicOut])
 def list_compromisos(token: str):
-    """Devuelve las actividades que tienen "Agenda Compromisos" en sus canales.
+    """Devuelve las actividades de la Agenda de Compromisos (origen='secretaria').
 
     Sin auth bearer — valida sólo por el token de la URL. Si el token es
     inválido, devuelve 404 (no 401/403) para no leak info de existencia.
@@ -45,15 +46,9 @@ def list_compromisos(token: str):
     _check_token(token)
     db = SessionLocal()
     try:
-        # No podemos filtrar por canales en la query (es JSON), así que
-        # traemos todo lo no-custom y filtramos en Python. Es una tabla
-        # chica (< 1000 filas típicamente), no es performance-crítico.
-        rows = db.query(agenda_models.Activity).filter(
-            agenda_models.Activity.is_custom == False  # noqa: E712 — SQLAlchemy
+        return db.query(agenda_models.Activity).filter(
+            agenda_models.Activity.is_custom == False,  # noqa: E712 — SQLAlchemy
+            agenda_models.Activity.origen == "secretaria",
         ).all()
-        return [
-            r for r in rows
-            if isinstance(r.channels, list) and "Agenda Compromisos" in r.channels
-        ]
     finally:
         db.close()

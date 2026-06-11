@@ -45,6 +45,14 @@ def migrate():
         "ALTER add block_type",
         "ALTER TABLE activities ADD COLUMN block_type VARCHAR DEFAULT NULL",
     )
+    _try_exec(
+        "ALTER add origen",
+        "ALTER TABLE activities ADD COLUMN origen VARCHAR DEFAULT 'comunicacion'",
+    )
+    _try_exec(
+        "ALTER add comunicacion_notes",
+        "ALTER TABLE activities ADD COLUMN comunicacion_notes VARCHAR DEFAULT ''",
+    )
 
     # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
     # Idempotente: sólo toca filas que todavía no tengan block_type seteado.
@@ -64,8 +72,45 @@ def migrate():
         expect_rowcount=True,
     )
 
+    backfill_origen_from_channel()
+
     seed_efemerides_if_empty()
     seed_metricas_if_empty()
+
+
+def backfill_origen_from_channel():
+    """Migra el viejo canal "Agenda Compromisos" al nuevo campo `origen`.
+
+    Las actividades que tenían ese canal pasan a origen='secretaria' (son la
+    Agenda de Compromisos) y se les saca el canal de la lista, porque el
+    casillero se eliminó del formulario. El resto queda en 'comunicacion' (el
+    default de la columna). Idempotente: una vez migradas, ninguna tiene el
+    canal, así que re-correr no cambia nada.
+
+    Se hace en Python (no en SQL) porque `channels` es JSON y filtrar/editar
+    listas JSON es dependiente del dialecto (SQLite vs Postgres)."""
+    from agenda_models import Activity
+
+    db = SessionLocal()
+    try:
+        rows = db.query(Activity).all()
+        changed = 0
+        for r in rows:
+            ch = r.channels if isinstance(r.channels, list) else []
+            if "Agenda Compromisos" in ch:
+                r.origen = "secretaria"
+                # Reasignamos una lista nueva para que SQLAlchemy marque el
+                # campo como modificado (mutar in-place no lo detecta en JSON).
+                r.channels = [c for c in ch if c != "Agenda Compromisos"]
+                changed += 1
+        if changed:
+            db.commit()
+        print(f"Backfill origen: {changed} actividad(es) marcadas como Secretaría.")
+    except Exception as e:
+        print(f"Error en backfill de origen: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def seed_efemerides_if_empty():

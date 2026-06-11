@@ -1,3 +1,11 @@
+/* ---------------------------------------------------------
+   Visibilidad por rol. El <body> lleva data-role="secretaria|comunicacion"
+   (lo setea app.js). Cada elemento marcado con .only-<rol> aparece sólo para
+   ese rol. v1: separación de UI por frontend.
+   --------------------------------------------------------- */
+body[data-role="secretaria"] .only-comunicacion { display: none !important; }
+body[data-role="comunicacion"] .only-secretaria { display: none !important; }
+
 :root {
     /* Colors */
     --primary: #4f46e5;
