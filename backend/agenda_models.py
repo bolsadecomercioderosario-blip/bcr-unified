@@ -46,6 +46,19 @@ class Activity(Base):
     # gente, llegar temprano"). Sólo las ve Comunicación — separadas de
     # `observations`, que es un campo de Datos Generales (de Secretaría).
     comunicacion_notes = Column(String, default="")
+    # --- Campos exclusivos de Secretaría (sección "Estado" del form) ---
+    # Estado de avance: "Pendiente" | "En Proceso" | "Avanzado" | "Finalizado".
+    # Alimenta el semáforo (barra de color) del listado de Secretaría.
+    estado = Column(String, default="Pendiente")
+    # Responsable del evento por el lado de Secretaría (distinto del operativo
+    # `responsible`, que es quién lo cubre en Comunicación). Si es "Otro", el
+    # nombre va en sec_responsible_other.
+    sec_responsible = Column(String, default="")
+    sec_responsible_other = Column(String, default="")
+    # Archivo adjunto (DOC/DOCX/PDF/JPG/PNG). Lo sube Secretaría; Comunicación lo
+    # ve/descarga (solo lectura). No aparece en la landing pública.
+    attachment_url = Column(String, default="")
+    attachment_name = Column(String, default="")
 
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
@@ -74,6 +87,11 @@ class ActivityBase(BaseModel):
     block_type: Optional[str] = None  # "fixed" | "variable" | None
     origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion"
     comunicacion_notes: Optional[str] = ""
+    estado: Optional[str] = "Pendiente"
+    sec_responsible: Optional[str] = ""
+    sec_responsible_other: Optional[str] = ""
+    attachment_url: Optional[str] = ""
+    attachment_name: Optional[str] = ""
 
 class ActivityCreate(ActivityBase):
     pass
@@ -103,6 +121,11 @@ class ActivityUpdate(BaseModel):
     block_type: Optional[str] = None
     origen: Optional[str] = None
     comunicacion_notes: Optional[str] = None
+    estado: Optional[str] = None
+    sec_responsible: Optional[str] = None
+    sec_responsible_other: Optional[str] = None
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
 
 class ActivityOut(ActivityBase):
     class Config:

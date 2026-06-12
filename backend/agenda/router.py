@@ -187,6 +187,54 @@ async def upload_agenda_image(file: UploadFile = File(...)):
 
 
 # ---------------------------------------------------------
+# Upload de archivos adjuntos de la Agenda de Compromisos (DOC/DOCX/PDF/JPG/PNG).
+# Lo usa Secretaría desde el form. A diferencia de /upload (sólo imágenes del
+# newsletter), acepta documentos: Cloudinary con resource_type="auto" preserva
+# el original (raw para .docx, etc.). Devuelve {url, name} — el name es el
+# nombre de archivo original, para mostrarlo y descargarlo prolijo.
+# ---------------------------------------------------------
+_ALLOWED_ATTACHMENT_EXT = {".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png"}
+
+
+@router.post("/upload-file")
+async def upload_agenda_file(file: UploadFile = File(...)):
+    original_name = file.filename or "adjunto"
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in _ALLOWED_ATTACHMENT_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail="Formato no permitido. Subí DOC, DOCX, PDF, JPG o PNG.",
+        )
+
+    if CLOUDINARY_ENABLED:
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="bcr-agenda-adjuntos",
+                resource_type="auto",  # imágenes -> image, docs -> raw
+                use_filename=True,
+                unique_filename=True,
+            )
+            secure_url = result.get("secure_url")
+            if secure_url:
+                return {"url": secure_url, "name": original_name}
+            print(f"Cloudinary no devolvió secure_url (adjunto). Respuesta: {result}")
+        except Exception as e:
+            print(f"Error subiendo adjunto a Cloudinary, fallback a local: {e}")
+            try:
+                file.file.seek(0)
+            except Exception:
+                pass
+
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    filename = f"adjunto_{uuid.uuid4()}{ext}"
+    file_path = os.path.join(UPLOADS_DIR, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"url": f"/static/uploads/{filename}", "name": original_name}
+
+
+# ---------------------------------------------------------
 # Webhook Santiago: avisa via Pipedream cuando hay link de Drive listo
 # ---------------------------------------------------------
 def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):

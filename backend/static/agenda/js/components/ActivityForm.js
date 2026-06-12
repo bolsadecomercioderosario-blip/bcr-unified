@@ -24,7 +24,12 @@ export function renderActivityForm(container, preData = null) {
         copy_linkedin: (sourceAct.copy_linkedin === 'undefined' || !sourceAct.copy_linkedin) ? '' : sourceAct.copy_linkedin,
         participants: sourceAct.participants || '',
         story_type: sourceAct.story_type || 'Video',
-        comunicacion_notes: sourceAct.comunicacion_notes || ''
+        comunicacion_notes: sourceAct.comunicacion_notes || '',
+        estado: sourceAct.estado || 'Pendiente',
+        sec_responsible: sourceAct.sec_responsible || '',
+        sec_responsible_other: sourceAct.sec_responsible_other || '',
+        attachment_url: sourceAct.attachment_url || '',
+        attachment_name: sourceAct.attachment_name || ''
     };
 
     const isNew = !state.currentActivity;
@@ -44,7 +49,60 @@ export function renderActivityForm(container, preData = null) {
     const showOperative = !isSec;
     // Borrar la actividad entera es acción del dueño de los Datos Generales.
     const showDelete = !isNew && generalsEditable;
-    
+
+    // --- Bloque de adjunto (al final de Datos Generales) ---
+    // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
+    // actividades de Secretaría que ya tengan adjunto).
+    let attachmentHTML = '';
+    if (isSec) {
+        attachmentHTML = `
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>Archivo adjunto <span style="font-weight: 400; color: var(--text-muted); font-size: 0.78rem;">(DOC, DOCX, PDF, JPG o PNG)</span></label>
+                <input type="file" id="attach-input" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png" style="display: none;">
+                <div id="attach-area"></div>
+            </div>`;
+    } else if (actOrigen === 'secretaria' && act.attachment_url) {
+        attachmentHTML = `
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>Archivo adjunto</label>
+                <a href="${act.attachment_url}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 0.4rem; color: var(--primary); font-size: 0.9rem; font-weight: 500; text-decoration: none; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; width: fit-content;">
+                    <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i> ${(act.attachment_name || 'archivo adjunto').replace(/</g, '&lt;')} · Descargar
+                </a>
+            </div>`;
+    }
+
+    // --- Sección "Estado" (sólo Secretaría) ---
+    const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
+    const SEC_RESPONSABLES = ['Daniel Vicente', 'Jorge Magariños', 'Andrés Williams'];
+    const secRespIsOther = act.sec_responsible === 'Otro';
+    let estadoHTML = '';
+    if (isSec) {
+        estadoHTML = `
+            <section>
+                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Estado</h3>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select name="estado">
+                            ${ESTADOS.map(s => `<option value="${s}" ${act.estado === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Responsable</label>
+                        <select name="sec_responsible" id="sec-resp-select">
+                            <option value="" ${!act.sec_responsible ? 'selected' : ''}>-- Seleccionar --</option>
+                            ${SEC_RESPONSABLES.map(r => `<option value="${r}" ${act.sec_responsible === r ? 'selected' : ''}>${r}</option>`).join('')}
+                            <option value="Otro" ${secRespIsOther ? 'selected' : ''}>Otro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" id="sec-resp-other-group" style="margin-top: 1rem; display: ${secRespIsOther ? 'block' : 'none'};">
+                    <label>Nombre del responsable</label>
+                    <input type="text" name="sec_responsible_other" value="${(act.sec_responsible_other || '').replace(/"/g, '&quot;')}" placeholder="Nombre y apellido">
+                </div>
+            </section>`;
+    }
+
     container.innerHTML = `
         <div class="sheet-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-weight: 700;">${isNew ? 'Nueva Actividad' : 'Editar Actividad'}</h2>
@@ -101,7 +159,10 @@ export function renderActivityForm(container, preData = null) {
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>
                     </fieldset>
+                    ${attachmentHTML}
                 </section>
+
+                ${estadoHTML}
 
                 ${showOperative ? `
                 <section>
@@ -274,6 +335,78 @@ export function renderActivityForm(container, preData = null) {
         copyToClipboard('btn-copy-li', txtLi);
     }
 
+    // --- Estado: mostrar el campo "Otro" cuando corresponde (sólo Secretaría) ---
+    const secRespSelect = container.querySelector('#sec-resp-select');
+    if (secRespSelect) {
+        const otherGroup = container.querySelector('#sec-resp-other-group');
+        secRespSelect.onchange = () => {
+            otherGroup.style.display = secRespSelect.value === 'Otro' ? 'block' : 'none';
+        };
+    }
+
+    // --- Adjunto: subir/cambiar/quitar (sólo Secretaría) ---
+    // getAttachment devuelve el adjunto vigente al guardar. Default: el que ya
+    // tenía la actividad (para no perderlo cuando el form no lo edita).
+    let getAttachment = () => ({ attachment_url: act.attachment_url || '', attachment_name: act.attachment_name || '' });
+    if (isSec) {
+        const attachInput = container.querySelector('#attach-input');
+        const attachArea = container.querySelector('#attach-area');
+        let attachUrl = act.attachment_url || '';
+        let attachNm = act.attachment_name || '';
+
+        const renderAttachArea = () => {
+            if (attachUrl) {
+                attachArea.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                        <a href="${attachUrl}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 0.4rem; color: var(--primary); font-size: 0.9rem; font-weight: 500; text-decoration: none;">
+                            <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i> ${(attachNm || 'archivo adjunto').replace(/</g, '&lt;')}
+                        </a>
+                        <button type="button" id="attach-replace" style="background: white; border: 1px solid var(--border); padding: 0.35rem 0.6rem; border-radius: 0.4rem; font-size: 0.8rem; cursor: pointer;">Cambiar</button>
+                        <button type="button" id="attach-remove" style="background: none; border: none; color: #ef4444; font-size: 0.8rem; cursor: pointer;">Quitar</button>
+                    </div>`;
+            } else {
+                attachArea.innerHTML = `
+                    <button type="button" id="attach-add" style="background: white; border: 1px dashed var(--border); color: var(--text-muted); padding: 0.55rem 0.85rem; border-radius: 0.5rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                        <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i> Adjuntar archivo
+                    </button>`;
+            }
+            const add = attachArea.querySelector('#attach-add');
+            const rep = attachArea.querySelector('#attach-replace');
+            const rem = attachArea.querySelector('#attach-remove');
+            if (add) add.onclick = () => attachInput.click();
+            if (rep) rep.onclick = () => attachInput.click();
+            if (rem) rem.onclick = () => { attachUrl = ''; attachNm = ''; renderAttachArea(); };
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        attachInput.onchange = async () => {
+            if (!attachInput.files.length) return;
+            const f = attachInput.files[0];
+            const fd = new FormData();
+            fd.append('file', f);
+            attachArea.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">Subiendo…</span>';
+            try {
+                const res = await fetch('/api/agenda/upload-file', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    attachUrl = data.url;
+                    attachNm = data.name || f.name;
+                } else {
+                    alert(data.detail || 'No se pudo subir el archivo.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error al subir el archivo.');
+            } finally {
+                attachInput.value = '';
+                renderAttachArea();
+            }
+        };
+
+        renderAttachArea();
+        getAttachment = () => ({ attachment_url: attachUrl, attachment_name: attachNm });
+    }
+
     // Drive Folder Creation logic
     const btnCreateFolder = container.querySelector('#btn-create-folder-bcr');
     if (btnCreateFolder) {
@@ -367,8 +500,18 @@ export function renderActivityForm(container, preData = null) {
 
         let data;
         if (isSec) {
-            // Secretaría: sólo Datos Generales; la actividad es suya.
-            data = { ...generalsData, origen: 'secretaria' };
+            // Secretaría: Datos Generales + sección Estado + adjunto. La
+            // actividad es suya.
+            const att = getAttachment();
+            data = {
+                ...generalsData,
+                origen: 'secretaria',
+                estado: formData.get('estado') || 'Pendiente',
+                sec_responsible: formData.get('sec_responsible') || '',
+                sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
+                attachment_url: att.attachment_url,
+                attachment_name: att.attachment_name,
+            };
         } else {
             // Comunicación: siempre lo operativo + notas internas.
             const selectedChannels = Array.from(form.querySelectorAll('input[name="channels"]:checked'))

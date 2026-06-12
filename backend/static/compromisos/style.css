@@ -75,11 +75,24 @@ html, body {
     margin-top: 0.15rem;
     letter-spacing: 0.3px;
 }
-.updated-at {
-    font-size: 0.75rem;
-    opacity: 0.8;
-    font-weight: 500;
+.brand-logo {
+    height: 46px;
+    width: auto;
+    display: block;
 }
+.print-btn {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0.5rem 0.95rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+.print-btn:hover { background: rgba(255, 255, 255, 0.28); }
 
 /* --- Filtros --- */
 .filters {
@@ -256,4 +269,25 @@ html, body {
     .activity-title {
         font-size: 1rem;
     }
+}
+
+/* --- Impresión a PDF por rango de fechas (botón "Imprimir") --- */
+#cmp-print-area { display: none; }
+@media print {
+    body * { visibility: hidden !important; }
+    #cmp-print-area, #cmp-print-area * { visibility: visible !important; }
+    #cmp-print-area {
+        display: block; position: absolute; inset: 0;
+        width: 100%; padding: 0 0 1rem; color: #000; font-size: 12px;
+    }
+    .cmp-pa-head h1 { font-size: 18px; margin: 0 0 0.2rem; }
+    .cmp-pa-head p { margin: 0 0 1rem; color: #333; }
+    .cmp-pa-day { break-inside: avoid; margin-bottom: 0.8rem; }
+    .cmp-pa-day h2 { font-size: 13px; border-bottom: 1px solid #999; padding-bottom: 2px; margin: 0.6rem 0 0.4rem; }
+    .cmp-pa-act { display: grid; grid-template-columns: 60px 1fr; gap: 0.5rem; margin-bottom: 0.5rem; break-inside: avoid; }
+    .cmp-pa-time { font-weight: 700; }
+    .cmp-pa-title { font-weight: 700; }
+    .cmp-pa-meta { font-size: 11px; color: #333; }
+    .cmp-pa-desc { font-size: 11px; white-space: pre-wrap; margin-top: 2px; }
+    @page { margin: 1.5cm; }
 }

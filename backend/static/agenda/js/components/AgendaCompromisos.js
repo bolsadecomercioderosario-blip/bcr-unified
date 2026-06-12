@@ -2,13 +2,12 @@
  * Vista "Agenda de Compromisos" — pantalla principal del rol Secretaría.
  *
  * Reproduce EL MISMO diseño que la landing pública (/compromisos/{token}):
- * header azul, pastillas de filtro y tarjetas por día. La única diferencia es
- * que acá, logueada, Secretaría puede crear ("Nueva actividad") y editar (tap en
- * una tarjeta → abre el form). La landing pública sólo mira.
- *
- * Para que el header azul quede a todo el ancho (como en la landing), el CSS
- * oculta la top-bar de la app y saca el padding del view-container cuando
- * body[data-role="secretaria"] (ver style.css).
+ * header azul (con logo BCR), pastillas de filtro y tarjetas por día. Diferencias
+ * respecto de la pública:
+ *   - Se puede crear ("Nueva actividad") y editar (tap en una tarjeta → form).
+ *   - Cada tarjeta lleva un semáforo (barra de color a la izquierda) según el
+ *     estado de avance, para ver el panorama de un vistazo.
+ *   - No tiene botón al Hub.
  *
  * Muestra sólo las actividades con origen='secretaria'.
  */
@@ -17,11 +16,33 @@ import { state } from '../state.js';
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
+// Colores del semáforo por estado de avance.
+const ESTADO_COLOR = {
+    'Pendiente': '#ef4444',   // rojo
+    'En Proceso': '#f59e0b',  // naranja
+    'Avanzado': '#2563eb',    // azul
+    'Finalizado': '#16a34a',  // verde
+};
+
+const FILTERS = [
+    { key: 'proximas', label: 'Próximas' },
+    { key: 'hoy', label: 'Hoy' },
+    { key: 'semana', label: 'Esta semana' },
+    { key: 'sem7', label: 'Próximos 7 días' },
+    { key: 'sem30', label: 'Próximos 30 días' },
+    { key: 'todas', label: 'Todas' },
+];
+
 // Filtro activo. Module-level para que sobreviva a los re-render del polling.
 let currentFilter = 'proximas';
 
 function todayISO() {
     const d = new Date(); d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+}
+function plusDaysISO(n) {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
     return d.toISOString().split('T')[0];
 }
 function endOfWeekISO() {
@@ -37,6 +58,8 @@ function passesFilter(act, filter) {
     if (filter === 'todas') return true;
     if (filter === 'hoy') return act.date === today;
     if (filter === 'semana') return act.date >= today && act.date <= endOfWeekISO();
+    if (filter === 'sem7') return act.date >= today && act.date <= plusDaysISO(7);
+    if (filter === 'sem30') return act.date >= today && act.date <= plusDaysISO(30);
     return act.date >= today; // 'proximas'
 }
 
@@ -56,11 +79,19 @@ function esc(s) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function secretariaActivities() {
+    return state.activities
+        .filter(a => !a.is_custom && a.origen === 'secretaria')
+        .sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99');
+        });
+}
+
 function cardHTML(act) {
     const time = fmtTime(act.time);
-    const timeHtml = time
-        ? esc(time)
-        : '<span class="cmp-tbd">A definir</span>';
+    const timeHtml = time ? esc(time) : '<span class="cmp-tbd">A definir</span>';
+    const color = ESTADO_COLOR[act.estado] || '#cbd5e1';
 
     const meta = [];
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
@@ -69,7 +100,7 @@ function cardHTML(act) {
     const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
 
     return `
-        <article class="cmp-card" data-id="${esc(act.id)}">
+        <article class="cmp-card" data-id="${esc(act.id)}" style="border-left: 6px solid ${color};" title="Estado: ${esc(act.estado || 'Pendiente')}">
             <div class="cmp-time">${timeHtml}</div>
             <div class="cmp-body">
                 <h3 class="cmp-title">${esc(act.title) || '(Sin título)'}</h3>
@@ -82,13 +113,7 @@ function cardHTML(act) {
 }
 
 function contentHTML(filter) {
-    const acts = state.activities
-        .filter(a => !a.is_custom && a.origen === 'secretaria')
-        .filter(a => passesFilter(a, filter))
-        .sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99');
-        });
+    const acts = secretariaActivities().filter(a => passesFilter(a, filter));
 
     if (acts.length === 0) {
         return '<div class="cmp-empty">No hay actividades para este filtro. Creá una con “Nueva actividad”.</div>';
@@ -118,24 +143,21 @@ export function renderAgendaCompromisos(container) {
         <header class="cmp-topbar">
             <div class="cmp-topbar-inner">
                 <div class="cmp-brand">
-                    <div class="cmp-brand-mark">BCR</div>
+                    <img class="cmp-brand-logo" src="/static/agenda/logo_bcr.png" alt="BCR">
                     <div>
                         <div class="cmp-brand-title">Agenda de Compromisos</div>
                         <div class="cmp-brand-sub">Bolsa de Comercio de Rosario</div>
                     </div>
                 </div>
                 <div class="cmp-actions">
-                    <a href="/" class="cmp-hub" title="Volver al Hub"><i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Hub</a>
+                    <button id="cmp-print-btn" class="cmp-ghost-btn"><i data-lucide="printer" style="width: 16px; height: 16px;"></i> Imprimir</button>
                     <button id="cmp-new-btn" class="cmp-new-btn"><i data-lucide="plus" style="width: 16px; height: 16px;"></i> Nueva actividad</button>
                 </div>
             </div>
         </header>
 
         <nav class="cmp-filters">
-            <button class="cmp-filter-btn" data-filter="proximas">Próximas</button>
-            <button class="cmp-filter-btn" data-filter="hoy">Hoy</button>
-            <button class="cmp-filter-btn" data-filter="semana">Esta semana</button>
-            <button class="cmp-filter-btn" data-filter="todas">Todas</button>
+            ${FILTERS.map(f => `<button class="cmp-filter-btn" data-filter="${f.key}">${f.label}</button>`).join('')}
         </nav>
 
         <main class="cmp-content"></main>
@@ -158,14 +180,110 @@ export function renderAgendaCompromisos(container) {
         btn.onclick = () => { currentFilter = btn.dataset.filter; paint(); };
     });
 
-    // Tap en una tarjeta → editar (delegación, así sobrevive a re-pintar el contenido).
     content.addEventListener('click', (e) => {
         const card = e.target.closest('.cmp-card');
         if (card) window.openActivityDetail(card.dataset.id);
     });
 
     wrapper.querySelector('#cmp-new-btn').onclick = () => window.openNewActivity();
+    wrapper.querySelector('#cmp-print-btn').onclick = () => openPrintModal();
 
     container.appendChild(wrapper);
     paint();
+}
+
+// =================================================================
+// Impresión a PDF (vía el diálogo del navegador) por rango de fechas.
+// =================================================================
+function openPrintModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'login-overlay';
+    overlay.style.zIndex = '1000';
+    overlay.innerHTML = `
+        <div class="login-card" style="max-width: 380px; width: 90%; text-align: left;">
+            <h3 style="margin: 0 0 0.35rem;">Imprimir agenda</h3>
+            <p style="margin: 0 0 1rem; color: var(--text-muted); font-size: 0.85rem;">Elegí el rango de fechas a incluir en el PDF.</p>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem;">Desde</label>
+            <input id="print-from" type="date" value="${todayISO()}" style="width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.4rem; margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem;">Hasta</label>
+            <input id="print-to" type="date" value="${plusDaysISO(30)}" style="width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.4rem; margin-bottom: 0.5rem;">
+            <div id="print-err" style="display: none; color: #b91c1c; font-size: 0.78rem; margin-bottom: 0.5rem;"></div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem;">
+                <button id="print-cancel" style="background: white; border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 0.4rem; font-weight: 600; cursor: pointer;">Cancelar</button>
+                <button id="print-go" class="btn-primary" style="width: auto; padding: 0.5rem 1.1rem;">Imprimir</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#print-cancel').onclick = close;
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+
+    overlay.querySelector('#print-go').onclick = () => {
+        const from = overlay.querySelector('#print-from').value;
+        const to = overlay.querySelector('#print-to').value;
+        const err = overlay.querySelector('#print-err');
+        if (!from || !to) { err.textContent = 'Completá las dos fechas.'; err.style.display = 'block'; return; }
+        if (to < from) { err.textContent = 'La fecha "Hasta" debe ser posterior a "Desde".'; err.style.display = 'block'; return; }
+        close();
+        printRange(from, to);
+    };
+}
+
+function printRange(from, to) {
+    const acts = secretariaActivities().filter(a => a.date >= from && a.date <= to);
+
+    const groups = new Map();
+    for (const act of acts) {
+        if (!groups.has(act.date)) groups.set(act.date, []);
+        groups.get(act.date).push(act);
+    }
+
+    let body = '';
+    if (acts.length === 0) {
+        body = '<p>No hay actividades en el rango elegido.</p>';
+    } else {
+        for (const [date, items] of groups) {
+            const h = dayHeader(date);
+            body += `<div class="cmp-pa-day"><h2>${h.title} · ${h.date}</h2>`;
+            for (const act of items) {
+                const t = fmtTime(act.time);
+                const meta = [];
+                if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
+                if (act.participants) meta.push(`<strong>Autoridades:</strong> ${esc(act.participants)}`);
+                body += `<div class="cmp-pa-act">
+                    <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
+                    <div>
+                        <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
+                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
+                        ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
+                    </div>
+                </div>`;
+            }
+            body += `</div>`;
+        }
+    }
+
+    const fmtRange = (iso) => {
+        const [y, m, d] = iso.split('-').map(Number);
+        return `${d}/${m}/${y}`;
+    };
+
+    const area = document.createElement('div');
+    area.id = 'cmp-print-area';
+    area.innerHTML = `
+        <div class="cmp-pa-head">
+            <h1>Agenda de Compromisos — BCR</h1>
+            <p>Período: ${fmtRange(from)} al ${fmtRange(to)}</p>
+        </div>
+        ${body}
+    `;
+    document.body.appendChild(area);
+
+    const cleanup = () => { area.remove(); window.removeEventListener('afterprint', cleanup); };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    // Fallback por si afterprint no dispara (algunos browsers).
+    setTimeout(() => { if (document.getElementById('cmp-print-area')) cleanup(); }, 1000);
 }
