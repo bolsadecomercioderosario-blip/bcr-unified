@@ -146,7 +146,6 @@ export function renderAgendaCompromisos(container) {
                     <img class="cmp-brand-logo" src="/static/agenda/logo_bcr.png" alt="BCR">
                     <div>
                         <div class="cmp-brand-title">Agenda de Compromisos</div>
-                        <div class="cmp-brand-sub">Bolsa de Comercio de Rosario</div>
                     </div>
                 </div>
                 <div class="cmp-actions">

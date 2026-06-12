@@ -1182,7 +1182,7 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
     font-weight: 800; font-size: 1rem; letter-spacing: 0.5px;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
-.cmp-brand-logo { height: 46px; width: auto; display: block; }
+.cmp-brand-logo { height: 64px; width: auto; display: block; }
 .cmp-brand-title { font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
 .cmp-brand-sub { font-size: 0.75rem; opacity: 0.8; margin-top: 0.15rem; letter-spacing: 0.3px; }
 
