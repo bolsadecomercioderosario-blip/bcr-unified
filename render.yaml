@@ -49,6 +49,11 @@ services:
       - key: EXTERNAL_INTEGRATIONS_ENABLED
         value: "true"
 
+      # --- Scheduler del bot apagado en testing (ahorra RAM; el plan Starter
+      #     de 512MB no aguanta los scrapers). En prod queda ON por default.
+      - key: BOT_SCHEDULER_ENABLED
+        value: "false"
+
       # --- OpenAI (bot, buscador, agenda, clips) ------------------------------
       - key: OPENAI_API_KEY
         sync: false

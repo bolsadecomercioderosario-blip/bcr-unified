@@ -35,6 +35,15 @@ EXTERNAL_INTEGRATIONS_ENABLED = (
 )
 
 
+# Scheduler in-process del bot (scrapers BCR programados). Por defecto ON para
+# no cambiar el comportamiento de producción. Se puede apagar (ej. en el entorno
+# de testing, que tiene poca RAM) seteando BOT_SCHEDULER_ENABLED=false.
+BOT_SCHEDULER_ENABLED = (
+    os.environ.get("BOT_SCHEDULER_ENABLED", "true").lower()
+    in ("true", "1", "yes", "on")
+)
+
+
 # ---------------------------------------------------------------------------
 # Bot BCR — env vars del módulo backend/bot/.
 #

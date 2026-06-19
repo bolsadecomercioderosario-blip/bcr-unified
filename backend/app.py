@@ -101,8 +101,12 @@ app.include_router(compromisos_api)
 # Asume un único worker — ver bot/scheduler.py si escalamos.
 # ---------------------------------------------------------
 from bot.scheduler import start as start_bot_scheduler  # noqa: E402
+from config import BOT_SCHEDULER_ENABLED  # noqa: E402
 
-start_bot_scheduler()
+if BOT_SCHEDULER_ENABLED:
+    start_bot_scheduler()
+else:
+    print("Bot scheduler DESACTIVADO (BOT_SCHEDULER_ENABLED=false).")
 
 
 # ---------------------------------------------------------
