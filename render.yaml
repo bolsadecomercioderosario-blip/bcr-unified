@@ -27,7 +27,9 @@ services:
     runtime: python
     region: virginia          # igual que prod (bcr está en Virginia)
     # plan: starter
-    branch: main
+    # Testing corre desde su propia rama (tiene el cambio de DRIVE_PARENT_FOLDER_ID).
+    # Al mergear a main, cambiar esto a `main`.
+    branch: feat/entorno-testing
     buildCommand: pip install -r requirements.txt
     startCommand: cd backend && python app.py
 
