@@ -1,0 +1,126 @@
+# =============================================================================
+# render.yaml — Blueprint para DUPLICAR el servicio en un entorno de TESTING.
+#
+# Qué es: una "receta" que Render lee para crear, de una sola vez, un servicio
+# web de pruebas (bcr-unified-test) + su propia base de datos PostgreSQL,
+# SEPARADOS de producción. No modifica el servicio de prod (que se creó a mano
+# y tiene otro nombre).
+#
+# Cómo usarlo:
+#   1. Render → New → Blueprint → conectar este repo y elegir la branch.
+#   2. Render crea el servicio + la DB con las variables de abajo.
+#   3. Las variables con `sync: false` quedan VACÍAS a propósito (son secretos):
+#      hay que cargarlas a mano en el dashboard del servicio de testing.
+#      Ver el instructivo completo en docs/DUPLICAR-RENDER-TESTING.md
+#
+# IMPORTANTE: nunca escribir credenciales reales en este archivo. Va al repo.
+# =============================================================================
+
+databases:
+  - name: bcr-test-db
+    region: virginia          # igual que prod (bcr-db está en Virginia)
+    # plan: free              # ajustar al plan que use prod
+
+services:
+  - type: web
+    name: bcr-test
+    runtime: python
+    region: virginia          # igual que prod (bcr está en Virginia)
+    # plan: starter
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd backend && python app.py
+
+    # Secret Files de Google (Drive + YouTube): NO se definen acá.
+    # Se suben a mano en Render → el servicio → Environment → Secret Files:
+    #   - client_secret.json
+    #   - token.json   (generarlo con scripts/reauth_google.py — ver instructivo)
+
+    envVars:
+      # --- Base de datos: la inyecta Render desde la DB de arriba -------------
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bcr-test-db
+          property: connectionString
+
+      # --- Master switch: en testing lo prendemos -----------------------------
+      - key: EXTERNAL_INTEGRATIONS_ENABLED
+        value: "true"
+
+      # --- OpenAI (bot, buscador, agenda, clips) ------------------------------
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_OPENAI_MODEL
+        value: gpt-5-mini
+
+      # --- Bot WhatsApp: vector stores de OpenAI ------------------------------
+      - key: BOT_VS_INSTITUCIONAL
+        sync: false
+      - key: BOT_VS_INFORMATIVO
+        sync: false
+      - key: BOT_VS_COMENTARIOS
+        sync: false
+      - key: BOT_VS_GEA
+        sync: false
+
+      # --- WhatsApp (Twilio) — usar el SANDBOX de Twilio en testing -----------
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        value: "whatsapp:+14155238886"   # número del sandbox de Twilio
+
+      # --- Twitter / X — OJO: no hay sandbox real. Usar cuenta de prueba ------
+      #     o dejar las 4 vacías para que Twitter quede deshabilitado en test.
+      - key: X_API_KEY
+        sync: false
+      - key: X_API_KEY_SECRET
+        sync: false
+      - key: X_ACCESS_TOKEN
+        sync: false
+      - key: X_ACCESS_TOKEN_SECRET
+        sync: false
+
+      # --- Cloudinary (imágenes del newsletter) -------------------------------
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # --- Google Drive / OAuth -----------------------------------------------
+      #     Usar una cuenta de Google de PRUEBA (no la de BCR). Ver instructivo.
+      #     OAUTH_REDIRECT_URI: la URL del servicio de testing, registrada en
+      #     Google Cloud Console → Credentials → Authorized redirect URIs.
+      - key: OAUTH_REDIRECT_URI
+        sync: false
+      # ID de la carpeta madre de Drive de PRUEBA (de la cuenta trucha).
+      # Si se deja vacía, cae a la carpeta institucional de prod — así que en
+      # testing SIEMPRE setearla a una carpeta de la cuenta de prueba.
+      - key: DRIVE_PARENT_FOLDER_ID
+        sync: false
+
+      # --- Webhook Santiago / Pipedream ---------------------------------------
+      - key: SANTIAGO_WEBHOOK_URL
+        sync: false
+
+      # --- Métricas (Google Sheet publicado como CSV) -------------------------
+      - key: METRICAS_SHEET_CSV_URL
+        sync: false
+      - key: METRICAS_SHEET_EDIT_URL
+        sync: false
+      - key: METRICAS_SHEET_TTL
+        value: "120"
+
+      # --- Acceso / auth ------------------------------------------------------
+      #     Recomendado: passwords y tokens DISTINTOS a los de prod.
+      - key: AGENDA_PASSWORD
+        sync: false
+      - key: SECGRAL_PASSWORD
+        sync: false
+      - key: SESSION_TOKEN
+        generateValue: true        # Render genera un token aleatorio
+      - key: COMPROMISOS_PUBLIC_TOKEN
+        sync: false

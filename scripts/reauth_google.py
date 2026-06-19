@@ -41,6 +41,12 @@ SCOPES = [
 
 
 def main():
+    # En Windows la consola usa cp1252 y los emojis del script (✅) hacen
+    # crashear el print al final, DESPUÉS de guardar el token. Forzamos UTF-8
+    # para que el mensaje de éxito se imprima bien.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     here = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(here)
     backend_dir = os.path.join(repo_root, "backend")

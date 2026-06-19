@@ -12,7 +12,14 @@ SCOPES = [
     'https://www.googleapis.com/auth/youtube.upload',
     'https://www.googleapis.com/auth/youtube',
 ]
-PARENT_FOLDER_ID = '1C9NICdm1iQN82kEEF04tRZQuxTAoN0kA'
+# Carpeta madre de Drive donde se crean las carpetas de cada actividad.
+# Configurable por env var para poder apuntar a una carpeta de prueba en el
+# entorno de testing. Si no se setea, usa la carpeta institucional de prod
+# (comportamiento histórico, prod no cambia).
+PARENT_FOLDER_ID = os.environ.get(
+    "DRIVE_PARENT_FOLDER_ID",
+    "1C9NICdm1iQN82kEEF04tRZQuxTAoN0kA",
+)
 
 # Render places secret files in /etc/secrets or the app root
 POSSIBLE_DIRS = [
