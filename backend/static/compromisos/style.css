@@ -241,22 +241,12 @@ html, body {
 @media (max-width: 640px) {
     .topbar { padding: 1.1rem 1rem; }
     .brand-title { font-size: 1rem; }
-    .updated-at { width: 100%; text-align: left; }
-    .filters {
-        margin-top: 0.85rem;
-        padding: 0 1rem;
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        -webkit-overflow-scrolling: touch;
-    }
-    .filter-btn {
-        flex-shrink: 0;
-        padding: 0.4rem 0.85rem;
-        font-size: 0.78rem;
-    }
+    /* En mobile: sin pastillas de filtro ni botón Imprimir. */
+    .filters { display: none; }
+    #print-btn { display: none; }
     .content {
         padding: 0 1rem 2rem;
-        margin-top: 1rem;
+        margin-top: 1.25rem;
     }
     .activity {
         grid-template-columns: 1fr;
@@ -269,6 +259,8 @@ html, body {
     .activity-title {
         font-size: 1rem;
     }
+    /* Lugar / Participa: cada uno en su propia línea. */
+    .activity-meta { flex-direction: column; gap: 0.2rem; }
 }
 
 /* --- Impresión a PDF por rango de fechas (botón "Imprimir") --- */
@@ -277,17 +269,28 @@ html, body {
     body * { visibility: hidden !important; }
     #cmp-print-area, #cmp-print-area * { visibility: visible !important; }
     #cmp-print-area {
-        display: block; position: absolute; inset: 0;
-        width: 100%; padding: 0 0 1rem; color: #000; font-size: 12px;
+        display: block; position: absolute; inset: 0; width: 100%;
+        padding: 0; color: #1a1a1a;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-size: 12px; line-height: 1.5;
     }
-    .cmp-pa-head h1 { font-size: 18px; margin: 0 0 0.2rem; }
-    .cmp-pa-head p { margin: 0 0 1rem; color: #333; }
-    .cmp-pa-day { break-inside: avoid; margin-bottom: 0.8rem; }
-    .cmp-pa-day h2 { font-size: 13px; border-bottom: 1px solid #999; padding-bottom: 2px; margin: 0.6rem 0 0.4rem; }
-    .cmp-pa-act { display: grid; grid-template-columns: 60px 1fr; gap: 0.5rem; margin-bottom: 0.5rem; break-inside: avoid; }
-    .cmp-pa-time { font-weight: 700; }
-    .cmp-pa-title { font-weight: 700; }
-    .cmp-pa-meta { font-size: 11px; color: #333; }
-    .cmp-pa-desc { font-size: 11px; white-space: pre-wrap; margin-top: 2px; }
-    @page { margin: 1.5cm; }
+    .cmp-pa-head { border-bottom: 2px solid #0742ab; padding-bottom: 8px; margin-bottom: 16px; }
+    .cmp-pa-head h1 { font-size: 20px; color: #0742ab; margin: 0 0 2px; font-weight: 700; }
+    .cmp-pa-head p { margin: 0; color: #666; font-size: 11px; }
+    .cmp-pa-day { break-inside: avoid; margin-bottom: 6px; }
+    .cmp-pa-day h2 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+        color: #0742ab; border-bottom: 1px solid #cbd5e1;
+        padding-bottom: 3px; margin: 14px 0 8px;
+    }
+    .cmp-pa-act {
+        display: grid; grid-template-columns: 52px 1fr; gap: 12px;
+        padding: 7px 0; border-bottom: 1px solid #eef1f5; break-inside: avoid;
+    }
+    .cmp-pa-time { font-weight: 700; color: #0742ab; }
+    .cmp-pa-title { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }
+    .cmp-pa-desc { color: #333; margin: 2px 0 4px; white-space: pre-wrap; }
+    .cmp-pa-meta { font-size: 11px; color: #475569; line-height: 1.6; }
+    .cmp-pa-meta strong { color: #1a1a1a; }
+    @page { margin: 1.6cm; }
 }

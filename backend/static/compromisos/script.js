@@ -231,7 +231,7 @@ function printRange(from, to) {
                     <div>
                         <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
-                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
+                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join('<br>')}</div>` : ''}
                     </div>
                 </div>`;
             }
