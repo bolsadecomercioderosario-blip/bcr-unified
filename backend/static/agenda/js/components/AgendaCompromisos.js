@@ -273,7 +273,8 @@ function printRange(from, to) {
     area.id = 'cmp-print-area';
     area.innerHTML = `
         <div class="cmp-pa-head">
-            <h1>Agenda de Compromisos — BCR</h1>
+            <img class="cmp-pa-logo" src="/static/agenda/logo_bcr_azul.png" alt="Bolsa de Comercio de Rosario">
+            <h1>Agenda de Compromisos</h1>
             <p>Período: ${fmtRange(from)} al ${fmtRange(to)}</p>
         </div>
         ${body}
@@ -292,7 +293,22 @@ function printRange(from, to) {
         window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);
-    window.print();
-    // Fallback por si afterprint no dispara (algunos browsers).
-    setTimeout(() => { if (document.getElementById('cmp-print-area')) cleanup(); }, 1000);
+
+    // Esperamos a que el logo cargue antes de imprimir (si no, sale en blanco).
+    let printed = false;
+    const go = () => {
+        if (printed) return;
+        printed = true;
+        window.print();
+        // Fallback por si afterprint no dispara (algunos browsers).
+        setTimeout(() => { if (document.getElementById('cmp-print-area')) cleanup(); }, 1000);
+    };
+    const logo = area.querySelector('.cmp-pa-logo');
+    if (logo && !logo.complete) {
+        logo.addEventListener('load', go, { once: true });
+        logo.addEventListener('error', go, { once: true });
+        setTimeout(go, 1500);
+    } else {
+        go();
+    }
 }

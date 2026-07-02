@@ -274,6 +274,7 @@ html, body {
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
         font-size: 12px; line-height: 1.5;
     }
+    .cmp-pa-logo { height: 50px; width: auto; display: block; margin-bottom: 10px; }
     .cmp-pa-head { border-bottom: 2px solid #0742ab; padding-bottom: 8px; margin-bottom: 16px; }
     .cmp-pa-head h1 { font-size: 20px; color: #0742ab; margin: 0 0 2px; font-weight: 700; }
     .cmp-pa-head p { margin: 0; color: #666; font-size: 11px; }
