@@ -55,6 +55,11 @@ export function renderActivityForm(container, preData = null) {
     // Multi-día / rango horario (excepcional): estado inicial según los datos.
     const isMultiday = !!(act.end_date && act.end_date > act.date);
     const hasEndTime = !!act.end_time;
+    // Estados de hora: "A definir" (hay hora pero sin definir) y "Sin horario"
+    // (todo el día, no tiene hora). Son excluyentes entre sí.
+    const timeIsTbd = act.time === 'A definir';
+    const timeIsNone = act.time === 'Sin horario';
+    const timeDisabled = timeIsTbd || timeIsNone;
 
     // --- Bloque de adjunto (al final de Datos Generales) ---
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
@@ -144,10 +149,14 @@ export function renderActivityForm(container, preData = null) {
                         <div class="form-group">
                             <label style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <span>Hora</span>
-                                <span style="display: inline-flex; gap: 0.75rem;">
+                                <span style="display: inline-flex; gap: 0.7rem; flex-wrap: wrap;">
                                     <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
-                                        <input type="checkbox" id="time-tbd" ${act.time === 'A definir' ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                                        <input type="checkbox" id="time-tbd" ${timeIsTbd ? 'checked' : ''} style="margin: 0; cursor: pointer;">
                                         A definir
+                                    </label>
+                                    <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
+                                        <input type="checkbox" id="time-none" ${timeIsNone ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                                        Sin horario
                                     </label>
                                     <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
                                         <input type="checkbox" id="endtime-check" ${hasEndTime ? 'checked' : ''} style="margin: 0; cursor: pointer;">
@@ -155,7 +164,7 @@ export function renderActivityForm(container, preData = null) {
                                     </label>
                                 </span>
                             </label>
-                            <input type="time" name="time" value="${act.time === 'A definir' ? '09:00' : act.time}" ${act.time === 'A definir' ? 'disabled style="opacity: 0.4;"' : ''}>
+                            <input type="time" name="time" value="${timeDisabled ? '09:00' : act.time}" ${timeDisabled ? 'disabled style="opacity: 0.4;"' : ''}>
                         </div>
                         <div class="form-group" id="grp-end-time" style="display: ${hasEndTime ? 'block' : 'none'};">
                             <label>Hora de fin</label>
@@ -310,16 +319,41 @@ export function renderActivityForm(container, preData = null) {
     const groupSant = container.querySelector('#group-santiago');
     const channelChecks = container.querySelectorAll('input[name="channels"]');
 
-    // Toggle "A definir" para la hora — deshabilita el input time y al guardar
-    // se manda time = "A definir" como string.
+    // --- Controles de hora: "A definir" | "Sin horario" | "Hora de fin" ---
+    // "A definir" y "Sin horario" son excluyentes; cualquiera de las dos
+    // deshabilita el input de hora y el rango horario.
     const timeTbd = container.querySelector('#time-tbd');
+    const timeNone = container.querySelector('#time-none');
     const timeInput = container.querySelector('input[name="time"]');
-    if (timeTbd && timeInput) {
-        timeTbd.addEventListener('change', () => {
-            timeInput.disabled = timeTbd.checked;
-            timeInput.style.opacity = timeTbd.checked ? '0.4' : '1';
-        });
-    }
+    const endtimeCheck = container.querySelector('#endtime-check');
+    const grpEndTime = container.querySelector('#grp-end-time');
+
+    const syncTimeControls = () => {
+        const noTime = (timeTbd && timeTbd.checked) || (timeNone && timeNone.checked);
+        if (timeInput) {
+            timeInput.disabled = noTime;
+            timeInput.style.opacity = noTime ? '0.4' : '1';
+        }
+        if (endtimeCheck) {
+            endtimeCheck.disabled = noTime;
+            if (noTime && endtimeCheck.checked) {
+                endtimeCheck.checked = false;
+                if (grpEndTime) grpEndTime.style.display = 'none';
+            }
+        }
+    };
+
+    if (timeTbd) timeTbd.addEventListener('change', () => {
+        if (timeTbd.checked && timeNone) timeNone.checked = false;
+        syncTimeControls();
+    });
+    if (timeNone) timeNone.addEventListener('change', () => {
+        if (timeNone.checked && timeTbd) timeTbd.checked = false;
+        syncTimeControls();
+    });
+    if (endtimeCheck) endtimeCheck.addEventListener('change', () => {
+        if (grpEndTime) grpEndTime.style.display = endtimeCheck.checked ? 'block' : 'none';
+    });
 
     // Multi-día: el check alterna Fecha ↔ Desde/Hasta.
     const multidayCheck = container.querySelector('#multiday-check');
@@ -336,15 +370,6 @@ export function renderActivityForm(container, preData = null) {
             if (on && endDateInput && !endDateInput.value && startDateInput) {
                 endDateInput.value = startDateInput.value;
             }
-        });
-    }
-
-    // Rango horario: el check muestra/oculta "Hora de fin".
-    const endtimeCheck = container.querySelector('#endtime-check');
-    if (endtimeCheck) {
-        const grpEndTime = container.querySelector('#grp-end-time');
-        endtimeCheck.addEventListener('change', () => {
-            grpEndTime.style.display = endtimeCheck.checked ? 'block' : 'none';
         });
     }
 
@@ -543,14 +568,17 @@ export function renderActivityForm(container, preData = null) {
         // Datos Generales (sólo se incluyen si el rol puede editarlos).
         const isMulti = !!(multidayCheck && multidayCheck.checked);
         const hasEnd = !!(endtimeCheck && endtimeCheck.checked);
-        const timeVal = (timeTbd && timeTbd.checked) ? 'A definir' : formData.get('time');
+        const timeVal = (timeNone && timeNone.checked) ? 'Sin horario'
+            : (timeTbd && timeTbd.checked) ? 'A definir'
+            : formData.get('time');
+        const noClock = (timeVal === 'A definir' || timeVal === 'Sin horario');
         const generalsData = {
             date: formData.get('date'),
             time: timeVal,
             // end_date sólo si es multi-día; end_time sólo si hay rango horario y
-            // no es "A definir" (un rango no aplica si la hora está sin definir).
+            // hay una hora real (no aplica con "A definir" ni "Sin horario").
             end_date: isMulti ? (formData.get('end_date') || '') : '',
-            end_time: (hasEnd && timeVal !== 'A definir') ? (formData.get('end_time') || '') : '',
+            end_time: (hasEnd && !noClock) ? (formData.get('end_time') || '') : '',
             title: formData.get('title'),
             description: formData.get('description'),
             location: formData.get('location'),

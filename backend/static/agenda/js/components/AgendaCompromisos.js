@@ -62,15 +62,15 @@ function passesFilter(dateISO, filter) {
 }
 
 function fmtTime(t) {
-    if (!t || t === 'A definir' || t === '00:00') return null;
+    if (!t || t === 'A definir' || t === 'Sin horario' || t === '00:00') return null;
     return t;
 }
-// Muestra la hora, o el rango "HH:MM a HH:MM" si hay end_time.
-function fmtTimeDisplay(act) {
+// Texto a mostrar en el slot de hora: hora, rango "HH:MM a HH:MM",
+// "Todo el día" (sin horario) o "A definir".
+function timeLabel(act) {
     const start = fmtTime(act.time);
-    if (!start) return null; // "A definir"
-    if (act.end_time && fmtTime(act.end_time)) return `${start} a ${act.end_time}`;
-    return start;
+    if (start) return (act.end_time && fmtTime(act.end_time)) ? `${start} a ${act.end_time}` : start;
+    return act.time === 'Sin horario' ? 'Todo el día' : 'A definir';
 }
 
 function dayHeader(dateISO) {
@@ -126,8 +126,8 @@ function secretariaOccurrences() {
 
 function cardHTML(occ) {
     const act = occ.act;
-    const time = fmtTimeDisplay(act);
-    const timeHtml = time ? esc(time) : '<span class="cmp-tbd">A definir</span>';
+    const isClock = !!fmtTime(act.time);
+    const timeHtml = isClock ? esc(timeLabel(act)) : `<span class="cmp-tbd">${esc(timeLabel(act))}</span>`;
     const color = ESTADO_COLOR[act.estado] || '#cbd5e1';
 
     const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
@@ -300,13 +300,12 @@ function printRange(from, to) {
             body += `<div class="cmp-pa-day"><h2>${h.title} · ${h.date}</h2>`;
             for (const o of items) {
                 const act = o.act;
-                const t = fmtTimeDisplay(act);
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
                 const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
                 body += `<div class="cmp-pa-act">
-                    <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
+                    <div class="cmp-pa-time">${esc(timeLabel(act))}</div>
                     <div>
                         <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}${dayTag}</div>
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
