@@ -1270,6 +1270,13 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 .cmp-time .cmp-tbd { font-size: 0.8rem; color: #64748b; font-weight: 500; }
 .cmp-body { min-width: 0; }
 .cmp-title { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.4rem; color: #0f172a; }
+.cmp-daybadge {
+    display: inline-block;
+    font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: #0742ab; background: #dbeafe;
+    padding: 0.12rem 0.5rem; border-radius: 999px;
+    margin-bottom: 0.45rem;
+}
 .cmp-meta {
     display: flex; flex-wrap: wrap; gap: 0.4rem 1rem;
     font-size: 0.82rem; color: #64748b; margin-bottom: 0;

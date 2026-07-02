@@ -52,41 +52,69 @@ function formatTime(t) {
     if (!t || t === 'A definir' || t === '00:00') return null;
     return t;
 }
+// Muestra la hora, o el rango "HH:MM a HH:MM" si hay end_time.
+function formatTimeDisplay(act) {
+    const start = formatTime(act.time);
+    if (!start) return null;
+    if (act.end_time && formatTime(act.end_time)) return `${start} a ${act.end_time}`;
+    return start;
+}
+
+// ---------- Multi-día: una actividad con end_date se muestra en cada día ----------
+function eachDay(from, to) {
+    const days = [];
+    const [fy, fm, fd] = from.split('-').map(Number);
+    const [ty, tm, td] = to.split('-').map(Number);
+    const cur = new Date(fy, fm - 1, fd);
+    const end = new Date(ty, tm - 1, td);
+    let guard = 0;
+    while (cur <= end && guard < 400) {
+        days.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+    }
+    return days;
+}
+function occurrencesOf(act) {
+    if (act.end_date && act.end_date > act.date) {
+        const days = eachDay(act.date, act.end_date);
+        return days.map((d, i) => ({ act, occDate: d, dayIndex: i + 1, dayCount: days.length }));
+    }
+    return [{ act, occDate: act.date, dayIndex: 1, dayCount: 1 }];
+}
 
 // ---------- Filter helpers ----------
-function passesFilter(act, filter) {
+function passesFilter(dateISO, filter) {
     const today = todayISO();
     if (filter === 'todas') return true;
-    if (filter === 'hoy') return act.date === today;
-    if (filter === 'semana') return act.date >= today && act.date <= endOfWeekISO();
-    if (filter === 'sem7') return act.date >= today && act.date <= plusDaysISO(7);
-    if (filter === 'sem30') return act.date >= today && act.date <= plusDaysISO(30);
-    // 'proximas' = hoy y futuro
-    return act.date >= today;
+    if (filter === 'hoy') return dateISO === today;
+    if (filter === 'semana') return dateISO >= today && dateISO <= endOfWeekISO();
+    if (filter === 'sem7') return dateISO >= today && dateISO <= plusDaysISO(7);
+    if (filter === 'sem30') return dateISO >= today && dateISO <= plusDaysISO(30);
+    return dateISO >= today; // 'proximas'
 }
 
 // ---------- Render ----------
 function render() {
     const content = document.getElementById('content');
-    const filtered = activities
-        .filter(a => passesFilter(a, currentFilter))
+    const occ = activities
+        .flatMap(occurrencesOf)
+        .filter(o => passesFilter(o.occDate, currentFilter))
         .sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            const aT = formatTime(a.time) || '99:99';
-            const bT = formatTime(b.time) || '99:99';
-            return aT.localeCompare(bT);
+            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
+            return (formatTime(a.act.time) || '99:99').localeCompare(formatTime(b.act.time) || '99:99');
         });
 
-    if (filtered.length === 0) {
+    if (occ.length === 0) {
         content.innerHTML = '<div class="empty">No hay actividades para este filtro.</div>';
         return;
     }
 
-    // Agrupar por fecha
+    // Agrupar por día (cada ocurrencia va bajo su fecha)
     const groups = new Map();
-    for (const act of filtered) {
-        if (!groups.has(act.date)) groups.set(act.date, []);
-        groups.get(act.date).push(act);
+    for (const o of occ) {
+        if (!groups.has(o.occDate)) groups.set(o.occDate, []);
+        groups.get(o.occDate).push(o);
     }
 
     let html = '';
@@ -94,20 +122,22 @@ function render() {
         const header = formatDayHeader(date);
         html += `<section class="day-group">`;
         html += `<h2 class="day-header">${header.title}<span class="day-date">${header.date}</span></h2>`;
-        for (const act of items) {
-            html += renderActivity(act);
+        for (const o of items) {
+            html += renderActivity(o);
         }
         html += `</section>`;
     }
     content.innerHTML = html;
 }
 
-function renderActivity(act) {
-    const time = formatTime(act.time);
+function renderActivity(occ) {
+    const act = occ.act;
+    const time = formatTimeDisplay(act);
     const timeHtml = time
-        ? `<div class="activity-time">${time}</div>`
+        ? `<div class="activity-time">${esc(time)}</div>`
         : `<div class="activity-time"><span class="tbd">A definir</span></div>`;
 
+    const dayBadge = occ.dayCount > 1 ? `<span class="activity-daybadge">Día ${occ.dayIndex} de ${occ.dayCount}</span>` : '';
     const descHtml = act.description ? `<div class="activity-description">${esc(act.description)}</div>` : '';
     const meta = [];
     if (act.location) {
@@ -123,6 +153,7 @@ function renderActivity(act) {
             ${timeHtml}
             <div class="activity-body">
                 <h3 class="activity-title">${esc(act.title) || '(Sin título)'}</h3>
+                ${dayBadge}
                 ${descHtml}
                 ${metaHtml}
             </div>
@@ -201,35 +232,38 @@ function openPrintModal() {
 }
 
 function printRange(from, to) {
-    const inRange = activities
-        .filter(a => a.date >= from && a.date <= to)
+    const occ = activities
+        .flatMap(occurrencesOf)
+        .filter(o => o.occDate >= from && o.occDate <= to)
         .sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return (formatTime(a.time) || '99:99').localeCompare(formatTime(b.time) || '99:99');
+            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
+            return (formatTime(a.act.time) || '99:99').localeCompare(formatTime(b.act.time) || '99:99');
         });
 
     const groups = new Map();
-    for (const act of inRange) {
-        if (!groups.has(act.date)) groups.set(act.date, []);
-        groups.get(act.date).push(act);
+    for (const o of occ) {
+        if (!groups.has(o.occDate)) groups.set(o.occDate, []);
+        groups.get(o.occDate).push(o);
     }
 
     let body = '';
-    if (inRange.length === 0) {
+    if (occ.length === 0) {
         body = '<p>No hay actividades en el rango elegido.</p>';
     } else {
         for (const [date, items] of groups) {
             const h = formatDayHeader(date);
             body += `<div class="cmp-pa-day"><h2>${h.title} · ${h.date}</h2>`;
-            for (const act of items) {
-                const t = formatTime(act.time);
+            for (const o of items) {
+                const act = o.act;
+                const t = formatTimeDisplay(act);
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
+                const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
                 body += `<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
                     <div>
-                        <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
+                        <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}${dayTag}</div>
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
                         ${meta.length ? `<div class="cmp-pa-meta">${meta.join('<br>')}</div>` : ''}
                     </div>

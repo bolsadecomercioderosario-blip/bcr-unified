@@ -203,9 +203,11 @@ export function renderList(container) {
                         ${items.map(act => `
                             <tr class="${act.done ? 'tr-done' : ''}" onclick="window.openActivityDetail('${act.id}')">
                                 <td style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">
-                                    ${formatFullDate(act.date)}
+                                    ${act.end_date && act.end_date > act.date
+                                        ? `${formatFullDate(act.date)}<br><span style="opacity: 0.8;">→ ${formatFullDate(act.end_date)}</span>`
+                                        : formatFullDate(act.date)}
                                 </td>
-                                <td style="font-weight: 500; ${act.time === 'A definir' ? 'font-size: 0.78rem; color: var(--text-muted); font-style: italic;' : 'font-variant-numeric: tabular-nums;'}">${act.time}</td>
+                                <td style="font-weight: 500; ${act.time === 'A definir' ? 'font-size: 0.78rem; color: var(--text-muted); font-style: italic;' : 'font-variant-numeric: tabular-nums;'}">${act.time === 'A definir' ? 'A definir' : (act.end_time ? act.time + ' a ' + act.end_time : act.time)}</td>
                                 <td>
                                     <div style="font-weight: 600; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">${act.title}${act.origen === 'secretaria' ? `<span style="font-weight: 600; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; color: #0742ab; background: #dbeafe; padding: 0.1rem 0.4rem; border-radius: 999px;">Secretaría</span>` : ''}</div>
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">${act.description.substring(0, 80)}${act.description.length > 80 ? '...' : ''}</div>

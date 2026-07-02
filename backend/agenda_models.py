@@ -10,6 +10,12 @@ class Activity(Base):
     id = Column(String, primary_key=True, index=True)
     date = Column(String, nullable=False)
     time = Column(String, nullable=False)
+    # Multi-día: si end_date está seteado y es posterior a date, la actividad se
+    # extiende de date a end_date y se muestra en cada día del rango. Vacío = un
+    # solo día (comportamiento por defecto de todo lo ya cargado).
+    end_date = Column(String, default="")
+    # Rango horario opcional: si end_time está, se muestra "HH:MM a HH:MM".
+    end_time = Column(String, default="")
     title = Column(String, nullable=False)
     description = Column(String, default="")
     location = Column(String, default="")
@@ -65,6 +71,8 @@ class ActivityBase(BaseModel):
     id: str
     date: str
     time: str
+    end_date: Optional[str] = ""
+    end_time: Optional[str] = ""
     title: str
     description: Optional[str] = ""
     location: Optional[str] = ""
@@ -99,6 +107,8 @@ class ActivityCreate(ActivityBase):
 class ActivityUpdate(BaseModel):
     date: Optional[str] = None
     time: Optional[str] = None
+    end_date: Optional[str] = None
+    end_time: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
@@ -141,6 +151,8 @@ class CompromisoPublicOut(BaseModel):
     id: str
     date: str
     time: str
+    end_date: Optional[str] = ""
+    end_time: Optional[str] = ""
     title: str
     description: Optional[str] = ""
     location: Optional[str] = ""

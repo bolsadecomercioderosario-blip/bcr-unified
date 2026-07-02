@@ -73,6 +73,14 @@ def migrate():
         "ALTER add attachment_name",
         "ALTER TABLE activities ADD COLUMN attachment_name VARCHAR DEFAULT ''",
     )
+    _try_exec(
+        "ALTER add end_date",
+        "ALTER TABLE activities ADD COLUMN end_date VARCHAR DEFAULT ''",
+    )
+    _try_exec(
+        "ALTER add end_time",
+        "ALTER TABLE activities ADD COLUMN end_time VARCHAR DEFAULT ''",
+    )
 
     # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
     # Idempotente: sólo toca filas que todavía no tengan block_type seteado.

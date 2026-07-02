@@ -202,6 +202,18 @@ html, body {
     margin: 0 0 0.4rem;
     color: var(--text-main);
 }
+.activity-daybadge {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #0742ab;
+    background: #eef2ff;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    margin-bottom: 0.4rem;
+}
 .activity-meta {
     display: flex;
     flex-wrap: wrap;

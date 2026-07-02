@@ -10,6 +10,8 @@ export function renderActivityForm(container, preData = null) {
         id: sourceAct.id || '',
         date: sourceAct.date || new Date().toISOString().split('T')[0],
         time: sourceAct.time || '09:00',
+        end_date: sourceAct.end_date || '',
+        end_time: sourceAct.end_time || '',
         title: sourceAct.title || '',
         description: sourceAct.description || '',
         location: (sourceAct.location === 'undefined' || !sourceAct.location) ? '' : sourceAct.location,
@@ -49,6 +51,10 @@ export function renderActivityForm(container, preData = null) {
     const showOperative = !isSec;
     // Borrar la actividad entera es acción del dueño de los Datos Generales.
     const showDelete = !isNew && generalsEditable;
+
+    // Multi-día / rango horario (excepcional): estado inicial según los datos.
+    const isMultiday = !!(act.end_date && act.end_date > act.date);
+    const hasEndTime = !!act.end_time;
 
     // --- Bloque de adjunto (al final de Datos Generales) ---
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
@@ -120,20 +126,40 @@ export function renderActivityForm(container, preData = null) {
                         ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> Los carga Secretaría · solo lectura</span>` : ''}
                     </h3>
                     <fieldset ${generalsReadOnly ? 'disabled' : ''} style="border: none; padding: 0; margin: 0; min-inline-size: auto;">
+                    <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0.85rem; user-select: none;">
+                        <input type="checkbox" id="multiday-check" ${isMultiday ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                        Dura varios días
+                    </label>
                     <div class="form-grid-2">
                         <div class="form-group">
-                            <label>Fecha</label>
+                            <label id="label-date">${isMultiday ? 'Desde' : 'Fecha'}</label>
                             <input type="date" name="date" value="${act.date}" required>
                         </div>
+                        <div class="form-group" id="grp-end-date" style="display: ${isMultiday ? 'block' : 'none'};">
+                            <label>Hasta</label>
+                            <input type="date" name="end_date" value="${act.end_date}">
+                        </div>
+                    </div>
+                    <div class="form-grid-2" style="margin-top: 1rem;">
                         <div class="form-group">
-                            <label style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                            <label style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <span>Hora</span>
-                                <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
-                                    <input type="checkbox" id="time-tbd" ${act.time === 'A definir' ? 'checked' : ''} style="margin: 0; cursor: pointer;">
-                                    A definir
-                                </label>
+                                <span style="display: inline-flex; gap: 0.75rem;">
+                                    <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
+                                        <input type="checkbox" id="time-tbd" ${act.time === 'A definir' ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                                        A definir
+                                    </label>
+                                    <label style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; user-select: none;">
+                                        <input type="checkbox" id="endtime-check" ${hasEndTime ? 'checked' : ''} style="margin: 0; cursor: pointer;">
+                                        Hora de fin
+                                    </label>
+                                </span>
                             </label>
                             <input type="time" name="time" value="${act.time === 'A definir' ? '09:00' : act.time}" ${act.time === 'A definir' ? 'disabled style="opacity: 0.4;"' : ''}>
+                        </div>
+                        <div class="form-group" id="grp-end-time" style="display: ${hasEndTime ? 'block' : 'none'};">
+                            <label>Hora de fin</label>
+                            <input type="time" name="end_time" value="${act.end_time || '17:00'}">
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 1rem;">
@@ -292,6 +318,33 @@ export function renderActivityForm(container, preData = null) {
         timeTbd.addEventListener('change', () => {
             timeInput.disabled = timeTbd.checked;
             timeInput.style.opacity = timeTbd.checked ? '0.4' : '1';
+        });
+    }
+
+    // Multi-día: el check alterna Fecha ↔ Desde/Hasta.
+    const multidayCheck = container.querySelector('#multiday-check');
+    if (multidayCheck) {
+        const labelDate = container.querySelector('#label-date');
+        const grpEndDate = container.querySelector('#grp-end-date');
+        const endDateInput = container.querySelector('input[name="end_date"]');
+        const startDateInput = container.querySelector('input[name="date"]');
+        multidayCheck.addEventListener('change', () => {
+            const on = multidayCheck.checked;
+            labelDate.textContent = on ? 'Desde' : 'Fecha';
+            grpEndDate.style.display = on ? 'block' : 'none';
+            // Al activar, si no hay "Hasta", lo prellenamos con la fecha de inicio.
+            if (on && endDateInput && !endDateInput.value && startDateInput) {
+                endDateInput.value = startDateInput.value;
+            }
+        });
+    }
+
+    // Rango horario: el check muestra/oculta "Hora de fin".
+    const endtimeCheck = container.querySelector('#endtime-check');
+    if (endtimeCheck) {
+        const grpEndTime = container.querySelector('#grp-end-time');
+        endtimeCheck.addEventListener('change', () => {
+            grpEndTime.style.display = endtimeCheck.checked ? 'block' : 'none';
         });
     }
 
@@ -488,15 +541,27 @@ export function renderActivityForm(container, preData = null) {
         const formData = new FormData(form);
 
         // Datos Generales (sólo se incluyen si el rol puede editarlos).
+        const isMulti = !!(multidayCheck && multidayCheck.checked);
+        const hasEnd = !!(endtimeCheck && endtimeCheck.checked);
+        const timeVal = (timeTbd && timeTbd.checked) ? 'A definir' : formData.get('time');
         const generalsData = {
             date: formData.get('date'),
-            time: (timeTbd && timeTbd.checked) ? 'A definir' : formData.get('time'),
+            time: timeVal,
+            // end_date sólo si es multi-día; end_time sólo si hay rango horario y
+            // no es "A definir" (un rango no aplica si la hora está sin definir).
+            end_date: isMulti ? (formData.get('end_date') || '') : '',
+            end_time: (hasEnd && timeVal !== 'A definir') ? (formData.get('end_time') || '') : '',
             title: formData.get('title'),
             description: formData.get('description'),
             location: formData.get('location'),
             observations: formData.get('observations'),
             participants: formData.get('participants'),
         };
+
+        if (generalsData.end_date && generalsData.end_date < generalsData.date) {
+            alert('La fecha "Hasta" no puede ser anterior a "Desde".');
+            return;
+        }
 
         let data;
         if (isSec) {

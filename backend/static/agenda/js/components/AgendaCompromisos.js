@@ -1,13 +1,11 @@
 /**
  * Vista "Agenda de Compromisos" — pantalla principal del rol Secretaría.
  *
- * Reproduce EL MISMO diseño que la landing pública (/compromisos/{token}):
- * header azul (con logo BCR), pastillas de filtro y tarjetas por día. Diferencias
- * respecto de la pública:
- *   - Se puede crear ("Nueva actividad") y editar (tap en una tarjeta → form).
- *   - Cada tarjeta lleva un semáforo (barra de color a la izquierda) según el
- *     estado de avance, para ver el panorama de un vistazo.
- *   - No tiene botón al Hub.
+ * Mismo diseño que la landing pública (header azul, pastillas, tarjetas por día),
+ * pero acá se crea y edita, y cada tarjeta lleva un semáforo por estado.
+ *
+ * Actividades de varios días: si una actividad tiene end_date > date, se expande
+ * y aparece en CADA día del rango, con un distintivo "Día X de N".
  *
  * Muestra sólo las actividades con origen='secretaria'.
  */
@@ -53,19 +51,26 @@ function endOfWeekISO() {
     return d.toISOString().split('T')[0];
 }
 
-function passesFilter(act, filter) {
+function passesFilter(dateISO, filter) {
     const today = todayISO();
     if (filter === 'todas') return true;
-    if (filter === 'hoy') return act.date === today;
-    if (filter === 'semana') return act.date >= today && act.date <= endOfWeekISO();
-    if (filter === 'sem7') return act.date >= today && act.date <= plusDaysISO(7);
-    if (filter === 'sem30') return act.date >= today && act.date <= plusDaysISO(30);
-    return act.date >= today; // 'proximas'
+    if (filter === 'hoy') return dateISO === today;
+    if (filter === 'semana') return dateISO >= today && dateISO <= endOfWeekISO();
+    if (filter === 'sem7') return dateISO >= today && dateISO <= plusDaysISO(7);
+    if (filter === 'sem30') return dateISO >= today && dateISO <= plusDaysISO(30);
+    return dateISO >= today; // 'proximas'
 }
 
 function fmtTime(t) {
     if (!t || t === 'A definir' || t === '00:00') return null;
     return t;
+}
+// Muestra la hora, o el rango "HH:MM a HH:MM" si hay end_time.
+function fmtTimeDisplay(act) {
+    const start = fmtTime(act.time);
+    if (!start) return null; // "A definir"
+    if (act.end_time && fmtTime(act.end_time)) return `${start} a ${act.end_time}`;
+    return start;
 }
 
 function dayHeader(dateISO) {
@@ -79,17 +84,41 @@ function esc(s) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function secretariaActivities() {
-    return state.activities
-        .filter(a => !a.is_custom && a.origen === 'secretaria')
-        .sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99');
-        });
+// --- Multi-día: enumera los días de un rango inclusive (con tope de seguridad) ---
+function eachDay(from, to) {
+    const days = [];
+    const [fy, fm, fd] = from.split('-').map(Number);
+    const [ty, tm, td] = to.split('-').map(Number);
+    const cur = new Date(fy, fm - 1, fd);
+    const end = new Date(ty, tm - 1, td);
+    let guard = 0;
+    while (cur <= end && guard < 400) {
+        days.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+    }
+    return days;
+}
+// Convierte una actividad en 1 (o N) "ocurrencias", una por cada día que dura.
+function occurrencesOf(act) {
+    if (act.end_date && act.end_date > act.date) {
+        const days = eachDay(act.date, act.end_date);
+        return days.map((d, i) => ({ act, occDate: d, dayIndex: i + 1, dayCount: days.length }));
+    }
+    return [{ act, occDate: act.date, dayIndex: 1, dayCount: 1 }];
+}
+function secretariaOccurrences() {
+    const occ = [];
+    for (const a of state.activities) {
+        if (a.is_custom || a.origen !== 'secretaria') continue;
+        for (const o of occurrencesOf(a)) occ.push(o);
+    }
+    return occ;
 }
 
-function cardHTML(act) {
-    const time = fmtTime(act.time);
+function cardHTML(occ) {
+    const act = occ.act;
+    const time = fmtTimeDisplay(act);
     const timeHtml = time ? esc(time) : '<span class="cmp-tbd">A definir</span>';
     const color = ESTADO_COLOR[act.estado] || '#cbd5e1';
 
@@ -98,12 +127,14 @@ function cardHTML(act) {
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     if (act.participants) meta.push(`<span><strong>Participa:</strong> ${esc(act.participants)}</span>`);
     const metaHtml = meta.length ? `<div class="cmp-meta">${meta.join('')}</div>` : '';
+    const dayBadge = occ.dayCount > 1 ? `<span class="cmp-daybadge">Día ${occ.dayIndex} de ${occ.dayCount}</span>` : '';
 
     return `
         <article class="cmp-card" data-id="${esc(act.id)}" style="border-left: 6px solid ${color};" title="Estado: ${esc(act.estado || 'Pendiente')}">
             <div class="cmp-time">${timeHtml}</div>
             <div class="cmp-body">
                 <h3 class="cmp-title">${esc(act.title) || '(Sin título)'}</h3>
+                ${dayBadge}
                 ${descHtml}
                 ${metaHtml}
             </div>
@@ -113,16 +144,21 @@ function cardHTML(act) {
 }
 
 function contentHTML(filter) {
-    const acts = secretariaActivities().filter(a => passesFilter(a, filter));
+    const occ = secretariaOccurrences()
+        .filter(o => passesFilter(o.occDate, filter))
+        .sort((a, b) => {
+            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
+            return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
+        });
 
-    if (acts.length === 0) {
+    if (occ.length === 0) {
         return '<div class="cmp-empty">No hay actividades para este filtro. Creá una con “Nueva actividad”.</div>';
     }
 
     const groups = new Map();
-    for (const act of acts) {
-        if (!groups.has(act.date)) groups.set(act.date, []);
-        groups.get(act.date).push(act);
+    for (const o of occ) {
+        if (!groups.has(o.occDate)) groups.set(o.occDate, []);
+        groups.get(o.occDate).push(o);
     }
 
     let html = '';
@@ -231,30 +267,37 @@ function openPrintModal() {
 }
 
 function printRange(from, to) {
-    const acts = secretariaActivities().filter(a => a.date >= from && a.date <= to);
+    const occ = secretariaOccurrences()
+        .filter(o => o.occDate >= from && o.occDate <= to)
+        .sort((a, b) => {
+            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
+            return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
+        });
 
     const groups = new Map();
-    for (const act of acts) {
-        if (!groups.has(act.date)) groups.set(act.date, []);
-        groups.get(act.date).push(act);
+    for (const o of occ) {
+        if (!groups.has(o.occDate)) groups.set(o.occDate, []);
+        groups.get(o.occDate).push(o);
     }
 
     let body = '';
-    if (acts.length === 0) {
+    if (occ.length === 0) {
         body = '<p>No hay actividades en el rango elegido.</p>';
     } else {
         for (const [date, items] of groups) {
             const h = dayHeader(date);
             body += `<div class="cmp-pa-day"><h2>${h.title} · ${h.date}</h2>`;
-            for (const act of items) {
-                const t = fmtTime(act.time);
+            for (const o of items) {
+                const act = o.act;
+                const t = fmtTimeDisplay(act);
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
+                const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
                 body += `<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
                     <div>
-                        <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
+                        <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}${dayTag}</div>
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
                         ${meta.length ? `<div class="cmp-pa-meta">${meta.join('<br>')}</div>` : ''}
                     </div>
