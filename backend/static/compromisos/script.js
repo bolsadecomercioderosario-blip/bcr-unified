@@ -9,6 +9,9 @@
 const TOKEN = window.location.pathname.split('/compromisos/')[1] || '';
 const API_URL = `/api/compromisos/${TOKEN}`;
 
+// Ícono de descarga (inline) para el link "Ver Información Adicional".
+const DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
 // State
 let activities = [];
 let currentFilter = 'proximas';
@@ -147,6 +150,9 @@ function renderActivity(occ) {
         meta.push(`<span class="activity-meta-item"><strong>Participa:</strong> ${esc(act.participants)}</span>`);
     }
     const metaHtml = meta.length ? `<div class="activity-meta">${meta.join('')}</div>` : '';
+    const attachHtml = act.attachment_url
+        ? `<div class="activity-attach"><a href="${esc(act.attachment_url)}" target="_blank" rel="noopener" download>${DOWNLOAD_ICON} Ver Información Adicional</a></div>`
+        : '';
 
     return `
         <article class="activity">
@@ -156,6 +162,7 @@ function renderActivity(occ) {
                 ${dayBadge}
                 ${descHtml}
                 ${metaHtml}
+                ${attachHtml}
             </div>
         </article>
     `;

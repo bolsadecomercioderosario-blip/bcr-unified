@@ -84,6 +84,14 @@ function esc(s) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Ícono de descarga (inline, no depende de lucide).
+const DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+function attachmentHTML(act) {
+    if (!act.attachment_url) return '';
+    return `<div class="cmp-attach"><a href="${esc(act.attachment_url)}" target="_blank" rel="noopener" download>${DOWNLOAD_ICON} Ver Información Adicional</a></div>`;
+}
+
 // --- Multi-día: enumera los días de un rango inclusive (con tope de seguridad) ---
 function eachDay(from, to) {
     const days = [];
@@ -137,6 +145,7 @@ function cardHTML(occ) {
                 ${dayBadge}
                 ${descHtml}
                 ${metaHtml}
+                ${attachmentHTML(act)}
             </div>
             <div class="cmp-edit-hint"><i data-lucide="pencil" style="width: 16px; height: 16px;"></i></div>
         </article>
@@ -216,6 +225,8 @@ export function renderAgendaCompromisos(container) {
     });
 
     content.addEventListener('click', (e) => {
+        // Si clickearon el link del adjunto, lo dejamos descargar (no abrimos el editor).
+        if (e.target.closest('a')) return;
         const card = e.target.closest('.cmp-card');
         if (card) window.openActivityDetail(card.dataset.id);
     });

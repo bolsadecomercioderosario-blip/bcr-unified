@@ -239,6 +239,26 @@ html, body {
     margin: 0 0 0.5rem;
     white-space: pre-wrap;
 }
+.activity-attach {
+    margin-top: 0.6rem;
+}
+.activity-attach a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--bcr-primary);
+    text-decoration: none;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: #f8fafc;
+}
+.activity-attach a:hover {
+    border-color: var(--bcr-primary);
+    background: #eef2ff;
+}
 
 /* --- Footer --- */
 .footer {

@@ -158,6 +158,10 @@ class CompromisoPublicOut(BaseModel):
     location: Optional[str] = ""
     observations: Optional[str] = ""
     participants: Optional[str] = ""
+    # Adjunto: se expone en la pública como "Ver Información Adicional". OJO: esto
+    # hace el archivo descargable por cualquiera con el link público (token).
+    attachment_url: Optional[str] = ""
+    attachment_name: Optional[str] = ""
 
     class Config:
         from_attributes = True
