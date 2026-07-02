@@ -1272,10 +1272,10 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 .cmp-title { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.4rem; color: #0f172a; }
 .cmp-meta {
     display: flex; flex-wrap: wrap; gap: 0.4rem 1rem;
-    font-size: 0.82rem; color: #64748b; margin-bottom: 0.55rem;
+    font-size: 0.82rem; color: #64748b; margin-bottom: 0;
 }
 .cmp-meta strong { color: #334155; font-weight: 600; }
-.cmp-desc { font-size: 0.92rem; color: #334155; line-height: 1.55; margin-top: 0.3rem; white-space: pre-wrap; }
+.cmp-desc { font-size: 0.92rem; color: #334155; line-height: 1.55; margin: 0 0 0.5rem; white-space: pre-wrap; }
 .cmp-edit-hint { align-self: center; color: #94a3b8; display: flex; }
 
 .cmp-footer {

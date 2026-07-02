@@ -108,23 +108,23 @@ function renderActivity(act) {
         ? `<div class="activity-time">${time}</div>`
         : `<div class="activity-time"><span class="tbd">A definir</span></div>`;
 
+    const descHtml = act.description ? `<div class="activity-description">${esc(act.description)}</div>` : '';
     const meta = [];
     if (act.location) {
         meta.push(`<span class="activity-meta-item"><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     }
     if (act.participants) {
-        meta.push(`<span class="activity-meta-item"><strong>Autoridades:</strong> ${esc(act.participants)}</span>`);
+        meta.push(`<span class="activity-meta-item"><strong>Participa:</strong> ${esc(act.participants)}</span>`);
     }
     const metaHtml = meta.length ? `<div class="activity-meta">${meta.join('')}</div>` : '';
-    const descHtml = act.description ? `<div class="activity-description">${esc(act.description)}</div>` : '';
 
     return `
         <article class="activity">
             ${timeHtml}
             <div class="activity-body">
                 <h3 class="activity-title">${esc(act.title) || '(Sin título)'}</h3>
-                ${metaHtml}
                 ${descHtml}
+                ${metaHtml}
             </div>
         </article>
     `;
@@ -225,13 +225,13 @@ function printRange(from, to) {
                 const t = formatTime(act.time);
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
-                if (act.participants) meta.push(`<strong>Autoridades:</strong> ${esc(act.participants)}`);
+                if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
                 body += `<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
                     <div>
                         <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
-                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
+                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
                     </div>
                 </div>`;
             }
