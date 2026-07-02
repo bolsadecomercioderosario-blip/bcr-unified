@@ -155,7 +155,7 @@ export function renderActivityForm(container, preData = null) {
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 1rem;">
-                        <label>Autoridades Presentes</label>
+                        <label>Participa</label>
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>
                     </fieldset>

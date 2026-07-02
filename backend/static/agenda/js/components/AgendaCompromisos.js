@@ -93,19 +93,19 @@ function cardHTML(act) {
     const timeHtml = time ? esc(time) : '<span class="cmp-tbd">A definir</span>';
     const color = ESTADO_COLOR[act.estado] || '#cbd5e1';
 
+    const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
     const meta = [];
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
-    if (act.participants) meta.push(`<span><strong>Autoridades:</strong> ${esc(act.participants)}</span>`);
+    if (act.participants) meta.push(`<span><strong>Participa:</strong> ${esc(act.participants)}</span>`);
     const metaHtml = meta.length ? `<div class="cmp-meta">${meta.join('')}</div>` : '';
-    const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
 
     return `
         <article class="cmp-card" data-id="${esc(act.id)}" style="border-left: 6px solid ${color};" title="Estado: ${esc(act.estado || 'Pendiente')}">
             <div class="cmp-time">${timeHtml}</div>
             <div class="cmp-body">
                 <h3 class="cmp-title">${esc(act.title) || '(Sin título)'}</h3>
-                ${metaHtml}
                 ${descHtml}
+                ${metaHtml}
             </div>
             <div class="cmp-edit-hint"><i data-lucide="pencil" style="width: 16px; height: 16px;"></i></div>
         </article>
@@ -250,13 +250,13 @@ function printRange(from, to) {
                 const t = fmtTime(act.time);
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
-                if (act.participants) meta.push(`<strong>Autoridades:</strong> ${esc(act.participants)}`);
+                if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
                 body += `<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${t ? esc(t) : 'A definir'}</div>
                     <div>
                         <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}</div>
-                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
+                        ${meta.length ? `<div class="cmp-pa-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>` : ''}
                     </div>
                 </div>`;
             }
@@ -280,7 +280,17 @@ function printRange(from, to) {
     `;
     document.body.appendChild(area);
 
-    const cleanup = () => { area.remove(); window.removeEventListener('afterprint', cleanup); };
+    // El título del documento aparece en el encabezado del PDF y como nombre de
+    // archivo por defecto. La app se llama "Agenda de Comunicación", así que lo
+    // pisamos con "Agenda de Compromisos" mientras dura la impresión.
+    const prevTitle = document.title;
+    document.title = 'Agenda de Compromisos';
+
+    const cleanup = () => {
+        area.remove();
+        document.title = prevTitle;
+        window.removeEventListener('afterprint', cleanup);
+    };
     window.addEventListener('afterprint', cleanup);
     window.print();
     // Fallback por si afterprint no dispara (algunos browsers).
