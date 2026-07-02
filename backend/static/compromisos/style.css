@@ -211,9 +211,10 @@ html, body {
     margin-bottom: 0;
 }
 .activity-meta-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
+    /* Bloque de texto normal: "Lugar: xxx" fluye como un párrafo y, si el valor
+       ocupa varias líneas, la etiqueta queda arriba a la izquierda (no centrada
+       verticalmente, que era el problema con inline-flex + align-items:center). */
+    display: block;
 }
 .activity-meta-item strong {
     color: var(--text-accent);
