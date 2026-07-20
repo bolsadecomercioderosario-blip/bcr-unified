@@ -10,6 +10,7 @@
  * Muestra sólo las actividades con origen='secretaria'.
  */
 import { state } from '../state.js';
+import { SEC_RESPONSABLES } from '../constants.js';
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -31,8 +32,11 @@ const FILTERS = [
     { key: 'todas', label: 'Todas' },
 ];
 
-// Filtro activo. Module-level para que sobreviva a los re-render del polling.
+// Filtros activos. Module-level para que sobrevivan a los re-render del polling.
 let currentFilter = 'proximas';
+let searchQuery = '';        // buscador por texto
+let responsableFilter = '';  // '' = todos; si no, un sec_responsible puntual
+let showPast = false;        // incluir actividades pasadas (icono)
 
 function todayISO() {
     const d = new Date(); d.setHours(0, 0, 0, 0);
@@ -152,16 +156,27 @@ function cardHTML(occ) {
     `;
 }
 
+function matchesText(act, q) {
+    if (!q) return true;
+    const hay = `${act.title || ''} ${act.description || ''} ${act.location || ''} ${act.participants || ''}`.toLowerCase();
+    return hay.includes(q);
+}
+
 function contentHTML(filter) {
+    const q = searchQuery.trim().toLowerCase();
+    const today = todayISO();
     const occ = secretariaOccurrences()
-        .filter(o => passesFilter(o.occDate, filter))
+        // Ventana temporal: lo que muestra la pastilla + (si "ver pasadas") lo pasado.
+        .filter(o => passesFilter(o.occDate, filter) || (showPast && o.occDate < today))
+        .filter(o => matchesText(o.act, q))
+        .filter(o => !responsableFilter || o.act.sec_responsible === responsableFilter)
         .sort((a, b) => {
             if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
             return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
         });
 
     if (occ.length === 0) {
-        return '<div class="cmp-empty">No hay actividades para este filtro. Creá una con “Nueva actividad”.</div>';
+        return '<div class="cmp-empty">No hay actividades para estos filtros.</div>';
     }
 
     const groups = new Map();
@@ -204,6 +219,20 @@ export function renderAgendaCompromisos(container) {
             ${FILTERS.map(f => `<button class="cmp-filter-btn" data-filter="${f.key}">${f.label}</button>`).join('')}
         </nav>
 
+        <div class="cmp-toolbar">
+            <div class="cmp-search">
+                <i data-lucide="search"></i>
+                <input id="cmp-search" type="text" placeholder="Buscar actividad..." value="${(searchQuery || '').replace(/"/g, '&quot;')}">
+            </div>
+            <select id="cmp-resp-filter" class="cmp-resp-filter" title="Filtrar por responsable">
+                <option value="">Todos los responsables</option>
+                ${SEC_RESPONSABLES.map(r => `<option value="${r}" ${responsableFilter === r ? 'selected' : ''}>${r}</option>`).join('')}
+            </select>
+            <button id="cmp-past-toggle" class="cmp-icon-btn" type="button" title="${showPast ? 'Ocultar pasadas' : 'Ver pasadas'}">
+                <i data-lucide="history"></i>
+            </button>
+        </div>
+
         <main class="cmp-content"></main>
 
         <footer class="cmp-footer">
@@ -214,14 +243,28 @@ export function renderAgendaCompromisos(container) {
     const content = wrapper.querySelector('.cmp-content');
     const filterBtns = wrapper.querySelectorAll('.cmp-filter-btn');
 
+    const pastBtn = wrapper.querySelector('#cmp-past-toggle');
+
     const paint = () => {
         filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === currentFilter));
+        if (pastBtn) pastBtn.classList.toggle('active', showPast);
         content.innerHTML = contentHTML(currentFilter);
         if (window.lucide) window.lucide.createIcons();
     };
 
     filterBtns.forEach(btn => {
         btn.onclick = () => { currentFilter = btn.dataset.filter; paint(); };
+    });
+
+    // Buscador, filtro por responsable e icono "ver pasadas".
+    const searchInput = wrapper.querySelector('#cmp-search');
+    searchInput.addEventListener('input', () => { searchQuery = searchInput.value; paint(); });
+    const respFilter = wrapper.querySelector('#cmp-resp-filter');
+    respFilter.addEventListener('change', () => { responsableFilter = respFilter.value; paint(); });
+    pastBtn.addEventListener('click', () => {
+        showPast = !showPast;
+        pastBtn.title = showPast ? 'Ocultar pasadas' : 'Ver pasadas';
+        paint();
     });
 
     content.addEventListener('click', (e) => {

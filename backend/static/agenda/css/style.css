@@ -1234,6 +1234,35 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 .cmp-filter-btn:hover { border-color: #0742ab; color: #0742ab; }
 .cmp-filter-btn.active { background: #0742ab; color: white; border-color: #0742ab; }
 
+/* Barra: buscador + filtro por responsable + icono "ver pasadas" */
+.cmp-toolbar {
+    max-width: 900px; margin: 0.85rem auto 0; padding: 0 1.25rem;
+    display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;
+}
+.cmp-search {
+    flex: 1 1 240px; min-width: 170px;
+    display: flex; align-items: center; gap: 0.5rem;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 0.6rem; padding: 0.5rem 0.75rem;
+}
+.cmp-search svg { width: 16px; height: 16px; color: #64748b; flex-shrink: 0; }
+.cmp-search input {
+    border: none; outline: none; width: 100%; background: transparent;
+    font-size: 0.9rem; font-family: inherit; color: #0f172a;
+}
+.cmp-resp-filter {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 0.6rem;
+    padding: 0.5rem 0.75rem; font-size: 0.88rem; font-family: inherit; color: #0f172a; cursor: pointer;
+}
+.cmp-icon-btn {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 0.6rem;
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #64748b;
+}
+.cmp-icon-btn svg { width: 18px; height: 18px; }
+.cmp-icon-btn:hover { border-color: #0742ab; color: #0742ab; }
+.cmp-icon-btn.active { background: #eef2ff; border-color: #0742ab; color: #0742ab; }
+
 .cmp-content { max-width: 900px; margin: 1.5rem auto; padding: 0 1.25rem 2rem; }
 .cmp-empty { text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.95rem; }
 

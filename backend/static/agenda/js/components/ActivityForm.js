@@ -1,5 +1,6 @@
 import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
 import { getRole } from '../role.js';
+import { SEC_RESPONSABLES } from '../constants.js';
 // Nota: los botones de "Generar con IA" en este modal se sacaron por seguridad
 // (no exponer la API key de OpenAI desde un endpoint público). La generación
 // IA queda sólo en el botón del bloque de Conectados.
@@ -84,7 +85,6 @@ export function renderActivityForm(container, preData = null) {
 
     // --- Sección "Estado" (sólo Secretaría) ---
     const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
-    const SEC_RESPONSABLES = ['Daniel Vicente', 'Jorge Magariños', 'Andrés Williams'];
     const secRespIsOther = act.sec_responsible === 'Otro';
     let estadoHTML = '';
     if (isSec) {
