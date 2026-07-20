@@ -162,35 +162,75 @@ function matchesText(act, q) {
     return hay.includes(q);
 }
 
-function contentHTML(filter) {
-    const q = searchQuery.trim().toLowerCase();
-    const today = todayISO();
-    const occ = secretariaOccurrences()
-        // Ventana temporal: lo que muestra la pastilla + (si "ver pasadas") lo pasado.
-        .filter(o => passesFilter(o.occDate, filter) || (showPast && o.occDate < today))
-        .filter(o => matchesText(o.act, q))
-        .filter(o => !responsableFilter || o.act.sec_responsible === responsableFilter)
-        .sort((a, b) => {
-            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
-            return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
-        });
+// Fecha compacta para la lista de pasadas: "mar 24/6".
+function shortDate(dateISO) {
+    const [y, m, d] = dateISO.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const wd = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][dt.getDay()];
+    return `${wd} ${d}/${m}`;
+}
 
-    if (occ.length === 0) {
-        return '<div class="cmp-empty">No hay actividades para estos filtros.</div>';
-    }
-
+// Futuras/actuales: agrupadas por día, tarjeta completa (ASC).
+function renderDayGroups(occList) {
     const groups = new Map();
-    for (const o of occ) {
+    for (const o of occList) {
         if (!groups.has(o.occDate)) groups.set(o.occDate, []);
         groups.get(o.occDate).push(o);
     }
-
     let html = '';
     for (const [date, items] of groups) {
         const h = dayHeader(date);
         html += `<section class="cmp-day-group">
             <h2 class="cmp-day-header">${h.title}<span class="cmp-day-date">${h.date}</span></h2>
             ${items.map(cardHTML).join('')}
+        </section>`;
+    }
+    return html;
+}
+
+// Pasadas: fila compacta y con menos peso visual (clickeable para ver detalle).
+function pastItemHTML(occ) {
+    const act = occ.act;
+    const dayTag = occ.dayCount > 1 ? ` · Día ${occ.dayIndex}/${occ.dayCount}` : '';
+    return `<div class="cmp-past-item" data-id="${esc(act.id)}">
+        <span class="cmp-past-date">${esc(shortDate(occ.occDate))}</span>
+        <span class="cmp-past-time">${esc(timeLabel(act))}</span>
+        <span class="cmp-past-title">${esc(act.title) || '(Sin título)'}${dayTag}</span>
+    </div>`;
+}
+
+function contentHTML(filter) {
+    const q = searchQuery.trim().toLowerCase();
+    const today = todayISO();
+    const all = secretariaOccurrences()
+        .filter(o => matchesText(o.act, q))
+        .filter(o => !responsableFilter || o.act.sec_responsible === responsableFilter);
+
+    // Futuras/actuales: de hoy en adelante, según la pastilla. ASC.
+    const future = all
+        .filter(o => o.occDate >= today && passesFilter(o.occDate, filter))
+        .sort((a, b) => {
+            if (a.occDate !== b.occDate) return a.occDate.localeCompare(b.occDate);
+            return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
+        });
+
+    // Pasadas: sólo con el toggle activo, más recientes primero (DESC).
+    const past = showPast
+        ? all.filter(o => o.occDate < today).sort((a, b) => {
+            if (a.occDate !== b.occDate) return b.occDate.localeCompare(a.occDate);
+            return (fmtTime(a.act.time) || '99:99').localeCompare(fmtTime(b.act.time) || '99:99');
+        })
+        : [];
+
+    if (future.length === 0 && past.length === 0) {
+        return '<div class="cmp-empty">No hay actividades para estos filtros.</div>';
+    }
+
+    let html = renderDayGroups(future);
+    if (past.length) {
+        html += `<section class="cmp-past-section">
+            <h2 class="cmp-past-header">Pasadas</h2>
+            ${past.map(pastItemHTML).join('')}
         </section>`;
     }
     return html;
@@ -270,8 +310,8 @@ export function renderAgendaCompromisos(container) {
     content.addEventListener('click', (e) => {
         // Si clickearon el link del adjunto, lo dejamos descargar (no abrimos el editor).
         if (e.target.closest('a')) return;
-        const card = e.target.closest('.cmp-card');
-        if (card) window.openActivityDetail(card.dataset.id);
+        const el = e.target.closest('.cmp-card, .cmp-past-item');
+        if (el) window.openActivityDetail(el.dataset.id);
     });
 
     wrapper.querySelector('#cmp-new-btn').onclick = () => window.openNewActivity();

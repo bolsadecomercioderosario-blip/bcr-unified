@@ -1321,6 +1321,21 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 .cmp-attach a:hover { border-color: #0742ab; background: #eef2ff; }
 .cmp-edit-hint { align-self: center; color: #94a3b8; display: flex; }
 
+/* Sección "Pasadas": compacta y con menos peso visual, clickeable */
+.cmp-past-section { margin-top: 2rem; }
+.cmp-past-header {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin: 0 0 0.4rem;
+}
+.cmp-past-item {
+    display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap;
+    padding: 0.5rem 0.55rem; border-bottom: 1px solid #f1f5f9; border-radius: 0.4rem; cursor: pointer;
+}
+.cmp-past-item:hover { background: #f8fafc; }
+.cmp-past-date { color: #94a3b8; font-weight: 600; font-size: 0.78rem; min-width: 60px; text-transform: capitalize; flex-shrink: 0; }
+.cmp-past-time { color: #94a3b8; font-size: 0.8rem; font-variant-numeric: tabular-nums; min-width: 46px; flex-shrink: 0; }
+.cmp-past-title { color: #475569; font-weight: 500; font-size: 0.88rem; flex: 1; min-width: 0; }
+
 .cmp-footer {
     text-align: center;
     padding: 1.5rem 1.25rem;
