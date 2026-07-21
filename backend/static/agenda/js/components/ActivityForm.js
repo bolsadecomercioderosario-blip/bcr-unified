@@ -61,6 +61,13 @@ export function renderActivityForm(container, preData = null) {
     const timeIsTbd = act.time === 'A definir';
     const timeIsNone = act.time === 'Sin horario';
     const timeDisabled = timeIsTbd || timeIsNone;
+    // En actividades de Secretaría vistas por Comunicación (solo lectura),
+    // ocultamos los campos de Datos Generales que estén vacíos.
+    const hasContent = (v) => v != null && String(v).trim() !== '';
+    const showGen = (v) => !generalsReadOnly || hasContent(v);
+    // Notas internas: sólo en actividades que vienen de Secretaría (no en las
+    // nativas de Comunicación).
+    const showNotes = showOperative && actOrigen === 'secretaria';
 
     // --- Bloque de adjunto (al final de Datos Generales) ---
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
@@ -175,24 +182,27 @@ export function renderActivityForm(container, preData = null) {
                         <label>Título</label>
                         <input type="text" name="title" value="${act.title}" placeholder="Ej: Lanzamiento de..." required>
                     </div>
+                    ${showGen(act.description) ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Descripción</label>
                         <textarea name="description" rows="3">${act.description}</textarea>
-                    </div>
+                    </div>` : ''}
+                    ${(showGen(act.location) || showGen(act.observations)) ? `
                     <div class="form-grid-2" style="margin-top: 1rem;">
-                        <div class="form-group">
+                        ${showGen(act.location) ? `<div class="form-group">
                             <label>Lugar</label>
                             <input type="text" name="location" value="${act.location}">
-                        </div>
-                        <div class="form-group">
+                        </div>` : ''}
+                        ${showGen(act.observations) ? `<div class="form-group">
                             <label>Observaciones</label>
                             <input type="text" name="observations" value="${act.observations}">
-                        </div>
-                    </div>
+                        </div>` : ''}
+                    </div>` : ''}
+                    ${showGen(act.participants) ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Participa</label>
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
-                    </div>
+                    </div>` : ''}
                     </fieldset>
                     ${attachmentHTML}
                 </section>
@@ -200,11 +210,13 @@ export function renderActivityForm(container, preData = null) {
                 ${estadoHTML}
 
                 ${showOperative ? `
+                ${showNotes ? `
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Notas internas · Comunicación</h3>
                     <p style="font-size: 0.78rem; color: var(--text-muted); margin: -0.5rem 0 0.6rem;">Sólo las ve Comunicación. No aparecen en la landing ni para Secretaría.</p>
-                    <textarea name="comunicacion_notes" rows="2" placeholder="Ej: va a haber mucha gente, conviene llegar temprano…" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.9rem; font-family: inherit; resize: vertical;">${act.comunicacion_notes}</textarea>
+                    <textarea name="comunicacion_notes" rows="5" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${act.comunicacion_notes}</textarea>
                 </section>
+                ` : ''}
 
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Operativo</h3>
@@ -619,8 +631,11 @@ export function renderActivityForm(container, preData = null) {
                 copy_instagram: formData.get('copy_instagram'),
                 copy_linkedin: formData.get('copy_linkedin'),
                 story_type: formData.get('story_type'),
-                comunicacion_notes: formData.get('comunicacion_notes'),
             };
+            // Notas internas: sólo se manda si el campo existe (actividad de
+            // Secretaría). En las nativas no se muestra, así que no lo pisamos.
+            const notesField = form.querySelector('[name="comunicacion_notes"]');
+            if (notesField) data.comunicacion_notes = notesField.value;
             // Los Datos Generales sólo se mandan si Comunicación es dueña de
             // ellos (actividad propia o nueva). En las de Secretaría quedan
             // intactos: no se incluyen, así el backend no los pisa.
