@@ -40,6 +40,8 @@ class AapShift(Base):
     end_time = Column(String(5), nullable=False)
     display_order = Column(Integer, default=0)
     active = Column(Boolean, default=True)
+    # Responsable del turno: texto libre (alguien escribe quién es).
+    responsible_name = Column(String(200), default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -91,13 +93,15 @@ class AapMeeting(Base):
     event_id = Column(Integer, ForeignKey("aap_events.id"), nullable=False)
     shift_id = Column(Integer, ForeignKey("aap_shifts.id"), nullable=True)  # calculado por horario
     title = Column(String(300), nullable=False)
-    organization = Column(String(300), default="")    # empresa/institución/contraparte
-    external_participants = Column(String(1000), default="")
+    organization = Column(String(300), default="")    # legacy, sin uso
+    external_participants = Column(String(1000), default="")  # legacy, sin uso
     date = Column(String(10), nullable=False)
-    start_time = Column(String(5), nullable=False)
+    start_time = Column(String(5), nullable=False, default="")  # ya no se usa hora
     end_time = Column(String(5), default="")
-    location = Column(String(300), default="")        # lugar/stand/punto de encuentro
-    responsible_person_id = Column(Integer, ForeignKey("aap_people.id"), nullable=True)
+    location = Column(String(300), default="")        # "Stand BCR" u otro espacio
+    area_id = Column(Integer, ForeignKey("aap_areas.id"), nullable=True)  # área de la BCR
+    responsible_name = Column(String(200), default="")  # quién carga (texto libre)
+    responsible_person_id = Column(Integer, ForeignKey("aap_people.id"), nullable=True)  # legacy, sin uso
     description = Column(Text, default="")
     notes = Column(Text, default="")
     status = Column(String(20), default="Tentativa")  # Tentativa|Confirmada|Realizada|Cancelada
@@ -226,9 +230,14 @@ class ShiftOut(BaseModel):
     end_time: str
     display_order: int
     active: bool
+    responsible_name: Optional[str] = ""
 
     class Config:
         from_attributes = True
+
+
+class ShiftResponsibleIn(BaseModel):
+    responsible_name: Optional[str] = ""
 
 
 class ShiftIn(BaseModel):
@@ -272,18 +281,12 @@ MEETING_STATUSES = ["Tentativa", "Confirmada", "Realizada", "Cancelada"]
 
 
 class MeetingIn(BaseModel):
-    title: str
-    organization: Optional[str] = ""
-    external_participants: Optional[str] = ""
-    date: str
-    start_time: str
-    end_time: Optional[str] = ""
-    location: Optional[str] = ""
-    responsible_person_id: Optional[int] = None
-    description: Optional[str] = ""
-    notes: Optional[str] = ""
+    shift_id: int
+    title: str                                # descripción / tema
+    responsible_name: Optional[str] = ""      # quién carga (texto libre)
+    area_id: Optional[int] = None             # área de la BCR
+    location: Optional[str] = ""              # "Stand BCR" u otro espacio
     status: Optional[str] = "Tentativa"
-    participant_ids: Optional[List[int]] = []
 
 
 class MeetingOut(BaseModel):
@@ -291,17 +294,11 @@ class MeetingOut(BaseModel):
     event_id: int
     shift_id: Optional[int] = None
     title: str
-    organization: Optional[str] = ""
-    external_participants: Optional[str] = ""
-    date: str
-    start_time: str
-    end_time: Optional[str] = ""
+    responsible_name: Optional[str] = ""
+    area_id: Optional[int] = None
     location: Optional[str] = ""
-    responsible_person_id: Optional[int] = None
-    description: Optional[str] = ""
-    notes: Optional[str] = ""
+    date: str
     status: str
-    participant_ids: List[int] = []
 
     class Config:
         from_attributes = True

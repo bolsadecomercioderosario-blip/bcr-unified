@@ -6,6 +6,7 @@ personas + presencias), ABM de áreas y personas, y CRUD de presencias
 (crear/editar/borrar/mover/duplicar, sin duplicar persona en el mismo turno).
 Todos los endpoints (menos login) requieren usuario autenticado.
 """
+import json
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -70,9 +71,7 @@ def _participant_ids(db: Session, meeting_id: int) -> List[int]:
 
 
 def _meeting_out(db: Session, mtg: m.AapMeeting) -> dict:
-    d = m.MeetingOut.model_validate(mtg).model_dump()
-    d["participant_ids"] = _participant_ids(db, mtg.id)
-    return d
+    return m.MeetingOut.model_validate(mtg).model_dump()
 
 
 def _set_participants(db: Session, meeting_id: int, person_ids: List[int]):
@@ -81,6 +80,49 @@ def _set_participants(db: Session, meeting_id: int, person_ids: List[int]):
     ).delete()
     for pid in set(person_ids or []):
         db.add(m.AapMeetingParticipant(meeting_id=meeting_id, person_id=pid))
+
+
+# --- Auditoría (historial simple) ---
+def _snap(db: Session, entity_type: str, obj) -> dict:
+    """Resumen legible de un registro para el historial."""
+    if obj is None:
+        return {}
+    if entity_type == "attendance":
+        p = db.get(m.AapPerson, obj.person_id)
+        s = db.get(m.AapShift, obj.shift_id)
+        return {"persona": p.full_name if p else obj.person_id,
+                "turno": (f"{s.date} {s.name}" if s else obj.shift_id),
+                "responsable": bool(obj.is_shift_responsible)}
+    if entity_type == "meeting":
+        return {"titulo": obj.title, "fecha": obj.date, "inicio": obj.start_time, "estado": obj.status}
+    if entity_type == "person":
+        return {"nombre": obj.full_name, "area_id": obj.area_id, "activa": bool(obj.active)}
+    if entity_type == "area":
+        return {"nombre": obj.name, "activa": bool(obj.active)}
+    if entity_type == "shift":
+        return {"turno": f"{obj.date} {obj.name}", "responsable": obj.responsible_name}
+    return {}
+
+
+def _audit(db: Session, user, entity_type: str, entity_id, action: str, prev=None, new=None):
+    """Registra un cambio. No commitea: se persiste con el commit del caller."""
+    db.add(m.AapAudit(
+        user_id=user.id, user_email=user.email, entity_type=entity_type,
+        entity_id=entity_id, action=action,
+        previous_data=json.dumps(prev or {}, ensure_ascii=False, default=str),
+        new_data=json.dumps(new or {}, ensure_ascii=False, default=str),
+    ))
+
+
+@router.get("/audit")
+def get_audit(user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+    rows = db.query(m.AapAudit).order_by(m.AapAudit.id.desc()).limit(150).all()
+    return [{
+        "id": r.id, "user_email": r.user_email, "entity_type": r.entity_type,
+        "entity_id": r.entity_id, "action": r.action,
+        "previous_data": r.previous_data, "new_data": r.new_data,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in rows]
 
 
 @router.get("/state")
@@ -199,6 +241,7 @@ def create_attendance(payload: m.AttendanceIn, user: m.AapUser = Depends(require
         event_id=ev.id, created_by=user.id, updated_by=user.id, **payload.model_dump(),
     )
     db.add(att); db.commit(); db.refresh(att)
+    _audit(db, user, "attendance", att.id, "create", new=_snap(db, "attendance", att)); db.commit()
     return att
 
 
@@ -212,10 +255,12 @@ def update_attendance(att_id: int, payload: m.AttendanceUpdate, user: m.AapUser 
     new_person = data.get("person_id", att.person_id)
     if _dup_exists(db, new_shift, new_person, exclude_id=att_id):
         raise HTTPException(status_code=409, detail="Esa persona ya está en ese turno.")
+    prev = _snap(db, "attendance", att)
     for k, v in data.items():
         setattr(att, k, v)
     att.updated_by = user.id
     db.commit(); db.refresh(att)
+    _audit(db, user, "attendance", att.id, "update", prev=prev, new=_snap(db, "attendance", att)); db.commit()
     return att
 
 
@@ -244,6 +289,7 @@ def delete_attendance(att_id: int, user: m.AapUser = Depends(require_user), db: 
     att = db.query(m.AapAttendance).filter(m.AapAttendance.id == att_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="Presencia no encontrada")
+    _audit(db, user, "attendance", att.id, "delete", prev=_snap(db, "attendance", att))
     db.delete(att); db.commit()
     return {"ok": True}
 
@@ -274,29 +320,33 @@ def update_shift(shift_id: int, payload: m.ShiftIn, user: m.AapUser = Depends(re
 # Reuniones
 # ---------------------------------------------------------
 def _validate_meeting(payload: m.MeetingIn):
-    # Validación dura: sin esto no se guarda (las advertencias son del front).
     if not (payload.title or "").strip():
-        raise HTTPException(status_code=400, detail="La reunión necesita un título.")
-    if not (payload.date or "").strip() or not (payload.start_time or "").strip():
-        raise HTTPException(status_code=400, detail="La reunión necesita fecha y hora de inicio.")
-    if not payload.responsible_person_id:
-        raise HTTPException(status_code=400, detail="La reunión necesita un responsable.")
+        raise HTTPException(status_code=400, detail="La reunión necesita una descripción.")
     if payload.status and payload.status not in m.MEETING_STATUSES:
         raise HTTPException(status_code=400, detail="Estado inválido.")
+
+
+def _apply_meeting(mtg: m.AapMeeting, payload: m.MeetingIn, shift: m.AapShift):
+    mtg.shift_id = shift.id
+    mtg.date = shift.date
+    mtg.title = payload.title.strip()
+    mtg.responsible_name = (payload.responsible_name or "").strip()
+    mtg.area_id = payload.area_id
+    mtg.location = (payload.location or "").strip()
+    mtg.status = payload.status or "Tentativa"
 
 
 @router.post("/meetings")
 def create_meeting(payload: m.MeetingIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
     _validate_meeting(payload)
     ev = _active_event(db)
-    data = payload.model_dump(exclude={"participant_ids"})
-    mtg = m.AapMeeting(
-        event_id=ev.id,
-        shift_id=_shift_for(db, ev.id, payload.date, payload.start_time),
-        created_by=user.id, updated_by=user.id, **data,
-    )
+    shift = db.get(m.AapShift, payload.shift_id)
+    if not shift:
+        raise HTTPException(status_code=400, detail="Turno inválido")
+    mtg = m.AapMeeting(event_id=ev.id, created_by=user.id, updated_by=user.id)
+    _apply_meeting(mtg, payload, shift)
     db.add(mtg); db.commit(); db.refresh(mtg)
-    _set_participants(db, mtg.id, payload.participant_ids); db.commit()
+    _audit(db, user, "meeting", mtg.id, "create", new=_snap(db, "meeting", mtg)); db.commit()
     return _meeting_out(db, mtg)
 
 
@@ -306,14 +356,27 @@ def update_meeting(meeting_id: int, payload: m.MeetingIn, user: m.AapUser = Depe
     mtg = db.query(m.AapMeeting).filter(m.AapMeeting.id == meeting_id).first()
     if not mtg:
         raise HTTPException(status_code=404, detail="Reunión no encontrada")
-    data = payload.model_dump(exclude={"participant_ids"})
-    for k, v in data.items():
-        setattr(mtg, k, v)
-    mtg.shift_id = _shift_for(db, mtg.event_id, payload.date, payload.start_time)
+    shift = db.get(m.AapShift, payload.shift_id)
+    if not shift:
+        raise HTTPException(status_code=400, detail="Turno inválido")
+    prev = _snap(db, "meeting", mtg)
+    _apply_meeting(mtg, payload, shift)
     mtg.updated_by = user.id
-    _set_participants(db, mtg.id, payload.participant_ids)
     db.commit(); db.refresh(mtg)
+    _audit(db, user, "meeting", mtg.id, "update", prev=prev, new=_snap(db, "meeting", mtg)); db.commit()
     return _meeting_out(db, mtg)
+
+
+@router.put("/shifts/{shift_id}/responsible", response_model=m.ShiftOut)
+def set_shift_responsible(shift_id: int, payload: m.ShiftResponsibleIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+    shift = db.get(m.AapShift, shift_id)
+    if not shift:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+    prev = shift.responsible_name
+    shift.responsible_name = (payload.responsible_name or "").strip()
+    db.commit(); db.refresh(shift)
+    _audit(db, user, "shift", shift.id, "update", prev={"responsable": prev}, new={"responsable": shift.responsible_name}); db.commit()
+    return shift
 
 
 @router.delete("/meetings/{meeting_id}")
@@ -321,6 +384,7 @@ def delete_meeting(meeting_id: int, user: m.AapUser = Depends(require_user), db:
     mtg = db.query(m.AapMeeting).filter(m.AapMeeting.id == meeting_id).first()
     if not mtg:
         raise HTTPException(status_code=404, detail="Reunión no encontrada")
+    _audit(db, user, "meeting", mtg.id, "delete", prev=_snap(db, "meeting", mtg))
     db.query(m.AapMeetingParticipant).filter(m.AapMeetingParticipant.meeting_id == meeting_id).delete()
     db.delete(mtg); db.commit()
     return {"ok": True}

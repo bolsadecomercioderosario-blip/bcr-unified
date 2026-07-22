@@ -105,6 +105,14 @@ def migrate():
     seed_efemerides_if_empty()
     seed_metricas_if_empty()
 
+    # Columnas nuevas del módulo Aapresid (tablero simplificado)
+    _try_exec("ALTER aap_shifts add responsible_name",
+              "ALTER TABLE aap_shifts ADD COLUMN responsible_name VARCHAR DEFAULT ''")
+    _try_exec("ALTER aap_meetings add area_id",
+              "ALTER TABLE aap_meetings ADD COLUMN area_id INTEGER")
+    _try_exec("ALTER aap_meetings add responsible_name",
+              "ALTER TABLE aap_meetings ADD COLUMN responsible_name VARCHAR DEFAULT ''")
+
     from aapresid.seed import seed_aapresid_if_empty
     seed_aapresid_if_empty()
 
