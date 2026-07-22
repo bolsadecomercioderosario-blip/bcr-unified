@@ -99,7 +99,7 @@ class AapMeeting(Base):
     start_time = Column(String(5), nullable=False, default="")  # ya no se usa hora
     end_time = Column(String(5), default="")
     location = Column(String(300), default="")        # "Stand BCR" u otro espacio
-    area_id = Column(Integer, ForeignKey("aap_areas.id"), nullable=True)  # área de la BCR
+    area_name = Column(String(200), default="")       # área de la BCR (texto libre)
     responsible_name = Column(String(200), default="")  # quién carga (texto libre)
     responsible_person_id = Column(Integer, ForeignKey("aap_people.id"), nullable=True)  # legacy, sin uso
     description = Column(Text, default="")
@@ -284,7 +284,7 @@ class MeetingIn(BaseModel):
     shift_id: int
     title: str                                # descripción / tema
     responsible_name: Optional[str] = ""      # quién carga (texto libre)
-    area_id: Optional[int] = None             # área de la BCR
+    area_name: Optional[str] = ""             # área de la BCR (texto libre)
     location: Optional[str] = ""              # "Stand BCR" u otro espacio
     status: Optional[str] = "Tentativa"
 
@@ -295,7 +295,7 @@ class MeetingOut(BaseModel):
     shift_id: Optional[int] = None
     title: str
     responsible_name: Optional[str] = ""
-    area_id: Optional[int] = None
+    area_name: Optional[str] = ""
     location: Optional[str] = ""
     date: str
     status: str

@@ -331,7 +331,7 @@ def _apply_meeting(mtg: m.AapMeeting, payload: m.MeetingIn, shift: m.AapShift):
     mtg.date = shift.date
     mtg.title = payload.title.strip()
     mtg.responsible_name = (payload.responsible_name or "").strip()
-    mtg.area_id = payload.area_id
+    mtg.area_name = (payload.area_name or "").strip()
     mtg.location = (payload.location or "").strip()
     mtg.status = payload.status or "Tentativa"
 

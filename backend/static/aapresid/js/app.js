@@ -131,7 +131,7 @@
       ? `<div class="turn-resp"><span class="resp-badge">★ ${esc(s.responsible_name)}</span><button class="link-btn" data-action="set-resp" data-shift="${s.id}">cambiar</button></div>`
       : `<div class="turn-resp"><span class="no-resp">⚠ Sin responsable</span><button class="btn-soft btn-sm" data-action="set-resp" data-shift="${s.id}">Designar responsable</button></div>`;
     const mrows = meetingsForShift(s.id).map(mt => {
-      const meta = [areaName(mt.area_id), mt.responsible_name, mt.location].filter(Boolean).map(esc).join(' · ');
+      const meta = [mt.area_name, mt.responsible_name, mt.location].filter(Boolean).map(esc).join(' · ');
       return `<div class="mcard ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
         <div class="mcard-top"><span class="mtitle">${esc(mt.title)}</span><span class="mstatus ${statusClass(mt.status)}">${esc(mt.status)}</span></div>
         ${meta ? `<div class="mmeta">${meta}</div>` : ''}
@@ -187,8 +187,6 @@
     const editing = !!mtg;
     const sid = editing ? mtg.shift_id : shiftId;
     const s = STATE.shifts.find(x => x.id === sid);
-    const areaOpts = STATE.areas.filter(a => a.active || (editing && a.id === mtg.area_id))
-      .map(a => `<option value="${a.id}" ${editing && mtg.area_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
     const statusOpts = MEETING_STATUSES.map(st => `<option ${editing && mtg.status === st ? 'selected' : ''}>${st}</option>`).join('');
     const isOtro = editing && mtg.location && mtg.location !== 'Stand BCR';
     openModal(`
@@ -198,7 +196,7 @@
       <textarea id="mf-title" rows="2" placeholder="¿De qué se trata?">${editing ? esc(mtg.title) : ''}</textarea>
       <div class="grid-2">
         <div><label>Responsable (quién carga)</label><input id="mf-resp" type="text" value="${editing ? esc(mtg.responsible_name || '') : ''}" placeholder="Nombre"></div>
-        <div><label>Área de la BCR</label><select id="mf-area"><option value="">— Elegir —</option>${areaOpts}</select></div>
+        <div><label>Área de la BCR</label><input id="mf-area" type="text" value="${editing ? esc(mtg.area_name || '') : ''}" placeholder="Ej: Comunicación"></div>
       </div>
       <div class="grid-2">
         <div><label>Estado</label><select id="mf-status">${statusOpts}</select></div>
@@ -220,7 +218,7 @@
       const body = {
         shift_id: sid, title,
         responsible_name: el('mf-resp').value.trim(),
-        area_id: el('mf-area').value ? Number(el('mf-area').value) : null,
+        area_name: el('mf-area').value.trim(),
         location, status: el('mf-status').value,
       };
       try {

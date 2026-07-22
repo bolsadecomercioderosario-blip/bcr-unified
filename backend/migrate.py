@@ -108,8 +108,8 @@ def migrate():
     # Columnas nuevas del módulo Aapresid (tablero simplificado)
     _try_exec("ALTER aap_shifts add responsible_name",
               "ALTER TABLE aap_shifts ADD COLUMN responsible_name VARCHAR DEFAULT ''")
-    _try_exec("ALTER aap_meetings add area_id",
-              "ALTER TABLE aap_meetings ADD COLUMN area_id INTEGER")
+    _try_exec("ALTER aap_meetings add area_name",
+              "ALTER TABLE aap_meetings ADD COLUMN area_name VARCHAR DEFAULT ''")
     _try_exec("ALTER aap_meetings add responsible_name",
               "ALTER TABLE aap_meetings ADD COLUMN responsible_name VARCHAR DEFAULT ''")
 
