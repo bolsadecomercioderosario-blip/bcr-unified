@@ -119,6 +119,25 @@ button { font-family: inherit; }
 .chk { display: flex; align-items: center; gap: .4rem; font-size: .86rem; font-weight: 400; cursor: pointer; margin: 0; }
 .chk input { width: auto; margin: 0; }
 
+/* --- Filtros + KPIs por día + detalle --- */
+.byday { font-size: .82rem; color: var(--muted); margin: -.4rem 0 1rem; display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.byday .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: .12rem .6rem; }
+.byday b { color: var(--text); }
+.filterbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+.filterbar select, .f-search { padding: .45rem .6rem; border: 1px solid var(--border); border-radius: .5rem; font-size: .86rem; font-family: inherit; background: #fff; color: var(--text); }
+.f-search { flex: 1 1 220px; min-width: 160px; }
+.f-check { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; cursor: pointer; }
+.f-check input { margin: 0; }
+.clickable { cursor: pointer; }
+.list-row .clickable:hover, .d-row.clickable:hover { background: #f8fafc; border-radius: 6px; }
+.detail { padding: 1rem 1.1rem; }
+.detail .d-meta { color: var(--muted); font-size: .9rem; margin-bottom: .4rem; }
+.d-sec { margin-top: 1rem; }
+.d-sec h4 { margin: 0 0 .4rem; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: .25rem; }
+.d-row { padding: .38rem .3rem; border-bottom: 1px solid #f6f8fb; font-size: .9rem; }
+.d-row:last-child { border-bottom: none; }
+.d-row.nocov { color: var(--muted); }
+
 /* --- Buttons --- */
 .btn-primary { background: var(--primary); color: #fff; border: none; padding: .55rem 1rem; border-radius: .5rem; font-weight: 600; cursor: pointer; font-size: .9rem; }
 .btn-primary:hover { background: var(--primary-dark); }

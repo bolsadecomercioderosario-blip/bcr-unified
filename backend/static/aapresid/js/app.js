@@ -8,6 +8,9 @@
   let STATE = { event: null, shifts: [], areas: [], people: [], attendance: [], meetings: [] };
   let ME = null;
   let currentView = 'board';
+  let FILTERS = { q: '', day: '', shift: '', area: '', responsible: '', status: '', noResp: false };
+  let detailPersonId = null, detailAreaId = null;
+  const filtersActive = () => FILTERS.q || FILTERS.day || FILTERS.shift || FILTERS.area || FILTERS.responsible || FILTERS.status || FILTERS.noResp;
 
   const $ = (s) => document.querySelector(s);
   const el = (id) => document.getElementById(id);
@@ -71,6 +74,57 @@
         });
     });
     return [...new Set(w)];
+  }
+
+  // --- Filtros ---
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const contentFilterActive = () => FILTERS.area || FILTERS.q || FILTERS.status;
+  function shiftPassesLevel(s) {
+    if (FILTERS.day && s.date !== FILTERS.day) return false;
+    if (FILTERS.shift && s.name !== FILTERS.shift) return false;
+    if (FILTERS.noResp && STATE.attendance.some(a => a.shift_id === s.id && a.is_shift_responsible)) return false;
+    if (FILTERS.responsible && !STATE.attendance.some(a => a.shift_id === s.id && a.person_id === Number(FILTERS.responsible) && a.is_shift_responsible)) return false;
+    return true;
+  }
+  function attPasses(a) {
+    const p = personById(a.person_id); if (!p) return false;
+    if (FILTERS.area && p.area_id !== Number(FILTERS.area)) return false;
+    if (FILTERS.q && !norm(p.full_name).includes(norm(FILTERS.q))) return false;
+    return true;
+  }
+  function mtgAreas(mt) {
+    return [mt.responsible_person_id, ...(mt.participant_ids || [])].filter(Boolean)
+      .map(id => { const p = personById(id); return p ? p.area_id : null; }).filter(Boolean);
+  }
+  function mtgPasses(mt) {
+    if (FILTERS.status && mt.status !== FILTERS.status) return false;
+    if (FILTERS.area && !mtgAreas(mt).includes(Number(FILTERS.area))) return false;
+    if (FILTERS.responsible && mt.responsible_person_id !== Number(FILTERS.responsible)) return false;
+    if (FILTERS.q && !norm(`${mt.title || ''} ${mt.organization || ''} ${mt.external_participants || ''}`).includes(norm(FILTERS.q))) return false;
+    return true;
+  }
+  function fullKpis() {
+    const att = STATE.attendance, mtgs = STATE.meetings;
+    const distinct = new Set(att.map(a => a.person_id)).size;
+    const byDay = [...new Set(STATE.shifts.map(s => s.date))].sort().map(d => {
+      const sids = STATE.shifts.filter(s => s.date === d).map(s => s.id);
+      return { date: d, n: new Set(att.filter(a => sids.includes(a.shift_id)).map(a => a.person_id)).size };
+    });
+    const noResp = STATE.shifts.filter(s => !att.some(a => a.shift_id === s.id && a.is_shift_responsible)).length;
+    const overlap = new Set();
+    STATE.people.forEach(p => {
+      const mine = mtgs.filter(mt => mt.responsible_person_id === p.id || (mt.participant_ids || []).includes(p.id));
+      for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) {
+        const a = mine[i], b = mine[j];
+        if (a.date === b.date && timeOverlap(a.start_time, a.end_time || a.start_time, b.start_time, b.end_time || b.start_time)) overlap.add(p.id);
+      }
+    });
+    return {
+      distinct, byDay, noResp, totalMtg: mtgs.length,
+      tent: mtgs.filter(x => x.status === 'Tentativa').length,
+      conf: mtgs.filter(x => x.status === 'Confirmada').length,
+      overlap: overlap.size, presencias: att.length,
+    };
   }
 
   function toast(msg, type) {
@@ -168,28 +222,59 @@
     if (currentView === 'agenda') return renderAgenda();
     if (currentView === 'people') return renderPeople();
     if (currentView === 'areas') return renderAreas();
+    if (currentView === 'person-detail') return renderPersonDetail(detailPersonId);
+    if (currentView === 'area-detail') return renderAreaDetail(detailAreaId);
+  }
+
+  function goView(v) {
+    currentView = v;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === v));
+    renderView();
   }
 
   // ---------------- BOARD ----------------
   function renderBoard() {
-    const dayIdx = dayIndexMap();
-    const att = STATE.attendance;
-    const mtgs = STATE.meetings;
-    const distinctPeople = new Set(att.map(a => a.person_id)).size;
-    const shiftsNoResp = STATE.shifts.filter(s => !att.some(a => a.shift_id === s.id && a.is_shift_responsible)).length;
-    const kpis = [
-      { n: distinctPeople, l: 'Personas' },
-      { n: att.length, l: 'Presencias' },
-      { n: mtgs.length, l: 'Reuniones' },
-      { n: mtgs.filter(x => x.status === 'Tentativa').length, l: 'Tentativas' },
-      { n: mtgs.filter(x => x.status === 'Confirmada').length, l: 'Confirmadas' },
-      { n: shiftsNoResp, l: 'Turnos sin responsable', warn: shiftsNoResp > 0 },
+    const k = fullKpis();
+    const kpiCards = [
+      { n: k.distinct, l: 'Personas' }, { n: k.presencias, l: 'Presencias' },
+      { n: k.totalMtg, l: 'Reuniones' }, { n: k.tent, l: 'Tentativas' },
+      { n: k.conf, l: 'Confirmadas' }, { n: k.noResp, l: 'Turnos sin responsable', warn: k.noResp > 0 },
+      { n: k.overlap, l: 'Personas superpuestas', warn: k.overlap > 0 },
     ];
-    const kpiHtml = kpis.map(k => `<div class="kpi ${k.warn ? 'warn' : ''}"><div class="n">${k.n}</div><div class="l">${k.l}</div></div>`).join('');
+    const kpiHtml = kpiCards.map(c => `<div class="kpi ${c.warn ? 'warn' : ''}"><div class="n">${c.n}</div><div class="l">${c.l}</div></div>`).join('');
+    const byDayHtml = k.byDay.map(d => `<span class="chip">${dayName(d.date)}: <b>${d.n}</b></span>`).join('');
+    const dates = [...new Set(STATE.shifts.map(s => s.date))].sort();
+    const shiftNames = [...new Set(STATE.shifts.map(s => s.name))];
+    const sel = (v, cur) => v === cur ? 'selected' : '';
+    $('#view').innerHTML = `
+      <div class="view-head"><h2>Tablero de cobertura</h2></div>
+      <div class="kpis">${kpiHtml}</div>
+      ${byDayHtml ? `<div class="byday">Personas por día — ${byDayHtml}</div>` : ''}
+      <div class="filterbar">
+        <input id="f-q" class="f-search" type="text" placeholder="Buscar persona, reunión, empresa…" value="${esc(FILTERS.q)}">
+        <select id="f-day"><option value="">Todos los días</option>${dates.map(d => `<option value="${d}" ${sel(d, FILTERS.day)}>${dayName(d)} ${dateLabel(d)}</option>`).join('')}</select>
+        <select id="f-shift"><option value="">Todos los turnos</option>${shiftNames.map(n => `<option value="${n}" ${sel(n, FILTERS.shift)}>${esc(n)}</option>`).join('')}</select>
+        <select id="f-area"><option value="">Todas las áreas</option>${STATE.areas.filter(a => a.active).map(a => `<option value="${a.id}" ${sel(String(a.id), FILTERS.area)}>${esc(a.name)}</option>`).join('')}</select>
+        <select id="f-resp"><option value="">Cualquier responsable</option>${STATE.people.map(p => `<option value="${p.id}" ${sel(String(p.id), FILTERS.responsible)}>${esc(p.full_name)}</option>`).join('')}</select>
+        <select id="f-status"><option value="">Todos los estados</option>${MEETING_STATUSES.map(s => `<option value="${s}" ${sel(s, FILTERS.status)}>${s}</option>`).join('')}</select>
+        <label class="f-check"><input type="checkbox" id="f-noresp" ${FILTERS.noResp ? 'checked' : ''}> Sin responsable</label>
+        <button class="btn-line btn-sm ${filtersActive() ? '' : 'hidden'}" id="f-clear">Limpiar filtros</button>
+      </div>
+      <div id="board-content"></div>`;
+    const wire = (id, prop, ev) => { const e = el(id); if (e) e.addEventListener(ev || 'change', () => { FILTERS[prop] = (e.type === 'checkbox') ? e.checked : e.value; el('f-clear').classList.toggle('hidden', !filtersActive()); renderBoardContent(); }); };
+    wire('f-q', 'q', 'input'); wire('f-day', 'day'); wire('f-shift', 'shift'); wire('f-area', 'area'); wire('f-resp', 'responsible'); wire('f-status', 'status'); wire('f-noresp', 'noResp');
+    el('f-clear').onclick = () => { FILTERS = { q: '', day: '', shift: '', area: '', responsible: '', status: '', noResp: false }; renderBoard(); };
+    renderBoardContent();
+  }
 
-    const blocks = STATE.shifts.map(s => {
-      const atts = att.filter(a => a.shift_id === s.id);
-      const resps = atts.filter(a => a.is_shift_responsible).map(a => personById(a.person_id)).filter(Boolean);
+  function renderBoardContent() {
+    const dayIdx = dayIndexMap();
+    const blocks = STATE.shifts.filter(shiftPassesLevel).map(s => {
+      const attsAll = STATE.attendance.filter(a => a.shift_id === s.id);
+      const atts = attsAll.filter(attPasses);
+      const mtgs = meetingsForShift(s.id).filter(mtgPasses);
+      if (contentFilterActive() && atts.length === 0 && mtgs.length === 0) return '';
+      const resps = attsAll.filter(a => a.is_shift_responsible).map(a => personById(a.person_id)).filter(Boolean);
       const respHtml = resps.length
         ? resps.map(p => `<span class="resp-badge">★ ${esc(p.full_name)}</span>`).join('')
         : `<span class="no-resp">⚠ Sin responsable</span>`;
@@ -202,8 +287,8 @@
               ${p.area_id ? `<span class="parea">${esc(areaName(p.area_id))}</span>` : ''}
             </div>`;
           }).join('')
-        : `<div class="block-empty">Sin personas asignadas.</div>`;
-      const mrows = meetingsForShift(s.id).map(mt =>
+        : `<div class="block-empty">Sin personas${contentFilterActive() ? ' (con estos filtros)' : ' asignadas'}.</div>`;
+      const mrows = mtgs.map(mt =>
         `<div class="mrow ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
           <span class="mtime">${esc(mt.start_time)}</span>
           <span class="mtitle">${esc(mt.title)}</span>
@@ -226,19 +311,15 @@
           </div>
         </div>
       </div>`;
-    }).join('');
-
-    $('#view').innerHTML = `
-      <div class="view-head"><h2>Tablero de cobertura</h2></div>
-      <div class="kpis">${kpiHtml}</div>
-      <div class="board">${blocks}</div>`;
+    }).filter(Boolean).join('');
+    el('board-content').innerHTML = blocks ? `<div class="board">${blocks}</div>` : `<div class="empty-state">No hay resultados para estos filtros.</div>`;
   }
 
   // ---------------- PEOPLE ----------------
   function renderPeople() {
     const rows = STATE.people.map(p => `
       <div class="list-row">
-        <div class="grow">
+        <div class="grow clickable" data-action="view-person" data-id="${p.id}">
           <div class="rname">${esc(p.full_name)} ${p.active ? '' : '<span class="badge off">inactiva</span>'}</div>
           <div class="rmeta">${p.area_id ? esc(areaName(p.area_id)) : 'Sin área'}${p.role ? ' · ' + esc(p.role) : ''}${p.email ? ' · ' + esc(p.email) : ''}</div>
         </div>
@@ -253,7 +334,7 @@
   function renderAreas() {
     const rows = STATE.areas.map(a => `
       <div class="list-row">
-        <div class="grow">
+        <div class="grow clickable" data-action="view-area" data-id="${a.id}">
           <div class="rname">${esc(a.name)} ${a.active ? '<span class="badge on">activa</span>' : '<span class="badge off">inactiva</span>'}</div>
           <div class="rmeta">${esc(a.description || '')}${a.responsible ? ' · Ref: ' + esc(a.responsible) : ''}</div>
         </div>
@@ -262,6 +343,52 @@
     $('#view').innerHTML = `
       <div class="view-head"><h2>Áreas de la BCR</h2><button class="btn-primary" data-action="new-area">+ Nueva área</button></div>
       <div class="card">${rows}</div>`;
+  }
+
+  // ---------------- DETALLE POR PERSONA ----------------
+  function renderPersonDetail(pid) {
+    const p = personById(pid);
+    if (!p) { $('#view').innerHTML = `<div class="empty-state">Persona no encontrada.</div>`; return; }
+    const myAtt = STATE.attendance.filter(a => a.person_id === pid);
+    const shiftsHtml = myAtt.length ? myAtt.map(a => {
+      const s = shiftById(a.shift_id); if (!s) return '';
+      const hrs = (a.start_time || a.end_time) ? ` <span class="rmeta">(ingreso ${esc(a.start_time || '?')} · salida ${esc(a.end_time || '?')})</span>` : '';
+      return `<div class="d-row">${a.is_shift_responsible ? '<span class="pstar">★</span> ' : ''}${dayName(s.date)} ${dateLabel(s.date)} · ${esc(s.name)} ${esc(s.start_time)}–${esc(s.end_time)}${hrs}${a.event_role ? ' · ' + esc(a.event_role) : ''}${a.notes ? ' · <i>' + esc(a.notes) + '</i>' : ''}</div>`;
+    }).join('') : '<div class="rmeta">Sin turnos asignados.</div>';
+    const asResp = STATE.meetings.filter(mt => mt.responsible_person_id === pid);
+    const asPart = STATE.meetings.filter(mt => (mt.participant_ids || []).includes(pid) && mt.responsible_person_id !== pid);
+    const mline = (mt) => `<div class="d-row clickable" data-action="edit-meeting" data-id="${mt.id}">${dayName(mt.date)} ${esc(mt.start_time)} · ${esc(mt.title)} <span class="mstatus ${statusClass(mt.status)}">${esc(mt.status)}</span>${mt.organization ? ' · ' + esc(mt.organization) : ''}</div>`;
+    $('#view').innerHTML = `
+      <div class="view-head"><h2>${esc(p.full_name)}</h2><button class="btn-line" data-action="back-people">← Volver</button></div>
+      <div class="card detail">
+        <div class="d-meta">${p.area_id ? '<span class="badge area">' + esc(areaName(p.area_id)) + '</span> ' : ''}${p.role ? esc(p.role) + ' · ' : ''}${p.email ? esc(p.email) + ' · ' : ''}${p.phone ? esc(p.phone) : ''}${p.active ? '' : ' <span class="badge off">inactiva</span>'}</div>
+        <div class="d-sec"><h4>Días y turnos asignados</h4>${shiftsHtml}</div>
+        <div class="d-sec"><h4>Responsable de reuniones (${asResp.length})</h4>${asResp.length ? asResp.map(mline).join('') : '<div class="rmeta">Ninguna.</div>'}</div>
+        <div class="d-sec"><h4>Participa en reuniones (${asPart.length})</h4>${asPart.length ? asPart.map(mline).join('') : '<div class="rmeta">Ninguna.</div>'}</div>
+      </div>`;
+  }
+
+  // ---------------- DETALLE POR ÁREA ----------------
+  function renderAreaDetail(aid) {
+    const a = areaById(aid);
+    if (!a) { $('#view').innerHTML = `<div class="empty-state">Área no encontrada.</div>`; return; }
+    const people = STATE.people.filter(p => p.area_id === aid);
+    const pids = new Set(people.map(p => p.id));
+    const peopleHtml = people.length ? people.map(p => `<div class="d-row clickable" data-action="view-person" data-id="${p.id}">${esc(p.full_name)}${p.active ? '' : ' <span class="badge off">inactiva</span>'}</div>`).join('') : '<div class="rmeta">Sin personas.</div>';
+    const covHtml = STATE.shifts.map(s => {
+      const n = STATE.attendance.filter(x => x.shift_id === s.id && pids.has(x.person_id)).length;
+      return `<div class="d-row ${n === 0 ? 'nocov' : ''}">${dayName(s.date)} ${dateLabel(s.date)} · ${esc(s.name)} → <b>${n}</b>${n === 0 ? ' <span class="no-resp">sin representantes del área</span>' : ''}</div>`;
+    }).join('');
+    const mtgs = STATE.meetings.filter(mt => mtgAreas(mt).includes(aid));
+    const mtgHtml = mtgs.length ? mtgs.map(mt => `<div class="d-row clickable" data-action="edit-meeting" data-id="${mt.id}">${dayName(mt.date)} ${esc(mt.start_time)} · ${esc(mt.title)} <span class="mstatus ${statusClass(mt.status)}">${esc(mt.status)}</span></div>`).join('') : '<div class="rmeta">Ninguna.</div>';
+    $('#view').innerHTML = `
+      <div class="view-head"><h2>${esc(a.name)}</h2><button class="btn-line" data-action="back-areas">← Volver</button></div>
+      <div class="card detail">
+        ${a.description ? `<div class="d-meta">${esc(a.description)}</div>` : ''}
+        <div class="d-sec"><h4>Personas del área (${people.length})</h4>${peopleHtml}</div>
+        <div class="d-sec"><h4>Cobertura por turno</h4>${covHtml}</div>
+        <div class="d-sec"><h4>Reuniones del área (${mtgs.length})</h4>${mtgHtml}</div>
+      </div>`;
   }
 
   // ---------------- delegación de acciones ----------------
@@ -277,6 +404,10 @@
     else if (act === 'edit-person') openPersonForm(personById(Number(b.dataset.id)));
     else if (act === 'new-area') openAreaForm(null);
     else if (act === 'edit-area') openAreaForm(areaById(Number(b.dataset.id)));
+    else if (act === 'view-person') { detailPersonId = Number(b.dataset.id); goView('person-detail'); }
+    else if (act === 'view-area') { detailAreaId = Number(b.dataset.id); goView('area-detail'); }
+    else if (act === 'back-people') goView('people');
+    else if (act === 'back-areas') goView('areas');
   });
 
   // ---------------- modal helpers ----------------

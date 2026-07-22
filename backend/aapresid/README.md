@@ -31,8 +31,17 @@ Aapresid 2026** (Salón Metropolitano, Rosario, 4-6 ago 2026). Es un módulo má
   ausente del turno).
 - Se ven **en el bloque** correspondiente y en una **agenda cronológica**.
 
-Pendiente: vistas por persona/área, filtros/buscador, panel de indicadores
-completo, export CSV, audit_log/historial.
+**Fase 3 — vistas y filtros:**
+- **Panel de indicadores** completo (personas, presencias, reuniones,
+  tentativas, confirmadas, turnos sin responsable, personas con reuniones
+  superpuestas + personas por día).
+- **Barra de filtros** en el tablero: buscador general + día, turno, área,
+  responsable, estado de reunión y "sólo sin responsable", con "Limpiar".
+- **Vista por persona** (turnos, horarios, reuniones donde participa / es
+  responsable) y **vista por área** (personas, cobertura por turno, reuniones,
+  turnos sin representantes del área). Se abren clickeando en las listas.
+
+Pendiente: export CSV, audit_log/historial.
 
 ## Variables de entorno
 
