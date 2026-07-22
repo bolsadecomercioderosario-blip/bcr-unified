@@ -27,6 +27,7 @@ import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 import conversatorio.models  # noqa: F401  — registra Sugerencia
 import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
+import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -39,6 +40,7 @@ from lluvias.router import router as lluvias_api
 from metricas.router import router as metricas_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
+from aapresid.router import router as aapresid_api
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -94,6 +96,7 @@ app.include_router(conversatorio_api)
 app.include_router(capacita_api)
 app.include_router(metricas_api)
 app.include_router(compromisos_api)
+app.include_router(aapresid_api)
 
 
 # ---------------------------------------------------------
@@ -131,7 +134,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -243,6 +246,7 @@ app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), 
 app.mount("/conversatorio", NoCacheStaticFiles(directory=_CONV_DIR, html=False), name="conversatorio_ui")
 app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
+app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
 
 
 @app.get("/")

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCR en Aapresid 2026</title>
+    <link rel="icon" type="image/png" href="/static/agenda/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+    <!-- App -->
+    <div id="app" class="hidden">
+        <header class="topbar">
+            <div class="topbar-inner">
+                <div class="brand">
+                    <div class="brand-mark">BCR</div>
+                    <div>
+                        <div class="brand-title" id="event-name">BCR en Aapresid</div>
+                        <div class="brand-sub" id="event-sub">Salón Metropolitano, Rosario</div>
+                    </div>
+                </div>
+                <nav class="topnav" id="topnav">
+                    <button class="nav-item active" data-view="board">Tablero</button>
+                    <button class="nav-item" data-view="people">Personas</button>
+                    <button class="nav-item only-admin" data-view="areas">Áreas</button>
+                </nav>
+                <div class="topbar-right">
+                    <span id="user-chip" class="user-chip"></span>
+                    <button id="btn-logout" class="btn-ghost" title="Salir">Salir</button>
+                </div>
+            </div>
+        </header>
+
+        <main id="view" class="view"></main>
+    </div>
+
+    <!-- Login -->
+    <div id="login" class="login-overlay hidden">
+        <form id="login-card" class="login-card">
+            <div class="login-brand"><span class="brand-mark">BCR</span> <span>Aapresid 2026</span></div>
+            <p class="login-sub">Acceso interno — ingresá con tu email y contraseña.</p>
+            <label>Email</label>
+            <input id="login-email" type="email" autocomplete="username" required>
+            <label>Contraseña</label>
+            <input id="login-pass" type="password" autocomplete="current-password" required>
+            <button id="login-btn" type="submit" class="btn-primary">Ingresar</button>
+            <div id="login-err" class="login-err"></div>
+        </form>
+    </div>
+
+    <!-- Modal genérico -->
+    <div id="modal" class="modal-overlay hidden">
+        <div class="modal-card" id="modal-card"></div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>

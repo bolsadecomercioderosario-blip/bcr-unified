@@ -1,0 +1,58 @@
+# Módulo Aapresid 2026
+
+App interna para organizar la presencia de la BCR y sus áreas en el **Congreso
+Aapresid 2026** (Salón Metropolitano, Rosario, 4-6 ago 2026). Es un módulo más de
+`bcr-unified` (FastAPI + JS vanilla + Postgres/Render), servido en **`/aapresid`**.
+
+## Estado: Fase 1 (cimiento)
+
+Implementado y funcionando:
+- **Login por usuario** (email + contraseña; auth propia del módulo, con roles
+  `admin` / `editor`). Necesaria para la auditoría (`created_by`/`updated_by`).
+- **Modelo de datos completo** (todas las tablas `aap_*`) + **seed**: evento, los
+  8 turnos (el martes sin Mañana), áreas de la BCR, un admin y datos de ejemplo
+  (marcados con `[Ejemplo]`).
+- **Tablero** de 8 bloques con KPIs, responsables destacados y aviso de turnos
+  sin responsable.
+- **ABM de personas y áreas** (áreas: sólo admin; no se borran si tienen
+  personas — se desactivan).
+- **Presencias**: crear / editar / eliminar / duplicar en otro turno, sin
+  permitir la misma persona dos veces en el mismo turno. Alta de persona nueva
+  sin salir del formulario.
+- **Colaborativo**: datos en la DB compartida + polling cada 15s (los cambios
+  aparecen sin recargar).
+
+Pendiente (próximas fases): reuniones + validaciones, vistas por persona/área,
+filtros/buscador, panel de indicadores completo, export CSV, audit_log/historial.
+
+## Variables de entorno
+
+Ver [`.env.example`](.env.example). Todas opcionales:
+- `AAPRESID_SECRET` — secreto para firmar tokens (cambiar en prod).
+- `AAPRESID_ADMIN_EMAIL` / `AAPRESID_ADMIN_PASSWORD` — admin inicial (default
+  `admin@aapresid.bcr` / `aapresid2026`, **cambiar**).
+
+## Acceso inicial
+
+Primer login: `admin@aapresid.bcr` / `aapresid2026` (o lo que definan las env
+vars). Desde ese admin se administran áreas, personas y (próximamente) usuarios.
+
+## Correr / probar localmente
+
+Forma parte de `bcr-unified`, así que arranca con el server principal:
+
+```powershell
+cd backend
+python app.py   # http://localhost:8000  → /aapresid/
+```
+
+Sin env vars usa SQLite local y crea el evento + turnos + admin en el primer
+arranque (migración/seed idempotentes). Las integraciones externas (Drive, X,
+etc.) no se tocan: este módulo no las usa.
+
+## Modelo de datos
+
+Tablas `aap_events`, `aap_shifts`, `aap_areas`, `aap_people`, `aap_attendance`,
+`aap_meetings`, `aap_meeting_participants`, `aap_users`, `aap_audit_log`
+(definidas en [`models.py`](models.py); se crean con `Base.metadata.create_all` +
+seed en `migrate.py`).

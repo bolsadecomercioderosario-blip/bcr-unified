@@ -105,6 +105,9 @@ def migrate():
     seed_efemerides_if_empty()
     seed_metricas_if_empty()
 
+    from aapresid.seed import seed_aapresid_if_empty
+    seed_aapresid_if_empty()
+
 
 def backfill_origen_from_channel():
     """Migra el viejo canal "Agenda Compromisos" al nuevo campo `origen`.
