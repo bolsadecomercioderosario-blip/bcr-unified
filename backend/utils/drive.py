@@ -34,11 +34,21 @@ TOKEN_FILE = find_file('token.json')
 def get_drive_service():
     creds = None
     if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-    
+        try:
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        except Exception as e:
+            # token.json presente pero malformado/ilegible.
+            print(f"token.json inválido o malformado: {e}")
+            return None
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                # Token revocado o vencido: hay que reautorizar (reauth_google.py).
+                print(f"No se pudo refrescar el token de Google Drive (¿revocado/vencido?): {e}")
+                return None
             # Render's /etc/secrets is read-only, so we catch permission errors
             try:
                 with open(TOKEN_FILE, 'w') as token:
@@ -46,8 +56,8 @@ def get_drive_service():
             except Exception as e:
                 print(f"No se pudo guardar el token actualizado (probable sistema de solo lectura): {e}")
         else:
-            return None # Must go through auth flow first
-            
+            return None  # Must go through auth flow first
+
     return build('drive', 'v3', credentials=creds)
 
 def create_activity_folder(date_iso, title):

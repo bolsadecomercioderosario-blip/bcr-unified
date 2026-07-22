@@ -328,7 +328,14 @@ def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(db_activity)
         return {"link": link, "ok": True}
-    raise HTTPException(status_code=500, detail="No se pudo crear la carpeta en Google Drive")
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "No se pudo crear la carpeta: Google Drive no está autorizado o el "
+            "token venció. Hay que reautorizar el acceso (scripts/reauth_google.py) "
+            "y subir el token.json actualizado al servidor."
+        ),
+    )
 
 
 @router.delete("/actividades/{activity_id}")
