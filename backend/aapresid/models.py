@@ -266,3 +266,42 @@ class UserOut(BaseModel):
 class LoginIn(BaseModel):
     email: str
     password: str
+
+
+MEETING_STATUSES = ["Tentativa", "Confirmada", "Realizada", "Cancelada"]
+
+
+class MeetingIn(BaseModel):
+    title: str
+    organization: Optional[str] = ""
+    external_participants: Optional[str] = ""
+    date: str
+    start_time: str
+    end_time: Optional[str] = ""
+    location: Optional[str] = ""
+    responsible_person_id: Optional[int] = None
+    description: Optional[str] = ""
+    notes: Optional[str] = ""
+    status: Optional[str] = "Tentativa"
+    participant_ids: Optional[List[int]] = []
+
+
+class MeetingOut(BaseModel):
+    id: int
+    event_id: int
+    shift_id: Optional[int] = None
+    title: str
+    organization: Optional[str] = ""
+    external_participants: Optional[str] = ""
+    date: str
+    start_time: str
+    end_time: Optional[str] = ""
+    location: Optional[str] = ""
+    responsible_person_id: Optional[int] = None
+    description: Optional[str] = ""
+    notes: Optional[str] = ""
+    status: str
+    participant_ids: List[int] = []
+
+    class Config:
+        from_attributes = True

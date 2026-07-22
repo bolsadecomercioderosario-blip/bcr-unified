@@ -4,9 +4,9 @@ App interna para organizar la presencia de la BCR y sus áreas en el **Congreso
 Aapresid 2026** (Salón Metropolitano, Rosario, 4-6 ago 2026). Es un módulo más de
 `bcr-unified` (FastAPI + JS vanilla + Postgres/Render), servido en **`/aapresid`**.
 
-## Estado: Fase 1 (cimiento)
+## Estado: Fases 1-2 hechas
 
-Implementado y funcionando:
+**Fase 1 — cimiento:**
 - **Login por usuario** (email + contraseña; auth propia del módulo, con roles
   `admin` / `editor`). Necesaria para la auditoría (`created_by`/`updated_by`).
 - **Modelo de datos completo** (todas las tablas `aap_*`) + **seed**: evento, los
@@ -19,11 +19,20 @@ Implementado y funcionando:
 - **Presencias**: crear / editar / eliminar / duplicar en otro turno, sin
   permitir la misma persona dos veces en el mismo turno. Alta de persona nueva
   sin salir del formulario.
-- **Colaborativo**: datos en la DB compartida + polling cada 15s (los cambios
-  aparecen sin recargar).
+- **Colaborativo**: datos en la DB compartida + polling cada 15s.
 
-Pendiente (próximas fases): reuniones + validaciones, vistas por persona/área,
-filtros/buscador, panel de indicadores completo, export CSV, audit_log/historial.
+**Fase 2 — reuniones:**
+- **ABM de reuniones**: título, empresa/contraparte, fecha, hora inicio/fin,
+  lugar, responsable, participantes BCR, participantes externos, descripción,
+  observaciones y estado (Tentativa/Confirmada/Realizada/Cancelada).
+- **Turno automático** según el horario de inicio.
+- **Validaciones**: duras (título/fecha/hora/responsable) + advertencias no
+  bloqueantes (superposición, fuera de horario de presencia, responsable
+  ausente del turno).
+- Se ven **en el bloque** correspondiente y en una **agenda cronológica**.
+
+Pendiente: vistas por persona/área, filtros/buscador, panel de indicadores
+completo, export CSV, audit_log/historial.
 
 ## Variables de entorno
 

@@ -5,7 +5,7 @@
 
   const TOKEN_KEY = 'aapresid_token';
   const API = '/api/aapresid';
-  let STATE = { event: null, shifts: [], areas: [], people: [], attendance: [] };
+  let STATE = { event: null, shifts: [], areas: [], people: [], attendance: [], meetings: [] };
   let ME = null;
   let currentView = 'board';
 
@@ -35,6 +35,43 @@
   const areaById = (id) => STATE.areas.find(a => a.id === id);
   const shiftById = (id) => STATE.shifts.find(s => s.id === id);
   const areaName = (id) => { const a = areaById(id); return a ? a.name : ''; };
+  const meetingsForShift = (sid) => STATE.meetings.filter(mt => mt.shift_id === sid);
+
+  // --- Reuniones: estados y validaciones (advertencias, no bloqueantes) ---
+  const MEETING_STATUSES = ['Tentativa', 'Confirmada', 'Realizada', 'Cancelada'];
+  function statusClass(s) {
+    return 'st-' + (s || 'Tentativa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  function shiftForClient(date, start) {
+    return STATE.shifts.find(s => s.date === date && s.start_time <= (start || '') && (start || '') < s.end_time) || null;
+  }
+  function timeOverlap(aS, aE, bS, bE) { return aS < bE && bS < aE; }
+  function personShiftIds(pid) { return STATE.attendance.filter(a => a.person_id === pid).map(a => a.shift_id); }
+  function meetingWarnings(mtg) {
+    const w = [];
+    const shift = shiftForClient(mtg.date, mtg.start_time);
+    if (mtg.start_time && !shift) w.push('La hora de inicio no cae dentro de ningún turno.');
+    const people = [...new Set([mtg.responsible_person_id, ...(mtg.participant_ids || [])].filter(Boolean))];
+    if (mtg.responsible_person_id && shift && !personShiftIds(mtg.responsible_person_id).includes(shift.id)) {
+      const p = personById(mtg.responsible_person_id);
+      w.push(`El responsable (${p ? p.full_name : '—'}) no figura presente en ese turno.`);
+    }
+    people.forEach(pid => {
+      if (shift && !personShiftIds(pid).includes(shift.id)) {
+        const p = personById(pid);
+        w.push(`${p ? p.full_name : 'Una persona'} tiene la reunión fuera de su horario de presencia.`);
+      }
+      STATE.meetings.filter(mm => mm.id !== mtg.id && mm.date === mtg.date &&
+        (mm.responsible_person_id === pid || (mm.participant_ids || []).includes(pid)))
+        .forEach(mm => {
+          if (timeOverlap(mtg.start_time, mtg.end_time || mtg.start_time, mm.start_time, mm.end_time || mm.start_time)) {
+            const p = personById(pid);
+            w.push(`${p ? p.full_name : 'Una persona'} tiene otra reunión superpuesta ("${mm.title}").`);
+          }
+        });
+    });
+    return [...new Set(w)];
+  }
 
   function toast(msg, type) {
     const t = el('toast'); t.textContent = msg; t.className = 'toast show ' + (type || '');
@@ -128,6 +165,7 @@
 
   function renderView() {
     if (currentView === 'board') return renderBoard();
+    if (currentView === 'agenda') return renderAgenda();
     if (currentView === 'people') return renderPeople();
     if (currentView === 'areas') return renderAreas();
   }
@@ -136,13 +174,16 @@
   function renderBoard() {
     const dayIdx = dayIndexMap();
     const att = STATE.attendance;
+    const mtgs = STATE.meetings;
     const distinctPeople = new Set(att.map(a => a.person_id)).size;
     const shiftsNoResp = STATE.shifts.filter(s => !att.some(a => a.shift_id === s.id && a.is_shift_responsible)).length;
     const kpis = [
-      { n: distinctPeople, l: 'Personas participantes' },
-      { n: att.length, l: 'Presencias asignadas' },
+      { n: distinctPeople, l: 'Personas' },
+      { n: att.length, l: 'Presencias' },
+      { n: mtgs.length, l: 'Reuniones' },
+      { n: mtgs.filter(x => x.status === 'Tentativa').length, l: 'Tentativas' },
+      { n: mtgs.filter(x => x.status === 'Confirmada').length, l: 'Confirmadas' },
       { n: shiftsNoResp, l: 'Turnos sin responsable', warn: shiftsNoResp > 0 },
-      { n: STATE.areas.filter(a => a.active).length, l: 'Áreas activas' },
     ];
     const kpiHtml = kpis.map(k => `<div class="kpi ${k.warn ? 'warn' : ''}"><div class="n">${k.n}</div><div class="l">${k.l}</div></div>`).join('');
 
@@ -162,6 +203,13 @@
             </div>`;
           }).join('')
         : `<div class="block-empty">Sin personas asignadas.</div>`;
+      const mrows = meetingsForShift(s.id).map(mt =>
+        `<div class="mrow ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
+          <span class="mtime">${esc(mt.start_time)}</span>
+          <span class="mtitle">${esc(mt.title)}</span>
+          <span class="mstatus ${statusClass(mt.status)}">${esc(mt.status)}</span>
+        </div>`).join('');
+      const meetingsSection = mrows ? `<div class="block-meetings"><div class="block-sub">Reuniones</div>${mrows}</div>` : '';
       return `<div class="block day-${dayIdx[s.date]}">
         <div class="block-head">
           <div class="block-day">${dayName(s.date)} <span class="block-date">· ${dateLabel(s.date)}</span></div>
@@ -169,9 +217,13 @@
           <div class="block-resp">${respHtml}</div>
         </div>
         <div class="block-people">${peopleHtml}</div>
+        ${meetingsSection}
         <div class="block-foot">
-          <span class="block-count">Total: <b>${atts.length}</b></span>
-          <button class="btn-soft" data-action="add-person" data-shift="${s.id}">+ Persona</button>
+          <span class="block-count">Personas: <b>${atts.length}</b></span>
+          <div class="block-actions">
+            <button class="btn-soft" data-action="add-person" data-shift="${s.id}">+ Persona</button>
+            <button class="btn-soft" data-action="add-meeting" data-shift="${s.id}">+ Reunión</button>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -218,6 +270,9 @@
     const act = b.dataset.action;
     if (act === 'add-person') openAttendanceForm(Number(b.dataset.shift), null);
     else if (act === 'edit-att') openAttendanceForm(null, STATE.attendance.find(a => a.id === Number(b.dataset.id)));
+    else if (act === 'add-meeting') openMeetingForm(Number(b.dataset.shift), null);
+    else if (act === 'edit-meeting') openMeetingForm(null, STATE.meetings.find(x => x.id === Number(b.dataset.id)));
+    else if (act === 'new-meeting') openMeetingForm(null, null);
     else if (act === 'new-person') openPersonForm(null);
     else if (act === 'edit-person') openPersonForm(personById(Number(b.dataset.id)));
     else if (act === 'new-area') openAreaForm(null);
@@ -395,6 +450,121 @@
     if (editing) el('modal-card').querySelector('[data-del]').onclick = async () => {
       if (!confirm('¿Eliminar esta área? (si tiene personas, no se podrá; desactivala)')) return;
       try { await api('/areas/' + area.id, { method: 'DELETE' }); closeModal(); await loadState(false); toast('Eliminada', 'ok'); }
+      catch (err) { toast(err.detail || 'Error', 'err'); }
+    };
+  }
+
+  // ---------------- AGENDA ----------------
+  function renderAgenda() {
+    const mtgs = [...STATE.meetings].sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : (a.start_time || '').localeCompare(b.start_time || ''));
+    let html = '';
+    if (!mtgs.length) html = `<div class="empty-state">No hay reuniones cargadas todavía.</div>`;
+    else {
+      const groups = new Map();
+      mtgs.forEach(mt => { if (!groups.has(mt.date)) groups.set(mt.date, []); groups.get(mt.date).push(mt); });
+      for (const [date, items] of groups) {
+        html += `<div class="agenda-day"><div class="agenda-day-head">${dayName(date)} · ${dateLabel(date)}</div>`;
+        items.forEach(mt => {
+          const resp = personById(mt.responsible_person_id);
+          const parts = (mt.participant_ids || []).map(personById).filter(Boolean).map(p => p.full_name);
+          html += `<div class="agenda-item ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
+            <div class="ai-time">${esc(mt.start_time)}${mt.end_time ? '–' + esc(mt.end_time) : ''}</div>
+            <div class="ai-body">
+              <div class="ai-title">${esc(mt.title)} <span class="mstatus ${statusClass(mt.status)}">${esc(mt.status)}</span></div>
+              <div class="ai-meta">${mt.organization ? `<b>${esc(mt.organization)}</b> · ` : ''}${resp ? 'Resp: ' + esc(resp.full_name) : '<span style="color:var(--warn)">sin responsable</span>'}${parts.length ? ' · BCR: ' + esc(parts.join(', ')) : ''}${mt.location ? ' · ' + esc(mt.location) : ''}</div>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+    }
+    $('#view').innerHTML = `
+      <div class="view-head"><h2>Agenda de reuniones</h2><button class="btn-primary" data-action="new-meeting">+ Nueva reunión</button></div>
+      ${html}`;
+  }
+
+  // ---------------- meeting form ----------------
+  function openMeetingForm(shiftId, mtg) {
+    const editing = !!mtg;
+    const shift = shiftId ? shiftById(shiftId) : null;
+    const defDate = editing ? mtg.date : (shift ? shift.date : (STATE.event ? STATE.event.start_date : ''));
+    const defStart = editing ? mtg.start_time : (shift ? shift.start_time : '');
+    const respSel = editing ? mtg.responsible_person_id : null;
+    const peopleOpts = STATE.people.filter(p => p.active || (editing && p.id === respSel))
+      .map(p => `<option value="${p.id}" ${respSel === p.id ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('');
+    const partChecks = STATE.people.filter(p => p.active || (editing && (mtg.participant_ids || []).includes(p.id)))
+      .map(p => `<label class="chk"><input type="checkbox" class="mf-part" value="${p.id}" ${editing && (mtg.participant_ids || []).includes(p.id) ? 'checked' : ''}> ${esc(p.full_name)}</label>`).join('');
+    const statusOpts = MEETING_STATUSES.map(s => `<option ${editing && mtg.status === s ? 'selected' : ''}>${s}</option>`).join('');
+
+    openModal(`
+      <div class="modal-head"><h3>${editing ? 'Editar reunión' : 'Nueva reunión'}</h3><button class="modal-x" data-x>×</button></div>
+      <label>Título / tema</label>
+      <input id="mf-title" type="text" value="${editing ? esc(mtg.title) : ''}" placeholder="Ej: Reunión con Aapresid">
+      <div class="grid-2">
+        <div><label>Fecha</label><input id="mf-date" type="date" value="${defDate}"></div>
+        <div><label>Estado</label><select id="mf-status">${statusOpts}</select></div>
+      </div>
+      <div class="grid-2">
+        <div><label>Hora inicio</label><input id="mf-start" type="time" value="${defStart}"></div>
+        <div><label>Hora fin (opcional)</label><input id="mf-end" type="time" value="${editing ? esc(mtg.end_time || '') : ''}"></div>
+      </div>
+      <label>Responsable de la reunión</label>
+      <select id="mf-resp"><option value="">— Elegir —</option>${peopleOpts}</select>
+      <div class="grid-2">
+        <div><label>Empresa / institución</label><input id="mf-org" type="text" value="${editing ? esc(mtg.organization || '') : ''}"></div>
+        <div><label>Lugar / stand</label><input id="mf-loc" type="text" value="${editing ? esc(mtg.location || '') : ''}"></div>
+      </div>
+      <label>Participantes externos (opcional)</label>
+      <input id="mf-ext" type="text" value="${editing ? esc(mtg.external_participants || '') : ''}">
+      <label>Participantes de la BCR</label>
+      <div class="chk-grid">${partChecks || '<span class="rmeta">No hay personas cargadas.</span>'}</div>
+      <label>Objetivo / descripción (opcional)</label>
+      <textarea id="mf-desc" rows="2">${editing ? esc(mtg.description || '') : ''}</textarea>
+      <label>Observaciones (opcional)</label>
+      <textarea id="mf-notes" rows="2">${editing ? esc(mtg.notes || '') : ''}</textarea>
+      <div id="mf-warn" class="form-warn hidden"></div>
+      <div class="modal-foot">
+        ${editing ? '<button class="btn-danger left" data-del>Eliminar</button>' : ''}
+        <button class="btn-line" data-x>Cancelar</button>
+        <button class="btn-primary" data-save>Guardar</button>
+      </div>`);
+
+    const draft = () => ({
+      id: editing ? mtg.id : -1, title: el('mf-title').value,
+      date: el('mf-date').value, start_time: el('mf-start').value, end_time: el('mf-end').value,
+      responsible_person_id: el('mf-resp').value ? Number(el('mf-resp').value) : null,
+      participant_ids: [...document.querySelectorAll('.mf-part:checked')].map(c => Number(c.value)),
+    });
+    const refreshWarnings = () => {
+      const w = meetingWarnings(draft()); const box = el('mf-warn');
+      if (w.length) { box.innerHTML = '⚠ ' + w.join('<br>⚠ '); box.classList.remove('hidden'); }
+      else box.classList.add('hidden');
+    };
+    ['mf-date', 'mf-start', 'mf-end', 'mf-resp'].forEach(id => { const e = el(id); if (e) e.addEventListener('change', refreshWarnings); });
+    document.querySelectorAll('.mf-part').forEach(c => c.addEventListener('change', refreshWarnings));
+    refreshWarnings();
+
+    el('modal-card').querySelectorAll('[data-x]').forEach(b => b.onclick = closeModal);
+    el('modal-card').querySelector('[data-save]').onclick = async () => {
+      const body = {
+        title: el('mf-title').value.trim(), organization: el('mf-org').value, external_participants: el('mf-ext').value,
+        date: el('mf-date').value, start_time: el('mf-start').value, end_time: el('mf-end').value, location: el('mf-loc').value,
+        responsible_person_id: el('mf-resp').value ? Number(el('mf-resp').value) : null,
+        description: el('mf-desc').value, notes: el('mf-notes').value, status: el('mf-status').value,
+        participant_ids: [...document.querySelectorAll('.mf-part:checked')].map(c => Number(c.value)),
+      };
+      if (!body.title) { toast('Falta el título', 'err'); return; }
+      if (!body.date || !body.start_time) { toast('Faltan fecha y hora de inicio', 'err'); return; }
+      if (!body.responsible_person_id) { toast('Elegí un responsable', 'err'); return; }
+      try {
+        if (editing) await api('/meetings/' + mtg.id, { method: 'PUT', body: JSON.stringify(body) });
+        else await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
+        closeModal(); await loadState(false); toast('Guardado', 'ok');
+      } catch (err) { toast(err.detail || 'No se pudo guardar', 'err'); }
+    };
+    if (editing) el('modal-card').querySelector('[data-del]').onclick = async () => {
+      if (!confirm('¿Eliminar esta reunión?')) return;
+      try { await api('/meetings/' + mtg.id, { method: 'DELETE' }); closeModal(); await loadState(false); toast('Eliminada', 'ok'); }
       catch (err) { toast(err.detail || 'Error', 'err'); }
     };
   }

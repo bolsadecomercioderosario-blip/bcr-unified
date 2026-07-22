@@ -84,6 +84,40 @@ button { font-family: inherit; }
 .block-foot { margin-top: auto; padding: .55rem .9rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .block-count { font-size: .78rem; color: var(--muted); }
 .block-count b { color: var(--text); }
+.block-actions { display: flex; gap: .4rem; }
+
+/* --- Reuniones en bloque + estados --- */
+.block-sub { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin: .1rem 0 .1rem; }
+.block-meetings { padding: .1rem .9rem .3rem; border-top: 1px dashed var(--border); }
+.mrow { display: flex; align-items: center; gap: .5rem; padding: .35rem .1rem; cursor: pointer; border-radius: 6px; }
+.mrow:hover { background: #f8fafc; }
+.mtime { font-size: .78rem; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 42px; }
+.mtitle { flex: 1; min-width: 0; font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mstatus { font-size: .64rem; font-weight: 700; text-transform: uppercase; padding: .08rem .42rem; border-radius: 999px; white-space: nowrap; }
+.mstatus.st-tentativa { background: #fef3c7; color: #92400e; }
+.mstatus.st-confirmada { background: #dcfce7; color: #166534; }
+.mstatus.st-realizada { background: #dbeafe; color: #0742ab; }
+.mstatus.st-cancelada { background: #fee2e2; color: #991b1b; }
+.mrow.st-cancelada .mtitle { text-decoration: line-through; color: var(--muted); }
+
+/* --- Agenda --- */
+.agenda-day { margin-bottom: 1.3rem; }
+.agenda-day-head { font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: .3rem; margin-bottom: .5rem; }
+.agenda-item { display: flex; gap: .9rem; padding: .7rem .8rem; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: .6rem; margin-bottom: .5rem; cursor: pointer; box-shadow: var(--shadow); }
+.agenda-item:hover { border-color: var(--primary); }
+.agenda-item.st-confirmada { border-left-color: #16a34a; }
+.agenda-item.st-tentativa { border-left-color: #d97706; }
+.agenda-item.st-realizada { border-left-color: #0742ab; }
+.agenda-item.st-cancelada { border-left-color: #dc2626; }
+.agenda-item.st-cancelada .ai-title { text-decoration: line-through; color: var(--muted); }
+.ai-time { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; min-width: 82px; }
+.ai-title { font-weight: 600; }
+.ai-meta { font-size: .82rem; color: var(--muted); margin-top: .2rem; }
+
+/* --- Checkbox grid (participantes) --- */
+.chk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .2rem .8rem; max-height: 170px; overflow-y: auto; border: 1px solid var(--border); border-radius: .5rem; padding: .5rem .6rem; margin-bottom: .8rem; }
+.chk { display: flex; align-items: center; gap: .4rem; font-size: .86rem; font-weight: 400; cursor: pointer; margin: 0; }
+.chk input { width: auto; margin: 0; }
 
 /* --- Buttons --- */
 .btn-primary { background: var(--primary); color: #fff; border: none; padding: .55rem 1rem; border-radius: .5rem; font-weight: 600; cursor: pointer; font-size: .9rem; }
