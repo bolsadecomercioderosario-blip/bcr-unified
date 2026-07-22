@@ -8,8 +8,11 @@ backend/static/uploads/*
 backend/static/lluvias/mapa_lluvias.jpg
 backend/static/social/*.pdf
 backend/static/social/*.jpg
-backend/client_secret.json
-backend/token.json
+# Credenciales de Google (Drive/YouTube) — NUNCA commitear.
+# Sin barra inicial: matchea en cualquier carpeta (raíz del repo y backend/).
+# Cubre también los backups (client_secret_testing.json, token_testing.json).
+client_secret*.json
+token*.json
 
 # SQLite local (en producción se usa Render Disk; el archivo local nunca debe
 # committearse para no pisar accidentalmente la DB de producción al hacer pull)
