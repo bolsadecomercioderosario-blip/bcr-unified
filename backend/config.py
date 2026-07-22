@@ -34,6 +34,15 @@ EXTERNAL_INTEGRATIONS_ENABLED = (
     in ("true", "1", "yes", "on")
 )
 
+# Flag granular SOLO para Google Drive (crear carpetas de actividades + OAuth).
+# Permite prender Drive sin activar el resto (X/Twitter, YouTube, webhook
+# Santiago). Para prender sólo Drive: GOOGLE_DRIVE_ENABLED=true en Render.
+# Si el flag global está en true, Drive también queda habilitado (el global manda).
+GOOGLE_DRIVE_ENABLED = (
+    EXTERNAL_INTEGRATIONS_ENABLED
+    or os.environ.get("GOOGLE_DRIVE_ENABLED", "false").lower() in ("true", "1", "yes", "on")
+)
+
 
 # ---------------------------------------------------------------------------
 # Bot BCR — env vars del módulo backend/bot/.

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from config import STATIC_DIR, UPLOADS_DIR, EXTERNAL_INTEGRATIONS_ENABLED
+from config import STATIC_DIR, UPLOADS_DIR, EXTERNAL_INTEGRATIONS_ENABLED, GOOGLE_DRIVE_ENABLED
 
 
 def require_external_integrations():
@@ -24,6 +24,20 @@ def require_external_integrations():
                 "Las integraciones externas (X/Twitter, YouTube, Google Drive, "
                 "webhooks) están temporalmente deshabilitadas por seguridad. "
                 "Contactá al admin para reactivarlas."
+            ),
+        )
+
+
+def require_google_drive():
+    """Como require_external_integrations pero SÓLO para Google Drive (crear
+    carpetas de actividades + OAuth). Se activa con GOOGLE_DRIVE_ENABLED=true (o
+    con el flag global). Permite prender Drive sin habilitar X/YouTube/webhooks."""
+    if not GOOGLE_DRIVE_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La integración con Google Drive está deshabilitada. "
+                "Contactá al admin para activarla."
             ),
         )
 
