@@ -26,7 +26,7 @@
     if (n.includes('tarde')) return 'turno-tarde';
     return '';
   }
-  const MEETING_STATUSES = ['Tentativa', 'Confirmada', 'Realizada', 'Cancelada'];
+  const MEETING_STATUSES = ['Tentativa', 'Confirmada'];
   const statusClass = (s) => 'st-' + (s || 'Tentativa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const areaById = (id) => STATE.areas.find(a => a.id === id);
   const areaName = (id) => { const a = areaById(id); return a ? a.name : ''; };

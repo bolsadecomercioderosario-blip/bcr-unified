@@ -277,7 +277,7 @@ class LoginIn(BaseModel):
     password: str
 
 
-MEETING_STATUSES = ["Tentativa", "Confirmada", "Realizada", "Cancelada"]
+MEETING_STATUSES = ["Tentativa", "Confirmada"]
 
 
 class MeetingIn(BaseModel):
