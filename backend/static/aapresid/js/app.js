@@ -3,10 +3,8 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEY = 'aapresid_token';
   const API = '/api/aapresid';
   let STATE = { event: null, shifts: [], areas: [], meetings: [] };
-  let ME = null;
 
   const $ = (s) => document.querySelector(s);
   const el = (id) => document.getElementById(id);
@@ -37,44 +35,19 @@
     setTimeout(() => { t.className = 'toast'; }, 2600);
   }
 
-  // ---------- token / api ----------
-  const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
-  const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
-  const clearToken = () => localStorage.removeItem(TOKEN_KEY);
-
+  // ---------- api (acceso abierto, sin token) ----------
   async function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-    const tk = getToken(); if (tk) opts.headers.Authorization = 'Bearer ' + tk;
     const res = await fetch(API + path, opts);
-    if (res.status === 401) { clearToken(); showLogin('La sesión expiró. Ingresá de nuevo.'); throw new Error('401'); }
     let data = null; try { data = await res.json(); } catch (e) {}
     if (!res.ok) { const err = new Error((data && data.detail) || 'Error'); err.detail = (data && data.detail); throw err; }
     return data;
   }
 
-  // ---------- login ----------
-  function showLogin(msg) { el('app').classList.add('hidden'); el('login').classList.remove('hidden'); el('login-err').textContent = msg || ''; }
-  function hideLogin() { el('login').classList.add('hidden'); }
-  el('login-card').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = el('login-email').value.trim(), password = el('login-pass').value;
-    el('login-err').textContent = '';
-    const btn = el('login-btn'); btn.disabled = true; btn.textContent = 'Ingresando…';
-    try {
-      const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      setToken(data.token); ME = data.user; el('login-pass').value = ''; hideLogin(); await boot();
-    } catch (err) { el('login-err').textContent = err.detail || 'Email o contraseña incorrectos'; }
-    finally { btn.disabled = false; btn.textContent = 'Ingresar'; }
-  });
-  el('btn-logout').addEventListener('click', () => { clearToken(); ME = null; showLogin(); });
-
   // ---------- boot / load ----------
   async function boot() {
-    if (!ME) ME = await api('/auth/me');
     el('app').classList.remove('hidden');
-    document.body.dataset.role = ME.role;
-    el('user-chip').textContent = ME.full_name || ME.email;
     await loadState(false); startPolling();
   }
   async function loadState(silent) {
@@ -86,7 +59,7 @@
       if (el('event-name')) el('event-name').textContent = 'BCR en ' + (STATE.event ? STATE.event.name : 'Aapresid');
       if (el('event-sub')) el('event-sub').textContent = STATE.event ? STATE.event.location : '';
       if (!silent || changed) renderBoard();
-    } catch (e) { if (e.message !== '401') console.error(e); }
+    } catch (e) { console.error(e); }
   }
   let pollingOn = false;
   function startPolling() {
@@ -235,8 +208,5 @@
   }
 
   // ---------- init ----------
-  (async function init() {
-    if (getToken()) { try { await boot(); return; } catch (e) { clearToken(); } }
-    showLogin();
-  })();
+  (async function init() { await boot(); })();
 })();

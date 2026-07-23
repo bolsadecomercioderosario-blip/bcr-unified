@@ -14,12 +14,22 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from aapresid import models as m
-from aapresid.auth import (
-    require_user, require_admin, verify_password, make_token,
-)
+from aapresid.auth import verify_password, make_token
 
 
 router = APIRouter(prefix="/api/aapresid", tags=["aapresid"])
+
+
+# Acceso directo por URL (sin login): los endpoints quedan abiertos. Se usa un
+# "usuario anónimo" para no romper created_by/updated_by ni la auditoría.
+class _AnonUser:
+    id = None
+    email = "—"
+    role = "editor"
+
+
+def anon_user() -> "_AnonUser":
+    return _AnonUser()
 
 
 # ---------------------------------------------------------
@@ -35,7 +45,7 @@ def login(payload: m.LoginIn, db: Session = Depends(get_db)):
 
 
 @router.get("/auth/me", response_model=m.UserOut)
-def me(user: m.AapUser = Depends(require_user)):
+def me(user: m.AapUser = Depends(anon_user)):
     return user
 
 
@@ -115,7 +125,7 @@ def _audit(db: Session, user, entity_type: str, entity_id, action: str, prev=Non
 
 
 @router.get("/audit")
-def get_audit(user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def get_audit(user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     rows = db.query(m.AapAudit).order_by(m.AapAudit.id.desc()).limit(150).all()
     return [{
         "id": r.id, "user_email": r.user_email, "entity_type": r.entity_type,
@@ -126,7 +136,7 @@ def get_audit(user: m.AapUser = Depends(require_user), db: Session = Depends(get
 
 
 @router.get("/state")
-def get_state(user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def get_state(user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     ev = _active_event(db)
     shifts = db.query(m.AapShift).filter(
         m.AapShift.event_id == ev.id, m.AapShift.active == True,  # noqa: E712
@@ -149,14 +159,14 @@ def get_state(user: m.AapUser = Depends(require_user), db: Session = Depends(get
 # Áreas (config — admin)
 # ---------------------------------------------------------
 @router.post("/areas", response_model=m.AreaOut)
-def create_area(payload: m.AreaIn, user: m.AapUser = Depends(require_admin), db: Session = Depends(get_db)):
+def create_area(payload: m.AreaIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     area = m.AapArea(**payload.model_dump())
     db.add(area); db.commit(); db.refresh(area)
     return area
 
 
 @router.put("/areas/{area_id}", response_model=m.AreaOut)
-def update_area(area_id: int, payload: m.AreaIn, user: m.AapUser = Depends(require_admin), db: Session = Depends(get_db)):
+def update_area(area_id: int, payload: m.AreaIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     area = db.query(m.AapArea).filter(m.AapArea.id == area_id).first()
     if not area:
         raise HTTPException(status_code=404, detail="Área no encontrada")
@@ -167,7 +177,7 @@ def update_area(area_id: int, payload: m.AreaIn, user: m.AapUser = Depends(requi
 
 
 @router.delete("/areas/{area_id}")
-def delete_area(area_id: int, user: m.AapUser = Depends(require_admin), db: Session = Depends(get_db)):
+def delete_area(area_id: int, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     area = db.query(m.AapArea).filter(m.AapArea.id == area_id).first()
     if not area:
         raise HTTPException(status_code=404, detail="Área no encontrada")
@@ -185,14 +195,14 @@ def delete_area(area_id: int, user: m.AapUser = Depends(require_admin), db: Sess
 # Personas
 # ---------------------------------------------------------
 @router.post("/people", response_model=m.PersonOut)
-def create_person(payload: m.PersonIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def create_person(payload: m.PersonIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     person = m.AapPerson(**payload.model_dump())
     db.add(person); db.commit(); db.refresh(person)
     return person
 
 
 @router.put("/people/{person_id}", response_model=m.PersonOut)
-def update_person(person_id: int, payload: m.PersonIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def update_person(person_id: int, payload: m.PersonIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     person = db.query(m.AapPerson).filter(m.AapPerson.id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="Persona no encontrada")
@@ -203,7 +213,7 @@ def update_person(person_id: int, payload: m.PersonIn, user: m.AapUser = Depends
 
 
 @router.delete("/people/{person_id}")
-def delete_person(person_id: int, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def delete_person(person_id: int, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     person = db.query(m.AapPerson).filter(m.AapPerson.id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="Persona no encontrada")
@@ -230,7 +240,7 @@ def _dup_exists(db: Session, shift_id: int, person_id: int, exclude_id: Optional
 
 
 @router.post("/attendance", response_model=m.AttendanceOut)
-def create_attendance(payload: m.AttendanceIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def create_attendance(payload: m.AttendanceIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     ev = _active_event(db)
     shift = db.query(m.AapShift).filter(m.AapShift.id == payload.shift_id).first()
     if not shift:
@@ -246,7 +256,7 @@ def create_attendance(payload: m.AttendanceIn, user: m.AapUser = Depends(require
 
 
 @router.put("/attendance/{att_id}", response_model=m.AttendanceOut)
-def update_attendance(att_id: int, payload: m.AttendanceUpdate, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def update_attendance(att_id: int, payload: m.AttendanceUpdate, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     att = db.query(m.AapAttendance).filter(m.AapAttendance.id == att_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="Presencia no encontrada")
@@ -265,7 +275,7 @@ def update_attendance(att_id: int, payload: m.AttendanceUpdate, user: m.AapUser 
 
 
 @router.post("/attendance/{att_id}/duplicate", response_model=m.AttendanceOut)
-def duplicate_attendance(att_id: int, payload: dict, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def duplicate_attendance(att_id: int, payload: dict, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     att = db.query(m.AapAttendance).filter(m.AapAttendance.id == att_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="Presencia no encontrada")
@@ -285,7 +295,7 @@ def duplicate_attendance(att_id: int, payload: dict, user: m.AapUser = Depends(r
 
 
 @router.delete("/attendance/{att_id}")
-def delete_attendance(att_id: int, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def delete_attendance(att_id: int, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     att = db.query(m.AapAttendance).filter(m.AapAttendance.id == att_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="Presencia no encontrada")
@@ -298,7 +308,7 @@ def delete_attendance(att_id: int, user: m.AapUser = Depends(require_user), db: 
 # Turnos (config — admin). Listado va incluido en /state.
 # ---------------------------------------------------------
 @router.post("/shifts", response_model=m.ShiftOut)
-def create_shift(payload: m.ShiftIn, user: m.AapUser = Depends(require_admin), db: Session = Depends(get_db)):
+def create_shift(payload: m.ShiftIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     ev = _active_event(db)
     shift = m.AapShift(event_id=ev.id, **payload.model_dump())
     db.add(shift); db.commit(); db.refresh(shift)
@@ -306,7 +316,7 @@ def create_shift(payload: m.ShiftIn, user: m.AapUser = Depends(require_admin), d
 
 
 @router.put("/shifts/{shift_id}", response_model=m.ShiftOut)
-def update_shift(shift_id: int, payload: m.ShiftIn, user: m.AapUser = Depends(require_admin), db: Session = Depends(get_db)):
+def update_shift(shift_id: int, payload: m.ShiftIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     shift = db.query(m.AapShift).filter(m.AapShift.id == shift_id).first()
     if not shift:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
@@ -337,7 +347,7 @@ def _apply_meeting(mtg: m.AapMeeting, payload: m.MeetingIn, shift: m.AapShift):
 
 
 @router.post("/meetings")
-def create_meeting(payload: m.MeetingIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def create_meeting(payload: m.MeetingIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     _validate_meeting(payload)
     ev = _active_event(db)
     shift = db.get(m.AapShift, payload.shift_id)
@@ -351,7 +361,7 @@ def create_meeting(payload: m.MeetingIn, user: m.AapUser = Depends(require_user)
 
 
 @router.put("/meetings/{meeting_id}")
-def update_meeting(meeting_id: int, payload: m.MeetingIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def update_meeting(meeting_id: int, payload: m.MeetingIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     _validate_meeting(payload)
     mtg = db.query(m.AapMeeting).filter(m.AapMeeting.id == meeting_id).first()
     if not mtg:
@@ -368,7 +378,7 @@ def update_meeting(meeting_id: int, payload: m.MeetingIn, user: m.AapUser = Depe
 
 
 @router.put("/shifts/{shift_id}/responsible", response_model=m.ShiftOut)
-def set_shift_responsible(shift_id: int, payload: m.ShiftResponsibleIn, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def set_shift_responsible(shift_id: int, payload: m.ShiftResponsibleIn, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     shift = db.get(m.AapShift, shift_id)
     if not shift:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
@@ -380,7 +390,7 @@ def set_shift_responsible(shift_id: int, payload: m.ShiftResponsibleIn, user: m.
 
 
 @router.delete("/meetings/{meeting_id}")
-def delete_meeting(meeting_id: int, user: m.AapUser = Depends(require_user), db: Session = Depends(get_db)):
+def delete_meeting(meeting_id: int, user: m.AapUser = Depends(anon_user), db: Session = Depends(get_db)):
     mtg = db.query(m.AapMeeting).filter(m.AapMeeting.id == meeting_id).first()
     if not mtg:
         raise HTTPException(status_code=404, detail="Reunión no encontrada")
