@@ -51,7 +51,7 @@ button { font-family: inherit; }
 .dcorner { }
 .dhead { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; color: var(--primary); background: #eef3ff; border: 1px solid #dbe6ff; border-radius: .5rem; padding: .4rem 0; cursor: pointer; user-select: none; }
 .dhead:hover { background: #e0eaff; }
-.hlabel { display: flex; align-items: center; justify-content: flex-end; padding-right: .35rem; font-size: .74rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; }
+.hlabel { display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; }
 .hlabel:hover { color: var(--primary); }
 .cell { height: 42px; border: 1px solid var(--border); border-radius: .5rem; background: #fff; cursor: pointer; transition: background .08s, border-color .08s; }
 .cell:hover { border-color: var(--primary); }
@@ -107,11 +107,39 @@ button { font-family: inherit; }
 .toast.ok { background: #166534; }
 .toast.err { background: #991b1b; }
 
-/* --- Responsive --- */
-@media (max-width: 560px) {
-    .dgrid { grid-template-columns: 40px repeat(5, 1fr); gap: 4px; }
-    .cell, .heat .rcell { height: 38px; }
-    .dhead { font-size: .72rem; padding: .35rem 0; }
-    .hlabel { font-size: .62rem; padding-right: .2rem; }
-    .card { padding: .9rem .8rem 1rem; }
+/* --- Responsive (mobile) --- */
+@media (max-width: 620px) {
+    body { font-size: 14px; }
+    .topbar-inner { padding: .6rem .8rem; gap: .6rem; }
+    .brand { min-width: 0; }
+    .brand-title { font-size: .92rem; }
+    .btn-ghost { padding: .4rem .7rem; font-size: .8rem; white-space: nowrap; }
+
+    .view { padding: .9rem .7rem 2.5rem; }
+    .card { padding: .9rem .75rem 1.05rem; margin-bottom: 1rem; }
+    .card-title { font-size: 1.05rem; }
+    .card-hint { font-size: .82rem; }
+
+    .name-row { max-width: none; }
+    .name-row input { font-size: 16px; }   /* evita el zoom automático de iOS al enfocar */
+
+    /* Grilla: etiqueta angosta + celdas más altas y tocables, sin scroll lateral */
+    .dgrid { grid-template-columns: 26px repeat(5, 1fr); gap: 5px; }
+    .cell, .heat .rcell { height: 46px; }
+    .dhead { font-size: .74rem; padding: .45rem 0; }
+    .hlabel { font-size: .7rem; }
+    .heat .rcell { font-size: .82rem; }
+
+    /* Guardar: contador arriba, botón full-width abajo */
+    .save-row { flex-direction: column; align-items: stretch; gap: .55rem; }
+    .sel-count { text-align: center; }
+    .btn-primary { width: 100%; padding: .85rem; font-size: 1rem; }
+
+    .results-head { align-items: flex-start; }
+}
+
+@media (max-width: 380px) {
+    .dgrid { grid-template-columns: 22px repeat(5, 1fr); gap: 4px; }
+    .dhead { font-size: .66rem; }
+    .hlabel { font-size: .64rem; }
 }

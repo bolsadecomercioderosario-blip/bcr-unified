@@ -18,7 +18,8 @@
   for (let h = 8; h < 20; h++) HOURS.push(h);   // 8-9 ... 19-20
 
   const slotKey = (day, hour) => day + '-' + hour;
-  const hourLabel = (h) => h + '–' + (h + 1);
+  const hourLabel = (h) => h + '–' + (h + 1);          // rango completo (tooltips/resultados)
+  const hourShort = (h) => String(h).padStart(2, '0'); // etiqueta compacta en la grilla
   const el = (id) => document.getElementById(id);
 
   const selected = new Set();     // franjas de la persona actual
@@ -49,7 +50,7 @@
     let html = '<div class="dcorner"></div>';
     DAYS.forEach(d => { html += `<div class="dhead" data-day="${d.k}" title="Marcar/limpiar toda la columna">${d.short}</div>`; });
     HOURS.forEach(h => {
-      html += `<div class="hlabel" data-hour="${h}" title="Marcar/limpiar toda la fila">${hourLabel(h)}</div>`;
+      html += `<div class="hlabel" data-hour="${h}" title="Marcar/limpiar toda la fila (${hourLabel(h)} hs)">${hourShort(h)}</div>`;
       DAYS.forEach(d => {
         html += `<button type="button" class="cell" data-slot="${slotKey(d.k, h)}" aria-label="${d.label} ${hourLabel(h)}"></button>`;
       });
@@ -158,7 +159,7 @@
     let html = '<div class="dcorner"></div>';
     DAYS.forEach(d => { html += `<div class="dhead" style="cursor:default">${d.short}</div>`; });
     HOURS.forEach(hr => {
-      html += `<div class="hlabel" style="cursor:default">${hourLabel(hr)}</div>`;
+      html += `<div class="hlabel" style="cursor:default" title="${hourLabel(hr)} hs">${hourShort(hr)}</div>`;
       DAYS.forEach(d => {
         const k = slotKey(d.k, hr);
         const c = (counts[k] || []).length;
