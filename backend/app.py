@@ -143,6 +143,18 @@ for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "
     app.get(f"/{_mod}/")(_idx)
 
 
+# Disponibilidad — vista de resultados en URL aparte (/disponibilidad/admin).
+# Sirve el MISMO SPA que la vista pública; el JS detecta la ruta y muestra sólo
+# los resultados (detrás de contraseña). El público no tiene ningún botón/enlace
+# a esta vista. Se registra antes del mount estático para tener precedencia.
+@app.get("/disponibilidad/admin")
+async def _disponibilidad_admin():
+    return HTMLResponse(
+        content=get_module_html("disponibilidad"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 # ---------------------------------------------------------
 # Agenda de Compromisos institucionales (vista pública para autoridades BCR).
 # URL: /compromisos/{token}  — el token se valida en el frontend contra el API.

@@ -25,6 +25,9 @@
   const selected = new Set();     // franjas de la persona actual
   let RESPONSES = [];             // solo se llena en modo admin
   let ADMIN = localStorage.getItem(ADMIN_KEY) || '';
+  // La vista de resultados vive en una URL aparte (/disponibilidad/admin).
+  // La vista pública no tiene ningún acceso visible a los resultados.
+  const ADMIN_PAGE = /\/admin\/?$/.test(location.pathname);
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -111,26 +114,26 @@
       await api('/responses', { method: 'POST', body: JSON.stringify({ name, slots: [...selected] }) });
       toast('¡Guardado! Gracias.', 'ok');
       await loadOwnIfExists();
-      if (ADMIN) loadState().catch(() => {});
     } catch (err) { toast(err.detail || 'No se pudo guardar', 'err'); }
     finally { btn.disabled = false; btn.textContent = prev; }
   });
 
-  // ================= ADMIN (resultados) =================
-  function showOverlay() { el('admin-err').textContent = ''; el('admin-pass').value = ''; el('admin-ov').classList.remove('hidden'); el('admin-pass').focus(); }
+  // ============= ADMIN (resultados) — solo en /disponibilidad/admin =============
+  function showOverlay() {
+    el('admin-err').textContent = ''; el('admin-pass').value = '';
+    el('admin-cancel').classList.toggle('hidden', ADMIN_PAGE);  // en la URL admin no hay a dónde cancelar
+    el('admin-ov').classList.remove('hidden'); el('admin-pass').focus();
+  }
   function hideOverlay() { el('admin-ov').classList.add('hidden'); }
-  function showResults() { el('results').classList.remove('hidden'); el('btn-admin').classList.add('hidden'); }
+  function showResults() { el('carga').classList.add('hidden'); el('results').classList.remove('hidden'); }
   function lockAdmin() {
     ADMIN = ''; localStorage.removeItem(ADMIN_KEY); RESPONSES = [];
-    el('results').classList.add('hidden'); el('btn-admin').classList.remove('hidden');
+    el('results').classList.add('hidden');
+    if (ADMIN_PAGE) showOverlay();
   }
 
-  el('btn-admin').addEventListener('click', () => {
-    if (ADMIN) { showResults(); loadState().catch(() => {}); }
-    else showOverlay();
-  });
   el('admin-cancel').addEventListener('click', hideOverlay);
-  el('admin-ov').addEventListener('mousedown', (e) => { if (e.target === el('admin-ov')) hideOverlay(); });
+  el('admin-ov').addEventListener('mousedown', (e) => { if (!ADMIN_PAGE && e.target === el('admin-ov')) hideOverlay(); });
   el('btn-lock').addEventListener('click', lockAdmin);
   el('admin-card').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -222,11 +225,17 @@
 
   // ================= init =================
   (async function init() {
+    if (ADMIN_PAGE) {
+      el('carga').classList.add('hidden');   // la URL admin solo muestra resultados
+      if (ADMIN) {
+        try { await loadState(); showResults(); startPolling(); return; }
+        catch (e) { /* token vencido: pedir contraseña de nuevo */ }
+      }
+      showOverlay();
+      return;
+    }
+    // Vista pública: solo el formulario de carga.
     buildGrid();
     refreshGridSelection();
-    if (ADMIN) {
-      try { await loadState(); showResults(); startPolling(); }
-      catch (e) { lockAdmin(); }
-    }
   })();
 })();
