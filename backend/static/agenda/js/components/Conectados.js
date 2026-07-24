@@ -50,9 +50,13 @@ const BLOCK_BADGE = {
     activity: { icon: '📅', label: 'Actividad', color: '#0742ab', bg: '#dbeafe' },
 };
 
-// Tomamos las primeras N palabras como vista previa del cuerpo.
+// Tomamos las primeras N palabras como vista previa del cuerpo. Sacamos el
+// marcado (**negrita** / *cursiva*) para que la tarjeta no muestre los asteriscos.
 function previewSnippet(text, maxWords = 22) {
-    const clean = (text || '').trim().replace(/\s+/g, ' ');
+    const clean = (text || '').trim()
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/\s+/g, ' ');
     if (!clean) return '';
     const words = clean.split(' ');
     if (words.length <= maxWords) return clean;
@@ -353,6 +357,13 @@ function openConectadosEditor(act) {
                     placeholder="Título del bloque"
                     style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.05rem; font-weight: 600;">
 
+                <!-- Barra de formato: negrita / cursiva (solo para el cuerpo) -->
+                <div id="editor-fmt" style="display: flex; align-items: center; gap: 0.4rem;">
+                    <button type="button" id="fmt-bold" title="Negrita" style="width: 30px; height: 28px; border: 1px solid var(--border); background: white; border-radius: 0.4rem; font-weight: 800; cursor: pointer;">B</button>
+                    <button type="button" id="fmt-italic" title="Cursiva" style="width: 30px; height: 28px; border: 1px solid var(--border); background: white; border-radius: 0.4rem; font-style: italic; font-family: Georgia, serif; cursor: pointer;">I</button>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Seleccioná texto y tocá B o I — en el newsletter se ve en negrita/cursiva.</span>
+                </div>
+
                 <!-- Textarea: protagonista, llena todo el alto disponible -->
                 <textarea id="editor-body"
                     placeholder="Texto del bloque…"
@@ -381,6 +392,18 @@ function openConectadosEditor(act) {
     const inputBody = overlay.querySelector('#editor-body');
     const strip = overlay.querySelector('#editor-image-strip');
     const imageInput = overlay.querySelector('#editor-image-input');
+
+    // --- Formato (negrita/cursiva): envuelve la selección con marcadores ---
+    const wrapSelection = (marker) => {
+        const s = inputBody.selectionStart, e = inputBody.selectionEnd, v = inputBody.value;
+        const sel = v.slice(s, e) || 'texto';
+        inputBody.value = v.slice(0, s) + marker + sel + marker + v.slice(e);
+        inputBody.focus();
+        inputBody.selectionStart = s + marker.length;
+        inputBody.selectionEnd = s + marker.length + sel.length;
+    };
+    overlay.querySelector('#fmt-bold').onclick = () => wrapSelection('**');
+    overlay.querySelector('#fmt-italic').onclick = () => wrapSelection('*');
 
     // Re-pinta la tira de imagen según haya o no imagen actual.
     function rerenderImageStrip() {

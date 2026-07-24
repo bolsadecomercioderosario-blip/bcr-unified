@@ -38,6 +38,16 @@ function uniqueContainerId() {
  * dentro de un párrafo se preservan como <br>; los saltos dobles separan
  * párrafos.
  */
+// Convierte el marcado liviano a HTML DESPUÉS de escapar, así solo introducimos
+// nuestras propias etiquetas (<strong>/<em>) y no hay riesgo de inyección:
+//   **negrita**  → <strong>…</strong>
+//   *cursiva*    → <em>…</em>
+function applyInlineFormat(escaped) {
+    return escaped
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+}
+
 function textToParagraphs(text) {
     if (!text) return '';
     const blocks = String(text).replace(/\r\n/g, '\n').split(/\n\s*\n/);
@@ -46,7 +56,8 @@ function textToParagraphs(text) {
         .filter(p => p.length > 0)
         .map(p => {
             const escaped = escapeHtml(p).replace(/\n/g, '<br>');
-            return `<p dir="ltr" style="margin: 0 0 12px 0; padding: 0; line-height: 1.4; font-family: Arial, Verdana, sans-serif; font-size: 14px; color: rgb(0, 0, 0); font-weight: normal; text-align: justify;">${escaped}</p>`;
+            const formatted = applyInlineFormat(escaped);
+            return `<p dir="ltr" style="margin: 0 0 12px 0; padding: 0; line-height: 1.4; font-family: Arial, Verdana, sans-serif; font-size: 14px; color: rgb(0, 0, 0); font-weight: normal; text-align: justify;">${formatted}</p>`;
         })
         .join('');
 }
