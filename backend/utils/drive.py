@@ -108,18 +108,19 @@ def create_activity_folder(date_iso, title):
         print(f"Error inesperado al crear carpeta en Drive: {e}")
         return ""
 
-def delete_drive_folder(url):
+def trash_drive_folder(url):
     """
-    Elimina una carpeta de Drive dado su webViewLink.
-    Extrae el ID de la URL y lo borra definitivamente.
+    Envía a la PAPELERA de Drive la carpeta dada por su webViewLink (NO la borra
+    definitivamente). Queda recuperable ~30 días desde la papelera de Drive.
+    Extrae el ID de la URL y la marca como `trashed`.
     """
     if not url or "drive.google.com" not in url:
         return
-        
+
     service = get_drive_service()
     if not service:
         return
-        
+
     try:
         # Extraer ID de la URL
         # Soporta formatos: /folders/ID o ?id=ID
@@ -128,9 +129,9 @@ def delete_drive_folder(url):
             folder_id = url.split('folders/')[-1].split('?')[0]
         elif 'id=' in url:
             folder_id = url.split('id=')[-1].split('&')[0]
-            
+
         if folder_id:
-            service.files().delete(fileId=folder_id).execute()
-            print(f"Carpeta de Drive eliminada con éxito: {folder_id}")
+            service.files().update(fileId=folder_id, body={"trashed": True}).execute()
+            print(f"Carpeta de Drive enviada a la papelera: {folder_id}")
     except Exception as e:
-        print(f"Error al intentar eliminar carpeta de Drive ({url}): {e}")
+        print(f"Error al enviar a la papelera la carpeta de Drive ({url}): {e}")

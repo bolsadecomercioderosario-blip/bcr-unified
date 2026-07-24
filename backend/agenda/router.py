@@ -24,7 +24,7 @@ from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
 from utils.drive import (
     CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE,
-    create_activity_folder, delete_drive_folder,
+    create_activity_folder, trash_drive_folder,
 )
 
 
@@ -345,9 +345,9 @@ def delete_activity(activity_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Activity not found")
 
     if db_activity.drive_bcr:
-        delete_drive_folder(db_activity.drive_bcr)
+        trash_drive_folder(db_activity.drive_bcr)
     if db_activity.drive_santiago:
-        delete_drive_folder(db_activity.drive_santiago)
+        trash_drive_folder(db_activity.drive_santiago)
 
     db.delete(db_activity)
     db.commit()
