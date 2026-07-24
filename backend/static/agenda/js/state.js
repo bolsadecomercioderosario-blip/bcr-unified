@@ -250,6 +250,10 @@ export async function updateActivity(id, updates, shouldNotify = true) {
     }
 }
 
+// "Eliminar" ahora ARCHIVA (soft-delete): el backend marca la actividad como
+// archivada en vez de borrarla y manda su carpeta de Drive a la papelera. Sale
+// de las vistas activas (por eso la sacamos de state.activities), pero queda
+// recuperable desde "Archivados".
 export async function deleteActivity(id) {
     // Optimistic update
     state.activities = state.activities.filter(a => a.id !== id);
@@ -261,8 +265,36 @@ export async function deleteActivity(id) {
             method: 'DELETE'
         });
     } catch (e) {
-        console.error("Failed to delete activity on server", e);
+        console.error("Failed to archive activity on server", e);
     }
+}
+
+// Trae el listado de actividades archivadas (para la vista Archivados).
+export async function loadArchived() {
+    try {
+        const res = await fetch('/api/agenda/actividades/archivadas');
+        if (res.ok) return await res.json();
+    } catch (e) {
+        console.error("Failed to load archived activities", e);
+    }
+    return [];
+}
+
+// Restaura una actividad archivada: vuelve a las vistas activas y su carpeta de
+// Drive sale de la papelera. Recargamos las activas para que reaparezca.
+export async function restoreActivity(id) {
+    try {
+        const res = await trackedFetch(`/api/agenda/actividades/${id}/restore`, {
+            method: 'POST'
+        });
+        if (res.ok) {
+            await loadActivities();
+            return true;
+        }
+    } catch (e) {
+        console.error("Failed to restore activity on server", e);
+    }
+    return false;
 }
 
 export function setCurrentActivity(activity) {

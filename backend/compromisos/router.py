@@ -49,6 +49,7 @@ def list_compromisos(token: str):
         return db.query(agenda_models.Activity).filter(
             agenda_models.Activity.is_custom == False,  # noqa: E712 — SQLAlchemy
             agenda_models.Activity.origen == "secretaria",
+            agenda_models.Activity.archived == False,  # noqa: E712 — no mostrar archivadas
         ).all()
     finally:
         db.close()

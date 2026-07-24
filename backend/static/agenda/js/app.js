@@ -5,6 +5,7 @@ import { renderSanti } from './components/Santi.js';
 import { renderActivityForm } from './components/ActivityForm.js';
 import { renderAgendaCompromisos } from './components/AgendaCompromisos.js';
 import { renderEfemeridesModal } from './components/EfemeridesModal.js';
+import { renderArchivedModal } from './components/ArchivedModal.js';
 import { getRole, isSecretaria } from './role.js';
 
 // Rol del usuario (secretaria | comunicacion). Lo exponemos en el <body> para
@@ -24,8 +25,10 @@ const viewContainer = document.getElementById('view-container');
 const btnNewActivity = document.getElementById('btn-new-activity');
 const btnTogglePast = document.getElementById('btn-toggle-past');
 const btnEfemerides = document.getElementById('btn-efemerides');
+const btnArchived = document.getElementById('btn-archived');
 const activitySheet = document.getElementById('activity-sheet');
 const efemeridesSheet = document.getElementById('efemerides-sheet');
+const archivedSheet = document.getElementById('archived-sheet');
 const globalSearch = document.getElementById('global-search');
 
 // Router/View Switcher
@@ -132,6 +135,30 @@ function openEfemeridesSheet() {
 export function closeEfemeridesSheet() {
     efemeridesSheet.classList.add('hidden');
 }
+
+// --- Archivados (soft-deleted) ---
+if (btnArchived) {
+    btnArchived.addEventListener('click', () => {
+        archivedSheet.classList.remove('hidden');
+        renderArchivedModal(archivedSheet.querySelector('.sheet-content'));
+    });
+}
+
+export function closeArchivedSheet() {
+    archivedSheet.classList.add('hidden');
+}
+window.closeArchivedSheet = closeArchivedSheet;
+
+let isMouseDownOnArchivedOverlay = false;
+archivedSheet.addEventListener('mousedown', (e) => {
+    isMouseDownOnArchivedOverlay = (e.target === archivedSheet);
+});
+archivedSheet.addEventListener('mouseup', (e) => {
+    if (isMouseDownOnArchivedOverlay && e.target === archivedSheet) {
+        closeArchivedSheet();
+    }
+    isMouseDownOnArchivedOverlay = false;
+});
 
 let isMouseDownOnEfOverlay = false;
 efemeridesSheet.addEventListener('mousedown', (e) => {

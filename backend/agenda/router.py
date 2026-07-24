@@ -5,6 +5,7 @@ con Drive (carpetas y OAuth) + webhook Santiago + CRUD de Efemérides.
 import os
 import shutil
 import uuid
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
@@ -24,7 +25,7 @@ from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
 from utils.drive import (
     CLIENT_SECRETS_FILE, SCOPES, TOKEN_FILE,
-    create_activity_folder, trash_drive_folder,
+    create_activity_folder, trash_drive_folder, untrash_drive_folder,
 )
 
 
@@ -263,7 +264,18 @@ def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):
 # ---------------------------------------------------------
 @router.get("/actividades", response_model=List[agenda_models.ActivityOut])
 def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
-    return db.query(agenda_models.Activity).offset(skip).limit(limit).all()
+    # Excluye archivadas: viven sólo en la vista "Archivados".
+    return db.query(agenda_models.Activity).filter(
+        agenda_models.Activity.archived == False,  # noqa: E712 — SQLAlchemy
+    ).offset(skip).limit(limit).all()
+
+
+@router.get("/actividades/archivadas", response_model=List[agenda_models.ActivityOut])
+def read_archived_activities(db: Session = Depends(get_db)):
+    """Listado de actividades archivadas (soft-deleted), para la vista Archivados."""
+    return db.query(agenda_models.Activity).filter(
+        agenda_models.Activity.archived == True,  # noqa: E712 — SQLAlchemy
+    ).all()
 
 
 @router.post("/actividades", response_model=agenda_models.ActivityOut)
@@ -339,7 +351,10 @@ def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/actividades/{activity_id}")
-def delete_activity(activity_id: str, db: Session = Depends(get_db)):
+def archive_activity(activity_id: str, db: Session = Depends(get_db)):
+    """Archiva la actividad (soft-delete): NO borra el registro, lo marca como
+    archivado y sale de todas las vistas activas. La carpeta de Drive va a la
+    PAPELERA (recuperable). Todo se puede restaurar desde la vista Archivados."""
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -349,9 +364,30 @@ def delete_activity(activity_id: str, db: Session = Depends(get_db)):
     if db_activity.drive_santiago:
         trash_drive_folder(db_activity.drive_santiago)
 
-    db.delete(db_activity)
+    db_activity.archived = True
+    db_activity.archived_at = datetime.utcnow().isoformat()
     db.commit()
     return {"ok": True}
+
+
+@router.post("/actividades/{activity_id}/restore", response_model=agenda_models.ActivityOut)
+def restore_activity(activity_id: str, db: Session = Depends(get_db)):
+    """Restaura una actividad archivada: vuelve a las vistas activas y saca su
+    carpeta de Drive de la papelera."""
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    if db_activity.drive_bcr:
+        untrash_drive_folder(db_activity.drive_bcr)
+    if db_activity.drive_santiago:
+        untrash_drive_folder(db_activity.drive_santiago)
+
+    db_activity.archived = False
+    db_activity.archived_at = ""
+    db.commit()
+    db.refresh(db_activity)
+    return db_activity
 
 
 # ---------------------------------------------------------

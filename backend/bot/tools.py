@@ -428,6 +428,7 @@ def consultar_agenda(
     query = ctx.db.query(agenda_models.Activity).filter(
         agenda_models.Activity.date >= desde_d.isoformat(),
         agenda_models.Activity.date <= hasta_d.isoformat(),
+        agenda_models.Activity.archived == False,  # noqa: E712 — excluir archivadas
     )
 
     if filtro_titulo:

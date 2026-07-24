@@ -61,6 +61,10 @@
                         <i data-lucide="calendar-clock"></i>
                     </button>
 
+                    <button id="btn-archived" class="btn-icon" title="Archivados">
+                        <i data-lucide="archive"></i>
+                    </button>
+
                     <button id="btn-new-activity" class="btn-primary">
                         <i data-lucide="plus"></i>
                         <span>Nueva Actividad</span>
@@ -84,6 +88,13 @@
         <div id="efemerides-sheet" class="sheet-overlay hidden">
             <div class="sheet-content">
                 <!-- Content injected by components/EfemeridesModal.js -->
+            </div>
+        </div>
+
+        <!-- Archivados Modal -->
+        <div id="archived-sheet" class="sheet-overlay hidden">
+            <div class="sheet-content">
+                <!-- Content injected by components/ArchivedModal.js -->
             </div>
         </div>
 

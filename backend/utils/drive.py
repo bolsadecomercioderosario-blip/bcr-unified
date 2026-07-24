@@ -108,30 +108,42 @@ def create_activity_folder(date_iso, title):
         print(f"Error inesperado al crear carpeta en Drive: {e}")
         return ""
 
+def _folder_id_from_url(url):
+    """Extrae el ID de carpeta de un webViewLink. Soporta /folders/ID y ?id=ID."""
+    if not url or "drive.google.com" not in url:
+        return None
+    if 'folders/' in url:
+        return url.split('folders/')[-1].split('?')[0]
+    if 'id=' in url:
+        return url.split('id=')[-1].split('&')[0]
+    return None
+
+
+def _set_folder_trashed(url, trashed):
+    """Marca (o desmarca) como `trashed` la carpeta de Drive dada por su URL."""
+    folder_id = _folder_id_from_url(url)
+    if not folder_id:
+        return
+    service = get_drive_service()
+    if not service:
+        return
+    try:
+        service.files().update(fileId=folder_id, body={"trashed": trashed}).execute()
+        estado = "enviada a la papelera" if trashed else "restaurada de la papelera"
+        print(f"Carpeta de Drive {estado}: {folder_id}")
+    except Exception as e:
+        accion = "enviar a la papelera" if trashed else "restaurar"
+        print(f"Error al {accion} la carpeta de Drive ({url}): {e}")
+
+
 def trash_drive_folder(url):
     """
     Envía a la PAPELERA de Drive la carpeta dada por su webViewLink (NO la borra
     definitivamente). Queda recuperable ~30 días desde la papelera de Drive.
-    Extrae el ID de la URL y la marca como `trashed`.
     """
-    if not url or "drive.google.com" not in url:
-        return
+    _set_folder_trashed(url, True)
 
-    service = get_drive_service()
-    if not service:
-        return
 
-    try:
-        # Extraer ID de la URL
-        # Soporta formatos: /folders/ID o ?id=ID
-        folder_id = None
-        if 'folders/' in url:
-            folder_id = url.split('folders/')[-1].split('?')[0]
-        elif 'id=' in url:
-            folder_id = url.split('id=')[-1].split('&')[0]
-
-        if folder_id:
-            service.files().update(fileId=folder_id, body={"trashed": True}).execute()
-            print(f"Carpeta de Drive enviada a la papelera: {folder_id}")
-    except Exception as e:
-        print(f"Error al enviar a la papelera la carpeta de Drive ({url}): {e}")
+def untrash_drive_folder(url):
+    """Restaura (saca de la papelera) la carpeta de Drive dada por su webViewLink."""
+    _set_folder_trashed(url, False)

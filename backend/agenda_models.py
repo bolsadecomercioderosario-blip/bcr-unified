@@ -65,6 +65,12 @@ class Activity(Base):
     # ve/descarga (solo lectura). No aparece en la landing pública.
     attachment_url = Column(String, default="")
     attachment_name = Column(String, default="")
+    # Soft-delete: al "eliminar" una actividad NO se borra el registro, se marca
+    # como archivada (queda en la vista "Archivados", recuperable). archived_at es
+    # el timestamp ISO UTC de cuándo se archivó. Las actividades archivadas se
+    # excluyen de todas las vistas activas (lista, landing, newsletter, bot).
+    archived = Column(Boolean, default=False)
+    archived_at = Column(String, default="")
 
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
@@ -100,6 +106,8 @@ class ActivityBase(BaseModel):
     sec_responsible_other: Optional[str] = ""
     attachment_url: Optional[str] = ""
     attachment_name: Optional[str] = ""
+    archived: Optional[bool] = False
+    archived_at: Optional[str] = ""
 
 class ActivityCreate(ActivityBase):
     pass

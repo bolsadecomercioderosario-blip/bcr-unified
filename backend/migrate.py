@@ -81,6 +81,16 @@ def migrate():
         "ALTER add end_time",
         "ALTER TABLE activities ADD COLUMN end_time VARCHAR DEFAULT ''",
     )
+    # Soft-delete / Archivados. DEFAULT FALSE deja en false las filas existentes
+    # (no NULL), así el filtro `archived == False` no las esconde.
+    _try_exec(
+        "ALTER add archived",
+        "ALTER TABLE activities ADD COLUMN archived BOOLEAN DEFAULT FALSE",
+    )
+    _try_exec(
+        "ALTER add archived_at",
+        "ALTER TABLE activities ADD COLUMN archived_at VARCHAR DEFAULT ''",
+    )
 
     # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
     # Idempotente: sólo toca filas que todavía no tengan block_type seteado.
