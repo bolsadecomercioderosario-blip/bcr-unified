@@ -137,11 +137,16 @@ export function closeEfemeridesSheet() {
 }
 
 // --- Archivados (soft-deleted) ---
+// Expuesto global para poder abrirlo también desde la vista de Secretaría
+// (Agenda de Compromisos), que tiene su propio header y oculta el top-bar.
+function openArchivedSheet() {
+    archivedSheet.classList.remove('hidden');
+    renderArchivedModal(archivedSheet.querySelector('.sheet-content'));
+}
+window.openArchivedSheet = openArchivedSheet;
+
 if (btnArchived) {
-    btnArchived.addEventListener('click', () => {
-        archivedSheet.classList.remove('hidden');
-        renderArchivedModal(archivedSheet.querySelector('.sheet-content'));
-    });
+    btnArchived.addEventListener('click', openArchivedSheet);
 }
 
 export function closeArchivedSheet() {

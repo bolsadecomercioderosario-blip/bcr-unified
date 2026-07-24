@@ -249,6 +249,7 @@ export function renderAgendaCompromisos(container) {
                     </div>
                 </div>
                 <div class="cmp-actions">
+                    <button id="cmp-archived-btn" class="cmp-ghost-btn"><i data-lucide="archive" style="width: 16px; height: 16px;"></i> Archivados</button>
                     <button id="cmp-print-btn" class="cmp-ghost-btn"><i data-lucide="printer" style="width: 16px; height: 16px;"></i> Imprimir</button>
                     <button id="cmp-new-btn" class="cmp-new-btn"><i data-lucide="plus" style="width: 16px; height: 16px;"></i> Nueva actividad</button>
                 </div>
@@ -316,6 +317,7 @@ export function renderAgendaCompromisos(container) {
 
     wrapper.querySelector('#cmp-new-btn').onclick = () => window.openNewActivity();
     wrapper.querySelector('#cmp-print-btn').onclick = () => openPrintModal();
+    wrapper.querySelector('#cmp-archived-btn').onclick = () => window.openArchivedSheet();
 
     container.appendChild(wrapper);
     paint();
