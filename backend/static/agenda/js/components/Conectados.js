@@ -1,4 +1,4 @@
-import { state, updateActivity, addActivity, deleteActivity, saveNewsletterSettings } from '../state.js';
+import { state, updateActivity, addActivity, removeFromNewsletter, deleteBlock, saveNewsletterSettings } from '../state.js';
 // Nota: la generación con IA (botón "Generar con IA" en cada bloque) se sacó
 // porque los resultados no eran lo suficientemente buenos. Por ahora los copys
 // se redactan a mano o en ChatGPT externo. La función generateNewsletterBlock
@@ -218,8 +218,8 @@ export function renderConectados(container) {
                 <button class="btn-edit-conectados" title="Editar bloque" style="background: white; border: 1px solid var(--border); color: var(--primary); cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600;">
                     <i data-lucide="pencil" style="width: 14px; height: 14px;"></i> Editar
                 </button>
-                <button class="btn-delete-conectados" title="Eliminar bloque" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; opacity: 0.6;">
-                    <i data-lucide="trash-2" style="width: 16px;"></i>
+                <button class="btn-delete-conectados" title="${kind === 'activity' ? 'Quitar del newsletter (no borra la actividad)' : 'Eliminar bloque'}" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                    <i data-lucide="${kind === 'activity' ? 'x' : 'trash-2'}" style="width: 16px;"></i>
                 </button>
             </div>
             <div class="conectados-content">
@@ -250,8 +250,14 @@ export function renderConectados(container) {
 
         btnDelete.onclick = (e) => {
             e.stopPropagation();
-            if (confirm('¿Estás seguro de que querés eliminar este bloque?')) {
-                deleteActivity(act.id);
+            if (kind === 'activity') {
+                if (confirm('¿Quitar esta actividad del newsletter Conectados?\n\nLa actividad NO se borra: seguí gestionándola desde la solapa Actividades.')) {
+                    removeFromNewsletter(act.id);
+                }
+            } else {
+                if (confirm('¿Eliminar este bloque del newsletter?')) {
+                    deleteBlock(act.id);
+                }
             }
         };
 
@@ -372,8 +378,8 @@ function openConectadosEditor(act) {
 
             <!-- Footer fijo -->
             <div style="padding: 0.75rem 1.1rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; background: #fafafa;">
-                <button id="btn-editor-delete" style="background: none; border: 1px solid #fecaca; color: #ef4444; padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;" title="Eliminar bloque">
-                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Eliminar
+                <button id="btn-editor-delete" style="background: none; border: 1px solid #fecaca; color: #ef4444; padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;" title="${kind === 'activity' ? 'Quitar del newsletter (no borra la actividad)' : 'Eliminar bloque'}">
+                    <i data-lucide="${kind === 'activity' ? 'x' : 'trash-2'}" style="width: 16px; height: 16px;"></i> ${kind === 'activity' ? 'Quitar del newsletter' : 'Eliminar'}
                 </button>
                 <div style="display: flex; gap: 0.6rem;">
                     <button id="btn-editor-cancel" style="background: white; border: 1px solid var(--border); padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
@@ -479,9 +485,16 @@ function openConectadosEditor(act) {
     // --- Eliminar --- (única forma de borrar en mobile, donde la tarjeta no
     // muestra el botón de basura; en desktop también funciona)
     overlay.querySelector('#btn-editor-delete').onclick = () => {
-        if (confirm('¿Estás seguro de que querés eliminar este bloque?')) {
-            deleteActivity(act.id);
-            close();
+        if (kind === 'activity') {
+            if (confirm('¿Quitar esta actividad del newsletter Conectados?\n\nLa actividad NO se borra: seguí gestionándola desde la solapa Actividades.')) {
+                removeFromNewsletter(act.id);
+                close();
+            }
+        } else {
+            if (confirm('¿Eliminar este bloque del newsletter?')) {
+                deleteBlock(act.id);
+                close();
+            }
         }
     };
 

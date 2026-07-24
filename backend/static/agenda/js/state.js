@@ -269,6 +269,27 @@ export async function deleteActivity(id) {
     }
 }
 
+// Conectados: quita una ACTIVIDAD real del newsletter (le saca el canal
+// "Conectados"). La actividad queda intacta en la agenda — NO se borra ni archiva.
+export async function removeFromNewsletter(id) {
+    const act = state.activities.find(a => a.id === id);
+    if (!act) return;
+    const channels = (act.channels || []).filter(c => c !== 'Conectados');
+    await updateActivity(id, { channels });
+}
+
+// Conectados: borra un BLOQUE suelto (is_custom) del newsletter. Es una pieza del
+// newsletter, no una actividad de la agenda → se borra de verdad (hard delete).
+export async function deleteBlock(id) {
+    state.activities = state.activities.filter(a => a.id !== id);
+    notify();
+    try {
+        await trackedFetch(`/api/agenda/actividades/${id}?hard=true`, { method: 'DELETE' });
+    } catch (e) {
+        console.error("Failed to delete newsletter block on server", e);
+    }
+}
+
 // Trae el listado de actividades archivadas (para la vista Archivados).
 export async function loadArchived() {
     try {

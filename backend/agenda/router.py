@@ -351,13 +351,23 @@ def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/actividades/{activity_id}")
-def archive_activity(activity_id: str, db: Session = Depends(get_db)):
+def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends(get_db)):
     """Archiva la actividad (soft-delete): NO borra el registro, lo marca como
     archivado y sale de todas las vistas activas. La carpeta de Drive va a la
-    PAPELERA (recuperable). Todo se puede restaurar desde la vista Archivados."""
+    PAPELERA (recuperable). Todo se puede restaurar desde la vista Archivados.
+
+    `hard=true` SÓLO se acepta para bloques de newsletter (is_custom): son piezas
+    del Conectados, no actividades de la agenda, y se borran de verdad. Para una
+    actividad real se archiva igual, aunque venga hard=true (nunca se borra por
+    accidente desde Conectados)."""
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+
+    if hard and db_activity.is_custom:
+        db.delete(db_activity)
+        db.commit()
+        return {"ok": True, "deleted": True}
 
     if db_activity.drive_bcr:
         trash_drive_folder(db_activity.drive_bcr)
