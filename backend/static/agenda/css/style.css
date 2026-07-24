@@ -1360,36 +1360,41 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 }
 
 /* --- Impresión a PDF por rango de fechas (botón "Imprimir") --- */
+/* El layout/tipografía va FUERA de @media print para que la medición offscreen
+   (el paginado por JS en printRange) calcule las mismas alturas que la
+   impresión. @media print sólo agrega tamaño de página, saltos y visibilidad.
+   Cada .cmp-pa-page es una hoja A4 con su encabezado y su pie ("Página N de M")
+   repetidos — así el PDF queda paginado y con el título en todas las hojas. */
 #cmp-print-area { display: none; }
+
+.cmp-pa-page {
+    box-sizing: border-box;
+    width: 210mm; min-height: 295mm; padding: 12mm 16mm;
+    display: flex; flex-direction: column; background: #fff; color: #1a1a1a;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 12px; line-height: 1.5;
+}
+.cmp-pa-body { flex: 1 1 auto; }
+.cmp-pa-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #0742ab; padding-bottom: 8px; margin-bottom: 12px; }
+.cmp-pa-logo { height: 40px; width: auto; display: block; }
+.cmp-pa-head h1 { font-size: 18px; color: #0742ab; margin: 0; font-weight: 700; line-height: 1.15; }
+.cmp-pa-head p { margin: 1px 0 0; color: #666; font-size: 11px; }
+.cmp-pa-day-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #0742ab; border-bottom: 1px solid #cbd5e1; padding: 8px 0 3px; margin: 0; }
+.cmp-pa-act { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eef1f5; }
+.cmp-pa-time { font-weight: 700; color: #0742ab; }
+.cmp-pa-title { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }
+.cmp-pa-desc { color: #333; margin: 2px 0 4px; white-space: pre-wrap; }
+.cmp-pa-meta { font-size: 11px; color: #475569; line-height: 1.6; }
+.cmp-pa-meta strong { color: #1a1a1a; }
+.cmp-pa-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #cbd5e1; margin-top: 10px; padding-top: 6px; font-size: 10px; color: #666; }
+
 @media print {
     body * { visibility: hidden !important; }
     #cmp-print-area, #cmp-print-area * { visibility: visible !important; }
-    #cmp-print-area {
-        display: block; position: absolute; inset: 0; width: 100%;
-        padding: 0; color: #1a1a1a;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        font-size: 12px; line-height: 1.5;
-    }
-    .cmp-pa-logo { height: 50px; width: auto; display: block; margin-bottom: 10px; }
-    .cmp-pa-head { border-bottom: 2px solid #0742ab; padding-bottom: 8px; margin-bottom: 16px; }
-    .cmp-pa-head h1 { font-size: 20px; color: #0742ab; margin: 0 0 2px; font-weight: 700; }
-    .cmp-pa-head p { margin: 0; color: #666; font-size: 11px; }
-    .cmp-pa-day { break-inside: avoid; margin-bottom: 6px; }
-    .cmp-pa-day h2 {
-        font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-        color: #0742ab; border-bottom: 1px solid #cbd5e1;
-        padding-bottom: 3px; margin: 14px 0 8px;
-    }
-    .cmp-pa-act {
-        display: grid; grid-template-columns: 52px 1fr; gap: 12px;
-        padding: 7px 0; border-bottom: 1px solid #eef1f5; break-inside: avoid;
-    }
-    .cmp-pa-time { font-weight: 700; color: #0742ab; }
-    .cmp-pa-title { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }
-    .cmp-pa-desc { color: #333; margin: 2px 0 4px; white-space: pre-wrap; }
-    .cmp-pa-meta { font-size: 11px; color: #475569; line-height: 1.6; }
-    .cmp-pa-meta strong { color: #1a1a1a; }
-    @page { margin: 1.6cm; }
+    #cmp-print-area { display: block; position: absolute; inset: 0; width: 100%; }
+    .cmp-pa-page { page-break-after: always; }
+    .cmp-pa-page:last-child { page-break-after: avoid; }
+    @page { size: A4; margin: 0; }
 }
 
 .conectados-editor-card #editor-image-area:hover {

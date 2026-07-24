@@ -376,47 +376,91 @@ function printRange(from, to) {
         groups.get(o.occDate).push(o);
     }
 
-    let body = '';
+    // Unidades paginables: un encabezado por día + una por actividad. Se reparten
+    // en hojas A4 midiendo su altura, para poder poner nº de página en cada una.
+    const units = [];
     if (occ.length === 0) {
-        body = '<p>No hay actividades en el rango elegido.</p>';
+        units.push('<p style="padding:12px 0;color:#555;">No hay actividades en el rango elegido.</p>');
     } else {
         for (const [date, items] of groups) {
             const h = dayHeader(date);
-            body += `<div class="cmp-pa-day"><h2>${h.title} · ${h.date}</h2>`;
+            units.push(`<h2 class="cmp-pa-day-h">${h.title} · ${h.date}</h2>`);
             for (const o of items) {
                 const act = o.act;
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
                 const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
-                body += `<div class="cmp-pa-act">
+                units.push(`<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${esc(timeLabel(act))}</div>
                     <div>
                         <div class="cmp-pa-title">${esc(act.title) || '(Sin título)'}${dayTag}</div>
                         ${act.description ? `<div class="cmp-pa-desc">${esc(act.description)}</div>` : ''}
                         ${meta.length ? `<div class="cmp-pa-meta">${meta.join('<br>')}</div>` : ''}
                     </div>
-                </div>`;
+                </div>`);
             }
-            body += `</div>`;
         }
     }
+    const isDay = (i) => units[i].startsWith('<h2');
 
     const fmtRange = (iso) => {
         const [y, m, d] = iso.split('-').map(Number);
         return `${d}/${m}/${y}`;
     };
+    const headerHTML = `
+        <div class="cmp-pa-head">
+            <img class="cmp-pa-logo" src="/static/agenda/logo_bcr_azul.png" alt="Bolsa de Comercio de Rosario">
+            <div>
+                <h1>Agenda de Compromisos</h1>
+                <p>Período: ${fmtRange(from)} al ${fmtRange(to)}</p>
+            </div>
+        </div>`;
+    const footerHTML = (n, tot) =>
+        `<div class="cmp-pa-foot"><span>Agenda de Compromisos — BCR</span><span>Página ${n} de ${tot}</span></div>`;
+
+    // Medición offscreen: mismas clases que la impresión → mismas alturas.
+    const MM = 96 / 25.4;
+    const measurer = document.createElement('div');
+    measurer.style.cssText = 'position:absolute; left:-99999px; top:0; width:178mm; visibility:hidden;';
+    document.body.appendChild(measurer);
+    measurer.innerHTML = headerHTML;
+    const headH = measurer.firstElementChild.offsetHeight + 12;  // + margin-bottom
+    measurer.innerHTML = footerHTML(9, 9);
+    const footH = measurer.firstElementChild.offsetHeight + 10;  // + margin-top
+    measurer.innerHTML = units.join('');
+    const heights = [...measurer.children].map(c => c.offsetHeight);
+    document.body.removeChild(measurer);
+
+    // Alto útil para el cuerpo de cada hoja (A4 menos padding, encabezado y pie).
+    const contentH = (295 - 2 * 12) * MM;
+    const avail = contentH - headH - footH - 16;   // buffer de seguridad
+
+    const pages = [[]];
+    let cur = 0;
+    for (let i = 0; i < units.length; i++) {
+        const uh = heights[i] || 0;
+        const nextH = heights[i + 1] || 0;
+        // No dejar un encabezado de día huérfano al pie: si no entra con su
+        // primera actividad, arrancamos hoja nueva.
+        const orphanDay = isDay(i) && cur > 0 && (cur + uh + nextH > avail);
+        if ((cur > 0 && cur + uh > avail) || orphanDay) {
+            pages.push([]); cur = 0;
+        }
+        pages[pages.length - 1].push(i);
+        cur += uh;
+    }
+
+    const total = pages.length;
+    const pagesHTML = pages.map((idxs, pi) =>
+        `<section class="cmp-pa-page">${headerHTML}` +
+        `<div class="cmp-pa-body">${idxs.map(i => units[i]).join('')}</div>` +
+        `${footerHTML(pi + 1, total)}</section>`
+    ).join('');
 
     const area = document.createElement('div');
     area.id = 'cmp-print-area';
-    area.innerHTML = `
-        <div class="cmp-pa-head">
-            <img class="cmp-pa-logo" src="/static/agenda/logo_bcr_azul.png" alt="Bolsa de Comercio de Rosario">
-            <h1>Agenda de Compromisos</h1>
-            <p>Período: ${fmtRange(from)} al ${fmtRange(to)}</p>
-        </div>
-        ${body}
-    `;
+    area.innerHTML = pagesHTML;
     document.body.appendChild(area);
 
     // El título del documento aparece en el encabezado del PDF y como nombre de
