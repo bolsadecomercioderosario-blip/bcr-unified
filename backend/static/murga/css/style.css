@@ -1,28 +1,29 @@
 /* ============================================================
    Murga "Y Parió La Abuela" — El Más Acá. Sorteo del estreno.
-   Paleta: fondo #20212B, texto hueso, acento dorado #D9B44A.
+   Tema CLARO: fondo hueso/blanco, texto oscuro #20212B, acento dorado #D9B44A.
+   (El logo y el título son arte negro sobre transparente → van sobre claro.)
    Mobile-first. Tipografía Montserrat.
    ============================================================ */
 :root {
-    --bg: #20212B;
-    --bg-2: #272834;          /* tarjetas, un pelín más claro */
-    --bg-3: #2f3140;
-    --hueso: #F2EFE6;         /* texto principal */
-    --hueso-soft: #b9b6ad;    /* texto secundario */
-    --oro: #D9B44A;           /* acento */
+    --bg: #FAF6EE;            /* fondo de página, hueso cálido */
+    --bg-card: #FFFFFF;       /* tarjetas */
+    --bg-input: #FFFFFF;
+    --ink: #20212B;           /* texto principal (oscuro) */
+    --ink-soft: #6b6d78;      /* texto secundario */
+    --oro: #D9B44A;           /* acento / relleno de botones */
     --oro-2: #e7c869;
-    --oro-soft: #b79a3e;
-    --linea: #3a3c4b;
-    --err: #e08a7a;
+    --oro-deep: #9c7b23;      /* dorado legible como TEXTO sobre blanco */
+    --linea: #e7e1d3;         /* bordes */
+    --err: #c0492f;           /* rojo legible sobre blanco */
     --radio: 16px;
-    --sombra: 0 10px 40px rgba(0,0,0,.35);
+    --sombra: 0 10px 30px rgba(32,33,43,.10);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
     background: var(--bg);
-    color: var(--hueso);
+    color: var(--ink);
     font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -35,8 +36,8 @@ body {
     align-items: center;
     padding: 24px 18px calc(48px + env(safe-area-inset-bottom, 0px));
     background-image:
-        radial-gradient(1100px 500px at 50% -10%, rgba(217,180,74,.10), transparent 60%),
-        radial-gradient(700px 400px at 50% 120%, rgba(217,180,74,.05), transparent 60%);
+        radial-gradient(1100px 500px at 50% -10%, rgba(217,180,74,.16), transparent 62%),
+        radial-gradient(700px 400px at 50% 120%, rgba(217,180,74,.10), transparent 60%);
     background-attachment: fixed;
 }
 
@@ -47,23 +48,24 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 22px;
     text-align: center;
 }
-.brand-logo { max-width: 150px; max-height: 150px; object-fit: contain; }
-.brand-titulo { max-width: 100%; max-height: 120px; object-fit: contain; }
-.brand-fallback { display: block; }
+.brand-logo { max-width: 190px; max-height: 190px; object-fit: contain; }
+.brand-titulo { max-width: 92%; max-height: 96px; object-fit: contain; }
+/* Oculto por defecto: el logo.onerror lo muestra sólo si la imagen no carga. */
+.brand-fallback { display: none; }
 .bf-murga {
     font-size: .78rem; letter-spacing: .28em; text-transform: uppercase;
-    color: var(--oro); font-weight: 700;
+    color: var(--oro-deep); font-weight: 700;
 }
 .bf-obra {
     font-size: 2rem; font-weight: 900; line-height: 1.05; margin-top: 6px;
-    letter-spacing: .01em;
+    letter-spacing: .01em; color: var(--ink);
 }
 .bf-sub {
-    font-size: .9rem; font-style: italic; color: var(--hueso-soft); margin-top: 4px;
+    font-size: .9rem; font-style: italic; color: var(--ink-soft); margin-top: 4px;
 }
 
 /* ---------------- Layout general ---------------- */
@@ -74,17 +76,17 @@ body {
 
 .titulo {
     font-size: 1.5rem; font-weight: 800; line-height: 1.15;
-    margin-bottom: 8px; letter-spacing: .005em;
+    margin-bottom: 8px; letter-spacing: .005em; color: var(--ink);
 }
-.bajada { color: var(--hueso-soft); font-size: 1rem; line-height: 1.5; margin-bottom: 14px; }
-.bajada-lg { font-size: 1.12rem; color: var(--hueso); }
-.oro { color: var(--oro); }
-.oro-soft { color: var(--oro-soft); font-weight: 600; }
-.mini { font-size: .8rem; color: var(--hueso-soft); text-align: center; margin-top: 12px; font-style: italic; }
+.bajada { color: var(--ink-soft); font-size: 1rem; line-height: 1.5; margin-bottom: 14px; }
+.bajada-lg { font-size: 1.12rem; color: var(--ink); }
+.oro { color: var(--oro-deep); }
+.oro-soft { color: var(--oro-deep); font-weight: 600; }
+.mini { font-size: .8rem; color: var(--ink-soft); text-align: center; margin-top: 12px; font-style: italic; }
 
 /* ---------------- Tarjetas ---------------- */
 .card {
-    background: var(--bg-2);
+    background: var(--bg-card);
     border: 1px solid var(--linea);
     border-radius: var(--radio);
     padding: 22px 20px;
@@ -97,25 +99,25 @@ body {
 .field { display: block; margin-bottom: 16px; }
 .label {
     display: block; font-size: .82rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--hueso-soft); margin-bottom: 7px;
+    letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 7px;
 }
 input, textarea {
     width: 100%;
-    background: var(--bg);
+    background: var(--bg-input);
     border: 1.5px solid var(--linea);
     border-radius: 12px;
-    color: var(--hueso);
+    color: var(--ink);
     font-family: inherit;
     font-size: 1.05rem;   /* >=16px evita el zoom automático en iOS */
     padding: 13px 14px;
     transition: border-color .15s, box-shadow .15s;
 }
 textarea { resize: vertical; min-height: 96px; line-height: 1.4; }
-input::placeholder, textarea::placeholder { color: #7a7c8a; }
+input::placeholder, textarea::placeholder { color: #a7a49c; }
 input:focus, textarea:focus {
     outline: none;
     border-color: var(--oro);
-    box-shadow: 0 0 0 3px rgba(217,180,74,.18);
+    box-shadow: 0 0 0 3px rgba(217,180,74,.28);
 }
 .form-err {
     color: var(--err); font-size: .9rem; min-height: 1.1em; margin-bottom: 8px;
@@ -132,10 +134,10 @@ input:focus, textarea:focus {
     -webkit-tap-highlight-color: transparent;
 }
 .btn:active { transform: scale(.98); }
-.btn-oro { background: var(--oro); color: #201a08; border-color: var(--oro); }
-.btn-oro:hover { filter: brightness(1.06); }
-.btn-line { background: transparent; color: var(--hueso); border-color: var(--linea); }
-.btn-line:hover { border-color: var(--oro); color: var(--oro); }
+.btn-oro { background: var(--oro); color: var(--ink); border-color: var(--oro); }
+.btn-oro:hover { filter: brightness(1.04); }
+.btn-line { background: transparent; color: var(--ink); border-color: var(--linea); }
+.btn-line:hover { border-color: var(--oro); color: var(--oro-deep); }
 .btn-sm { width: auto; padding: 9px 14px; font-size: .9rem; }
 .btn-lg { font-size: 1.2rem; padding: 18px 22px; }
 .btn + .btn { margin-top: 10px; }
@@ -144,7 +146,7 @@ input:focus, textarea:focus {
 /* ---------------- Toast ---------------- */
 .toast {
     position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
-    background: var(--bg-3); color: var(--hueso); border: 1px solid var(--linea);
+    background: var(--ink); color: #FAF6EE; border: 1px solid var(--ink);
     padding: 12px 18px; border-radius: 10px; font-size: .92rem; font-weight: 600;
     box-shadow: var(--sombra); opacity: 0; pointer-events: none;
     transition: opacity .2s, transform .2s; z-index: 50; max-width: 90vw; text-align: center;
@@ -157,50 +159,50 @@ input:focus, textarea:focus {
 .view-presenter .titulo { font-size: 1.9rem; }
 .pres-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .pill {
-    display: inline-block; background: var(--oro); color: #201a08;
+    display: inline-block; background: var(--oro); color: var(--ink);
     font-size: 1.1rem; font-weight: 800; padding: 2px 12px; border-radius: 999px;
     vertical-align: middle;
 }
 .denegado {
     display: none; margin-top: 18px; padding: 16px; border-radius: 12px;
-    background: rgba(224,138,122,.12); border: 1px solid var(--err); color: var(--err);
+    background: rgba(192,73,47,.08); border: 1px solid var(--err); color: var(--err);
     font-weight: 600; text-align: center;
 }
 
 /* --- Voluntades --- */
 .voluntades-lista { display: flex; flex-direction: column; gap: 12px; }
 .vol-item {
-    background: var(--bg-2); border: 1px solid var(--linea); border-left: 4px solid var(--oro);
-    border-radius: 12px; padding: 16px 18px;
+    background: var(--bg-card); border: 1px solid var(--linea); border-left: 4px solid var(--oro);
+    border-radius: 12px; padding: 16px 18px; box-shadow: var(--sombra);
     animation: fade .3s ease;
 }
-.vol-nombre { color: var(--oro); font-weight: 800; font-size: 1.25rem; margin-bottom: 4px; }
-.vol-texto { font-size: 1.35rem; line-height: 1.4; color: var(--hueso); }
-.vacio, .view-presenter .vacio { display: none; text-align: center; color: var(--hueso-soft); padding: 40px 10px; font-size: 1.1rem; font-style: italic; }
+.vol-nombre { color: var(--oro-deep); font-weight: 800; font-size: 1.25rem; margin-bottom: 4px; }
+.vol-texto { font-size: 1.35rem; line-height: 1.4; color: var(--ink); }
+.vacio, .view-presenter .vacio { display: none; text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 1.1rem; font-style: italic; }
 
 /* --- Sorteo --- */
 .ruleta-wrap {
     margin: 26px 0 10px; padding: 34px 16px;
-    background: var(--bg-2); border: 1px solid var(--linea); border-radius: 20px;
+    background: var(--bg-card); border: 1px solid var(--linea); border-radius: 20px;
     box-shadow: var(--sombra); text-align: center; overflow: hidden;
 }
 .ruleta {
     font-size: clamp(2rem, 11vw, 4.5rem); font-weight: 900; line-height: 1.1;
-    color: var(--hueso); letter-spacing: .01em; word-break: break-word;
+    color: var(--ink); letter-spacing: .01em; word-break: break-word;
     transition: color .2s;
 }
-.ruleta.girando { color: var(--hueso-soft); }
+.ruleta.girando { color: var(--ink-soft); }
 .ruleta.ganador {
-    color: var(--oro);
-    text-shadow: 0 0 26px rgba(217,180,74,.55);
+    color: var(--oro-deep);
+    text-shadow: 0 2px 18px rgba(217,180,74,.45);
     animation: pop .5s cubic-bezier(.2,1.4,.4,1);
 }
 @keyframes pop { 0% { transform: scale(.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-.s-info { text-align: center; color: var(--hueso-soft); font-size: 1rem; min-height: 1.4em; margin-bottom: 18px; font-weight: 600; }
+.s-info { text-align: center; color: var(--ink-soft); font-size: 1rem; min-height: 1.4em; margin-bottom: 18px; font-weight: 600; }
 .s-controls { margin-bottom: 14px; }
 .s-check {
     display: flex; align-items: center; justify-content: center; gap: 9px;
-    color: var(--hueso-soft); font-size: .95rem; cursor: pointer; user-select: none;
+    color: var(--ink-soft); font-size: .95rem; cursor: pointer; user-select: none;
 }
 .s-check input { width: 18px; height: 18px; accent-color: var(--oro); }
 
