@@ -69,12 +69,6 @@
             .catch(function (e) { err.textContent = e.message || "No se pudo registrar. Reintentá."; })
             .finally(function () { btn.disabled = false; btn.textContent = "Registrar mi voluntad"; });
         });
-
-        $("#btn-otra").addEventListener("click", function () {
-            show("view-form");
-            window.scrollTo({ top: 0, behavior: "smooth" });
-            $("#f-nombre").focus();
-        });
     }
 
     // ================= (3) VOLUNTADES =================

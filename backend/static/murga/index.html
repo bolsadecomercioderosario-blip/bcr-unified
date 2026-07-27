@@ -32,28 +32,27 @@
         <!-- ================= (1) FORMULARIO PÚBLICO ================= -->
         <section id="view-form" class="view">
             <h1 class="titulo">Antes de cruzar, dejá tu huella</h1>
-            <p class="bajada">Completá tus datos y entrá al sorteo de una remera de la murga. Y de paso… dejanos tu última voluntad. Nunca se sabe.</p>
+            <p class="bajada">Completá tus datos y participá del sorteo de una remera de la murga. Y de paso… dejanos tu última voluntad. Nunca se sabe.</p>
 
             <form id="form" class="card" autocomplete="on" novalidate>
                 <label class="field">
-                    <span class="label">Tu nombre</span>
-                    <input id="f-nombre" name="nombre" type="text" placeholder="¿Cómo te vamos a nombrar?" autocomplete="name" required>
+                    <span class="label">Tu nombre y apellido</span>
+                    <input id="f-nombre" name="nombre" type="text" autocomplete="name" required>
                 </label>
 
                 <label class="field">
                     <span class="label">Tu celular</span>
-                    <input id="f-celular" name="celular" type="tel" inputmode="tel" placeholder="Por si el destino te elige" autocomplete="tel" required>
+                    <input id="f-celular" name="celular" type="tel" inputmode="tel" autocomplete="tel" required>
                 </label>
 
                 <label class="field">
                     <span class="label">¿Cuál es tu última voluntad?</span>
-                    <textarea id="f-voluntad" name="voluntad" rows="4" placeholder="Un deseo, un descargo, una cuenta pendiente…" required></textarea>
+                    <textarea id="f-voluntad" name="voluntad" rows="4" required></textarea>
                 </label>
 
                 <div id="form-err" class="form-err" role="alert"></div>
 
                 <button id="btn-enviar" type="submit" class="btn btn-oro">Registrar mi voluntad</button>
-                <p class="mini">Tres campos, todos obligatorios. Del más acá no se vuelve con las manos vacías.</p>
             </form>
         </section>
 
@@ -62,10 +61,9 @@
             <div class="card card-center">
                 <div class="halo">✦</div>
                 <h1 class="titulo">Gracias, <span id="g-nombre" class="oro">…</span>.</h1>
-                <p class="bajada bajada-lg">Tu última voluntad quedó registrada en el más acá.</p>
-                <p class="bajada">Ya sos parte del ritual. Aflojá los huesos, respirá hondo y quedate: la función está por empezar. Si la vida es un ratito, que este sea uno bueno.</p>
-                <p class="bajada oro-soft">Tu nombre entró en la urna del destino. Puede que la remera venga a buscarte.</p>
-                <button id="btn-otra" type="button" class="btn btn-line">Registrar a otra persona</button>
+                <p class="bajada bajada-lg">Tu última voluntad quedó registrada.</p>
+                <p class="bajada">Seguí a la murga en Instagram, que esto recién arranca:</p>
+                <a class="btn btn-oro" href="https://www.instagram.com/y.pario.la.abuela" target="_blank" rel="noopener">Seguinos · @y.pario.la.abuela</a>
             </div>
         </section>
 
