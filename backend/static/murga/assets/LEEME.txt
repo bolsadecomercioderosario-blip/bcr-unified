@@ -1,0 +1,10 @@
+Branding de la murga — dejá acá los PNG y el front los toma solo.
+
+  logo.png    → logo de "Y Parió La Abuela"   (idealmente cuadrado o transparente, ~600px)
+  titulo.png  → lettering de "El Más Acá…"     (PNG transparente, ancho libre)
+
+Mientras estos archivos no existan, el header muestra un texto de respaldo
+(nombre de la murga + título). En cuanto los subís con estos nombres exactos,
+reemplazan al texto sin tocar código.
+
+Ubicación final: backend/static/murga/assets/logo.png y titulo.png

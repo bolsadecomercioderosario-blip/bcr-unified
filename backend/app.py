@@ -29,6 +29,7 @@ import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
 import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
 import disponibilidad.models  # noqa: F401  — registra tabla disp_responses
+import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -43,6 +44,7 @@ from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
 from aapresid.router import router as aapresid_api
 from disponibilidad.router import router as disponibilidad_api
+from murga.router import router as murga_api
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -100,6 +102,7 @@ app.include_router(metricas_api)
 app.include_router(compromisos_api)
 app.include_router(aapresid_api)
 app.include_router(disponibilidad_api)
+app.include_router(murga_api)
 
 
 # ---------------------------------------------------------
@@ -137,10 +140,24 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "disponibilidad"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "disponibilidad", "murga"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
+
+
+# Murga — sorteo del estreno. El home (/murga/) es el formulario público al que
+# apunta el QR. Las vistas del presentador viven en sub-rutas y sirven el MISMO
+# SPA: el JS mira location.pathname para decidir qué mostrar, y valida el token
+# (?k=...) contra el API. Se registran antes del mount estático para precedencia.
+@app.get("/murga/voluntades")
+@app.get("/murga/sorteo")
+@app.get("/murga/export")
+async def _murga_presentador():
+    return HTMLResponse(
+        content=get_module_html("murga"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
 
 
 # Disponibilidad — vista de resultados en URL aparte (/disponibilidad/admin).
@@ -263,6 +280,7 @@ app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), 
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
 app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
 app.mount("/disponibilidad", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "disponibilidad"), html=False), name="disponibilidad_ui")
+app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
 
 
 @app.get("/")

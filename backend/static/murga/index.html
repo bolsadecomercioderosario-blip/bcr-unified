@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Y Parió La Abuela — El Más Acá</title>
+    <meta name="theme-color" content="#20212B">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500;1,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+    <!-- ============ Slot para el branding de la murga ============
+         Pegá acá los PNG:  assets/logo.png  (logo de la murga)
+                            assets/titulo.png (lettering del título)
+         Si los archivos no existen, se muestra el texto de respaldo. -->
+    <header class="brand" id="brand">
+        <img class="brand-logo" src="assets/logo.png" alt="Y Parió La Abuela"
+             onerror="this.style.display='none'; document.getElementById('brand-fallback').style.display='block'">
+        <img class="brand-titulo" src="assets/titulo.png" alt="El Más Acá"
+             onerror="this.style.display='none'">
+        <div class="brand-fallback" id="brand-fallback">
+            <div class="bf-murga">Y Parió La Abuela</div>
+            <div class="bf-obra">El Más Acá</div>
+            <div class="bf-sub">¿Hay vida después del nacimiento?</div>
+        </div>
+    </header>
+
+    <main class="stage">
+
+        <!-- ================= (1) FORMULARIO PÚBLICO ================= -->
+        <section id="view-form" class="view">
+            <h1 class="titulo">Antes de cruzar, dejá tu huella</h1>
+            <p class="bajada">Completá tus datos y entrá al sorteo de una remera de la murga. Y de paso… dejanos tu última voluntad. Nunca se sabe.</p>
+
+            <form id="form" class="card" autocomplete="on" novalidate>
+                <label class="field">
+                    <span class="label">Tu nombre</span>
+                    <input id="f-nombre" name="nombre" type="text" placeholder="¿Cómo te vamos a nombrar?" autocomplete="name" required>
+                </label>
+
+                <label class="field">
+                    <span class="label">Tu celular</span>
+                    <input id="f-celular" name="celular" type="tel" inputmode="tel" placeholder="Por si el destino te elige" autocomplete="tel" required>
+                </label>
+
+                <label class="field">
+                    <span class="label">¿Cuál es tu última voluntad?</span>
+                    <textarea id="f-voluntad" name="voluntad" rows="4" placeholder="Un deseo, un descargo, una cuenta pendiente…" required></textarea>
+                </label>
+
+                <div id="form-err" class="form-err" role="alert"></div>
+
+                <button id="btn-enviar" type="submit" class="btn btn-oro">Registrar mi voluntad</button>
+                <p class="mini">Tres campos, todos obligatorios. Del más acá no se vuelve con las manos vacías.</p>
+            </form>
+        </section>
+
+        <!-- ================= (2) CONFIRMACIÓN ================= -->
+        <section id="view-gracias" class="view">
+            <div class="card card-center">
+                <div class="halo">✦</div>
+                <h1 class="titulo">Gracias, <span id="g-nombre" class="oro">…</span>.</h1>
+                <p class="bajada bajada-lg">Tu última voluntad quedó registrada en el más acá.</p>
+                <p class="bajada">Ya sos parte del ritual. Aflojá los huesos, respirá hondo y quedate: la función está por empezar. Si la vida es un ratito, que este sea uno bueno.</p>
+                <p class="bajada oro-soft">Tu nombre entró en la urna del destino. Puede que la remera venga a buscarte.</p>
+                <button id="btn-otra" type="button" class="btn btn-line">Registrar a otra persona</button>
+            </div>
+        </section>
+
+        <!-- ================= (3) VOLUNTADES (presentador) ================= -->
+        <section id="view-voluntades" class="view view-presenter">
+            <div class="pres-head">
+                <h1 class="titulo">Últimas voluntades <span id="v-total" class="pill">0</span></h1>
+                <button id="v-refresh" type="button" class="btn btn-line btn-sm">Refrescar</button>
+            </div>
+            <div id="v-lista" class="voluntades-lista"></div>
+            <div id="v-vacio" class="vacio">Todavía no hay voluntades. En cuanto entren, aparecen solas acá.</div>
+            <div id="v-denegado" class="denegado">Acceso restringido. Falta el token en la URL (…?k=…).</div>
+        </section>
+
+        <!-- ================= (4) SORTEO (presentador) ================= -->
+        <section id="view-sorteo" class="view view-presenter">
+            <h1 class="titulo">El sorteo</h1>
+            <div class="ruleta-wrap">
+                <div id="ruleta" class="ruleta">—</div>
+            </div>
+            <div id="s-info" class="s-info"></div>
+            <div class="s-controls">
+                <button id="s-go" type="button" class="btn btn-oro btn-lg">¡Sortear!</button>
+                <button id="s-ganador" type="button" class="btn btn-line hidden">Marcar como ganador/a</button>
+            </div>
+            <label class="s-check">
+                <input id="s-excluir" type="checkbox" checked>
+                <span>Excluir a quienes ya ganaron</span>
+            </label>
+            <div id="s-denegado" class="denegado">Acceso restringido. Falta el token en la URL (…?k=…).</div>
+        </section>
+
+        <!-- ================= (5) EXPORT (presentador) ================= -->
+        <section id="view-export" class="view view-presenter">
+            <div class="card card-center">
+                <h1 class="titulo">Exportar datos</h1>
+                <p class="bajada">Descargá un Excel con todos los inscriptos: nombre, celular, última voluntad y fecha/hora.</p>
+                <p id="e-count" class="bajada oro-soft"></p>
+                <button id="e-go" type="button" class="btn btn-oro btn-lg">Descargar Excel (.xlsx)</button>
+                <div id="e-denegado" class="denegado">Acceso restringido. Falta el token en la URL (…?k=…).</div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- SheetJS para generar el .xlsx en el browser (solo se usa en /export). -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>
