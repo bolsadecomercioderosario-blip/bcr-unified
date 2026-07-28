@@ -72,6 +72,7 @@ button { font-family: inherit; }
 .shift-badge.turno-tarde { background: #ede9fe; color: #6d28d9; }
 .block-time { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .block-resp { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.resp-label { flex-basis: 100%; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: -.15rem; }
 .resp-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .74rem; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; padding: .12rem .5rem; border-radius: 999px; }
 .no-resp { font-size: .74rem; font-weight: 700; color: var(--warn); background: #fffbeb; border: 1px solid #fde68a; padding: .12rem .5rem; border-radius: 999px; }
 .block-people { padding: .2rem .9rem .3rem; display: flex; flex-direction: column; }

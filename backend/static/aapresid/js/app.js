@@ -84,7 +84,7 @@
       { n: mtgs.length, l: 'Reuniones' },
       { n: mtgs.filter(x => x.status === 'Confirmada').length, l: 'Confirmadas' },
       { n: mtgs.filter(x => x.status === 'Tentativa').length, l: 'Tentativas' },
-      { n: noResp, l: 'Turnos sin responsable', warn: noResp > 0 },
+      { n: noResp, l: 'Turnos sin asignar', warn: noResp > 0 },
     ];
     const kpiHtml = kpis.map(k => `<div class="kpi ${k.warn ? 'warn' : ''}"><div class="n">${k.n}</div><div class="l">${k.l}</div></div>`).join('');
 
@@ -104,8 +104,8 @@
   function shiftBlock(s) {
     const rnames = respList(s);
     const respHtml = rnames.length
-      ? `<div class="turn-resp">${rnames.map(n => `<span class="resp-badge">★ ${esc(n)}</span>`).join('')}<button class="link-btn" data-action="set-resp" data-shift="${s.id}">editar</button></div>`
-      : `<div class="turn-resp"><span class="no-resp">⚠ Sin responsable</span><button class="btn-soft btn-sm" data-action="set-resp" data-shift="${s.id}">Designar responsables</button></div>`;
+      ? `<div class="turn-resp"><span class="resp-label">Presentes en el Stand</span>${rnames.map(n => `<span class="resp-badge">★ ${esc(n)}</span>`).join('')}<button class="link-btn" data-action="set-resp" data-shift="${s.id}">editar</button></div>`
+      : `<div class="turn-resp"><span class="no-resp">⚠ Nadie asignado al Stand</span><button class="btn-soft btn-sm" data-action="set-resp" data-shift="${s.id}">Asignar presentes</button></div>`;
     const mrows = meetingsForShift(s.id).map(mt => {
       const meta = [mt.area_name, mt.responsible_name, mt.location].filter(Boolean).map(esc).join(' · ');
       return `<div class="mcard ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
@@ -140,9 +140,9 @@
     const s = STATE.shifts.find(x => x.id === shiftId); if (!s) return;
     let names = respList(s);   // lista editable local
     openModal(`
-      <div class="modal-head"><h3>Responsables del turno</h3><button class="modal-x" data-x>×</button></div>
+      <div class="modal-head"><h3>Presentes en el Stand</h3><button class="modal-x" data-x>×</button></div>
       <p class="rmeta">${dayName(s.date)} ${dateLabel(s.date)} · ${esc(s.name)} (${esc(s.start_time)}–${esc(s.end_time)})</p>
-      <label>Responsables <span style="font-weight:400;color:var(--muted);">(podés poner varios)</span></label>
+      <label>¿Quiénes están en el Stand? <span style="font-weight:400;color:var(--muted);">(podés poner varios)</span></label>
       <div id="rf-chips" class="rf-chips"></div>
       <div class="rf-add">
         <input id="rf-name" type="text" placeholder="Escribí un nombre y Enter">
@@ -157,7 +157,7 @@
     const renderChips = () => {
       chipsEl.innerHTML = names.length
         ? names.map((n, i) => `<span class="rf-chip">${esc(n)}<button type="button" class="rf-chip-x" data-i="${i}" title="Quitar">×</button></span>`).join('')
-        : '<span class="no-resp">Sin responsables todavía</span>';
+        : '<span class="no-resp">Nadie asignado todavía</span>';
       chipsEl.querySelectorAll('.rf-chip-x').forEach(b => b.onclick = () => { names.splice(Number(b.dataset.i), 1); renderChips(); });
     };
     const addName = () => {
