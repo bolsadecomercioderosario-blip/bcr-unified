@@ -173,6 +173,14 @@ button { font-family: inherit; }
 .btn-sm { padding: .35rem .7rem; font-size: .82rem; border-radius: .45rem; }
 .btn-soft { background: #eef2ff; color: var(--primary); border: 1px solid #dbe3ff; padding: .35rem .7rem; border-radius: .45rem; font-weight: 600; font-size: .82rem; cursor: pointer; }
 .btn-soft:hover { background: #e0e7ff; }
+
+/* Editor de responsables (varios, con chips) */
+.rf-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .15rem 0 .7rem; min-height: 1.6rem; }
+.rf-chip { display: inline-flex; align-items: center; gap: .35rem; font-size: .84rem; font-weight: 600; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; padding: .2rem .3rem .2rem .6rem; border-radius: 999px; }
+.rf-chip-x { border: none; background: #bbf7d0; color: #166534; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: .9rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.rf-chip-x:hover { background: #16a34a; color: #fff; }
+.rf-add { display: flex; gap: .5rem; align-items: center; }
+.rf-add input { flex: 1; }
 .btn-line { background: #fff; border: 1px solid var(--border); color: var(--text); padding: .5rem .9rem; border-radius: .5rem; font-weight: 600; cursor: pointer; font-size: .88rem; }
 .btn-line:hover { border-color: var(--primary); color: var(--primary); }
 .btn-danger { background: none; border: 1px solid #fecaca; color: var(--danger); padding: .5rem .8rem; border-radius: .5rem; font-weight: 600; cursor: pointer; }

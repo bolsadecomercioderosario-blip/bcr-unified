@@ -28,7 +28,9 @@
   const statusClass = (s) => 'st-' + (s || 'Tentativa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const areaById = (id) => STATE.areas.find(a => a.id === id);
   const areaName = (id) => { const a = areaById(id); return a ? a.name : ''; };
-  const hasResp = (s) => s.responsible_name && s.responsible_name.trim();
+  // Responsables del turno: texto libre, uno por línea (puede haber varios).
+  const respList = (s) => (s.responsible_name || '').split('\n').map(x => x.trim()).filter(Boolean);
+  const hasResp = (s) => respList(s).length > 0;
 
   function toast(msg, type) {
     const t = el('toast'); t.textContent = msg; t.className = 'toast show ' + (type || '');
@@ -100,9 +102,10 @@
   }
 
   function shiftBlock(s) {
-    const respHtml = hasResp(s)
-      ? `<div class="turn-resp"><span class="resp-badge">★ ${esc(s.responsible_name)}</span><button class="link-btn" data-action="set-resp" data-shift="${s.id}">cambiar</button></div>`
-      : `<div class="turn-resp"><span class="no-resp">⚠ Sin responsable</span><button class="btn-soft btn-sm" data-action="set-resp" data-shift="${s.id}">Designar responsable</button></div>`;
+    const rnames = respList(s);
+    const respHtml = rnames.length
+      ? `<div class="turn-resp">${rnames.map(n => `<span class="resp-badge">★ ${esc(n)}</span>`).join('')}<button class="link-btn" data-action="set-resp" data-shift="${s.id}">editar</button></div>`
+      : `<div class="turn-resp"><span class="no-resp">⚠ Sin responsable</span><button class="btn-soft btn-sm" data-action="set-resp" data-shift="${s.id}">Designar responsables</button></div>`;
     const mrows = meetingsForShift(s.id).map(mt => {
       const meta = [mt.area_name, mt.responsible_name, mt.location].filter(Boolean).map(esc).join(' · ');
       return `<div class="mcard ${statusClass(mt.status)}" data-action="edit-meeting" data-id="${mt.id}">
@@ -132,27 +135,48 @@
   function closeModal() { el('modal').classList.add('hidden'); el('modal-card').innerHTML = ''; }
   el('modal').addEventListener('mousedown', (e) => { if (e.target === el('modal')) closeModal(); });
 
-  // ---------- responsable del turno (texto libre) ----------
+  // ---------- responsables del turno (texto libre, varios) ----------
   function openRespForm(shiftId) {
     const s = STATE.shifts.find(x => x.id === shiftId); if (!s) return;
+    let names = respList(s);   // lista editable local
     openModal(`
-      <div class="modal-head"><h3>Responsable del turno</h3><button class="modal-x" data-x>×</button></div>
+      <div class="modal-head"><h3>Responsables del turno</h3><button class="modal-x" data-x>×</button></div>
       <p class="rmeta">${dayName(s.date)} ${dateLabel(s.date)} · ${esc(s.name)} (${esc(s.start_time)}–${esc(s.end_time)})</p>
-      <label>¿Quién es el responsable?</label>
-      <input id="rf-name" type="text" value="${esc(s.responsible_name || '')}" placeholder="Escribí el nombre">
+      <label>Responsables <span style="font-weight:400;color:var(--muted);">(podés poner varios)</span></label>
+      <div id="rf-chips" class="rf-chips"></div>
+      <div class="rf-add">
+        <input id="rf-name" type="text" placeholder="Escribí un nombre y Enter">
+        <button class="btn-soft btn-sm" id="rf-add" type="button">+ Agregar</button>
+      </div>
       <div class="modal-foot">
-        ${hasResp(s) ? '<button class="btn-danger left" data-clear>Quitar</button>' : ''}
         <button class="btn-line" data-x>Cancelar</button>
         <button class="btn-primary" data-save>Guardar</button>
       </div>`);
-    el('rf-name').focus();
-    el('modal-card').querySelectorAll('[data-x]').forEach(b => b.onclick = closeModal);
-    const save = async (name) => {
-      try { await api('/shifts/' + shiftId + '/responsible', { method: 'PUT', body: JSON.stringify({ responsible_name: name }) }); closeModal(); await loadState(false); toast('Guardado', 'ok'); }
-      catch (err) { toast(err.detail || 'Error', 'err'); }
+    const chipsEl = el('rf-chips');
+    const input = el('rf-name');
+    const renderChips = () => {
+      chipsEl.innerHTML = names.length
+        ? names.map((n, i) => `<span class="rf-chip">${esc(n)}<button type="button" class="rf-chip-x" data-i="${i}" title="Quitar">×</button></span>`).join('')
+        : '<span class="no-resp">Sin responsables todavía</span>';
+      chipsEl.querySelectorAll('.rf-chip-x').forEach(b => b.onclick = () => { names.splice(Number(b.dataset.i), 1); renderChips(); });
     };
-    el('modal-card').querySelector('[data-save]').onclick = () => save(el('rf-name').value.trim());
-    const clr = el('modal-card').querySelector('[data-clear]'); if (clr) clr.onclick = () => save('');
+    const addName = () => {
+      const v = input.value.trim();
+      if (v && !names.some(n => n.toLowerCase() === v.toLowerCase())) names.push(v);
+      input.value = ''; input.focus(); renderChips();
+    };
+    renderChips();
+    input.focus();
+    el('rf-add').onclick = addName;
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addName(); } });
+    el('modal-card').querySelectorAll('[data-x]').forEach(b => b.onclick = closeModal);
+    el('modal-card').querySelector('[data-save]').onclick = async () => {
+      addName();  // por si quedó texto sin agregar en el input
+      try {
+        await api('/shifts/' + shiftId + '/responsible', { method: 'PUT', body: JSON.stringify({ responsible_name: names.join('\n') }) });
+        closeModal(); await loadState(false); toast('Guardado', 'ok');
+      } catch (err) { toast(err.detail || 'Error', 'err'); }
+    };
   }
 
   // ---------- reunión (simplificada) ----------

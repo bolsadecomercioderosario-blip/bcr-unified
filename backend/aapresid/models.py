@@ -40,8 +40,10 @@ class AapShift(Base):
     end_time = Column(String(5), nullable=False)
     display_order = Column(Integer, default=0)
     active = Column(Boolean, default=True)
-    # Responsable del turno: texto libre (alguien escribe quién es).
-    responsible_name = Column(String(200), default="")
+    # Responsables del turno: texto libre. Puede haber VARIOS — se guardan uno
+    # por línea (separados por '\n') en este mismo campo. Text (sin límite de
+    # largo) para que entren todos los que hagan falta.
+    responsible_name = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
