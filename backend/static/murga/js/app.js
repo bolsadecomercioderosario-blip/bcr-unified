@@ -210,6 +210,22 @@
             .then(function (d) { count.textContent = (d.total || 0) + " inscripto(s) para exportar."; })
             .catch(function () {});
 
+        // Borrado total (limpiar datos de prueba / vaciar después del estreno).
+        var btnReset = $("#e-reset");
+        btnReset.addEventListener("click", function () {
+            if (!confirm("¿Seguro que querés BORRAR TODOS los registros?\n\nEsto no se puede deshacer. Si no descargaste el Excel, hacelo antes.")) return;
+            if (!confirm("Última confirmación: se borran TODAS las respuestas. ¿Continuar?")) return;
+            btnReset.disabled = true; btnReset.textContent = "Borrando…";
+            fetch(withToken(API + "/reset"), { method: "POST" })
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (d) {
+                    toast("Listo: se borraron " + (d.borrados || 0) + " registro(s).");
+                    count.textContent = "0 inscripto(s) para exportar.";
+                })
+                .catch(function () { toast("No se pudo borrar. Reintentá."); })
+                .finally(function () { btnReset.disabled = false; btnReset.textContent = "Borrar todos los registros"; });
+        });
+
         btn.addEventListener("click", function () {
             btn.disabled = true; btn.textContent = "Generando…";
             fetch(withToken(API + "/participantes"))

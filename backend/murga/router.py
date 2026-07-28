@@ -107,3 +107,13 @@ def excluir(
     p.excluido = bool(payload.excluido)
     db.commit()
     return {"ok": True, "id": p.id, "excluido": p.excluido}
+
+
+@router.post("/reset")
+def reset(_: bool = Depends(require_token), db: Session = Depends(get_db)):
+    """Borra TODOS los inscriptos. Sirve para limpiar los datos de prueba antes
+    del estreno (y para vaciar todo después). Irreversible — el frontend pide
+    confirmación antes de llamarlo."""
+    borrados = db.query(m.Participante).delete()
+    db.commit()
+    return {"ok": True, "borrados": borrados}
