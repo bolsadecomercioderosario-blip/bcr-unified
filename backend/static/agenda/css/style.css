@@ -1380,6 +1380,7 @@ body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 .cmp-pa-head h1 { font-size: 18px; color: #0742ab; margin: 0; font-weight: 700; line-height: 1.15; }
 .cmp-pa-head p { margin: 1px 0 0; color: #666; font-size: 11px; }
 .cmp-pa-day-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #0742ab; border-bottom: 1px solid #cbd5e1; padding: 8px 0 3px; margin: 0; }
+.cmp-pa-day-h .cont-tag { font-weight: 500; text-transform: none; letter-spacing: 0; color: #64748b; font-size: 0.92em; }
 .cmp-pa-act { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eef1f5; }
 .cmp-pa-time { font-weight: 700; color: #0742ab; }
 .cmp-pa-title { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }

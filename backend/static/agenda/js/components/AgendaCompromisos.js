@@ -381,12 +381,18 @@ function printRange(from, to) {
     // Unidades paginables: un encabezado por día + una por actividad. Se reparten
     // en hojas A4 midiendo su altura, para poder poner nº de página en cada una.
     const units = [];
+    // Por cada unidad: el encabezado del día "en continuación" (para repetirlo
+    // arriba si esa actividad arranca una hoja nueva). null para los headers de día.
+    const contHeaderFor = [];
     if (occ.length === 0) {
         units.push('<p style="padding:12px 0;color:#555;">No hay actividades en el rango elegido.</p>');
+        contHeaderFor.push(null);
     } else {
         for (const [date, items] of groups) {
             const h = dayHeader(date);
+            const contHdr = `<h2 class="cmp-pa-day-h">${h.title} · ${h.date} <span class="cont-tag">(cont.)</span></h2>`;
             units.push(`<h2 class="cmp-pa-day-h">${h.title} · ${h.date}</h2>`);
+            contHeaderFor.push(null);
             for (const o of items) {
                 const act = o.act;
                 const meta = [];
@@ -401,6 +407,7 @@ function printRange(from, to) {
                         ${meta.length ? `<div class="cmp-pa-meta">${meta.join('<br>')}</div>` : ''}
                     </div>
                 </div>`);
+                contHeaderFor.push(contHdr);
             }
         }
     }
@@ -430,6 +437,8 @@ function printRange(from, to) {
     const headH = measurer.firstElementChild.offsetHeight + 12;  // + margin-bottom
     measurer.innerHTML = footerHTML(9, 9);
     const footH = measurer.firstElementChild.offsetHeight + 10;  // + margin-top
+    measurer.innerHTML = '<h2 class="cmp-pa-day-h">Xx · 1 de enero <span class="cont-tag">(cont.)</span></h2>';
+    const contH = measurer.firstElementChild.offsetHeight;       // alto del header "(cont.)"
     measurer.innerHTML = units.join('');
     const heights = [...measurer.children].map(c => c.offsetHeight);
     document.body.removeChild(measurer);
@@ -447,18 +456,25 @@ function printRange(from, to) {
         // primera actividad, arrancamos hoja nueva.
         const orphanDay = isDay(i) && cur > 0 && (cur + uh + nextH > avail);
         if ((cur > 0 && cur + uh > avail) || orphanDay) {
-            pages.push([]); cur = 0;
+            pages.push([]);
+            // Si la hoja nueva arranca con una actividad (día que se arrastra),
+            // reservamos el alto del encabezado "(cont.)" que le pondremos arriba.
+            cur = isDay(i) ? 0 : contH;
         }
         pages[pages.length - 1].push(i);
         cur += uh;
     }
 
     const total = pages.length;
-    const pagesHTML = pages.map((idxs, pi) =>
-        `<section class="cmp-pa-page">${headerHTML}` +
-        `<div class="cmp-pa-body">${idxs.map(i => units[i]).join('')}</div>` +
-        `${footerHTML(pi + 1, total)}</section>`
-    ).join('');
+    const pagesHTML = pages.map((idxs, pi) => {
+        const first = idxs[0];
+        // Hoja que continúa un día de la anterior: repetimos el encabezado del día.
+        const prefix = (pi > 0 && first != null && !isDay(first) && contHeaderFor[first])
+            ? contHeaderFor[first] : '';
+        return `<section class="cmp-pa-page">${headerHTML}` +
+            `<div class="cmp-pa-body">${prefix}${idxs.map(i => units[i]).join('')}</div>` +
+            `${footerHTML(pi + 1, total)}</section>`;
+    }).join('');
 
     const area = document.createElement('div');
     area.id = 'cmp-print-area';
