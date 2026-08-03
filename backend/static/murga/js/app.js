@@ -47,7 +47,6 @@
         if (!TOKEN) $("#panel-denegado").style.display = "block";
         $("#p-voluntades").href = pageLink("/murga/voluntades");
         $("#p-sorteo").href = pageLink("/murga/sorteo");
-        $("#p-export").href = pageLink("/murga/export");
     }
 
     // ================= (1) FORMULARIO =================
