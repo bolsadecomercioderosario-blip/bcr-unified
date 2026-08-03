@@ -29,6 +29,18 @@
 
     <main class="stage">
 
+        <!-- ============= PORTAL / PANEL DEL PRESENTADOR ============= -->
+        <section id="view-panel" class="view view-presenter">
+            <h1 class="titulo">Panel del presentador</h1>
+            <p class="bajada">Elegí a dónde ir. Desde cada pantalla podés volver acá.</p>
+            <div class="panel-links">
+                <a id="p-voluntades" class="btn btn-oro btn-lg" href="#">Ver respuestas en vivo</a>
+                <a id="p-sorteo" class="btn btn-oro btn-lg" href="#">Ir al sorteo</a>
+                <a id="p-export" class="btn btn-line" href="#">Exportar / limpiar datos</a>
+            </div>
+            <div id="panel-denegado" class="denegado">Acceso restringido. Falta el token en la URL (…?k=…).</div>
+        </section>
+
         <!-- ================= (1) FORMULARIO PÚBLICO ================= -->
         <section id="view-form" class="view">
             <h1 class="titulo">Antes de cruzar, dejá tu huella</h1>
@@ -69,6 +81,7 @@
 
         <!-- ================= (3) VOLUNTADES (presentador) ================= -->
         <section id="view-voluntades" class="view view-presenter">
+            <div class="pres-topbar"><a id="v-volver" class="btn btn-line btn-sm" href="#">← Volver al panel</a></div>
             <div class="pres-head">
                 <h1 class="titulo">Últimas voluntades <span id="v-total" class="pill">0</span></h1>
                 <button id="v-refresh" type="button" class="btn btn-line btn-sm">Refrescar</button>
@@ -80,9 +93,11 @@
 
         <!-- ================= (4) SORTEO (presentador) ================= -->
         <section id="view-sorteo" class="view view-presenter">
+            <div class="pres-topbar"><a id="s-volver" class="btn btn-line btn-sm" href="#">← Volver al panel</a></div>
             <h1 class="titulo">El sorteo</h1>
             <div class="ruleta-wrap">
                 <div id="ruleta" class="ruleta">—</div>
+                <div id="s-cel" class="s-cel hidden"></div>
             </div>
             <div id="s-info" class="s-info"></div>
             <div class="s-controls">

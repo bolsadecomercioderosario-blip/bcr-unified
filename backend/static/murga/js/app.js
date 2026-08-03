@@ -36,6 +36,19 @@
     function withToken(url) {
         return url + (url.indexOf("?") === -1 ? "?" : "&") + "k=" + encodeURIComponent(TOKEN);
     }
+    // Link a otra página del presentador, arrastrando el token en la URL.
+    function pageLink(path) {
+        return path + (TOKEN ? "?k=" + encodeURIComponent(TOKEN) : "");
+    }
+
+    // ================= PANEL DEL PRESENTADOR =================
+    function initPanel() {
+        show("view-panel");
+        if (!TOKEN) $("#panel-denegado").style.display = "block";
+        $("#p-voluntades").href = pageLink("/murga/voluntades");
+        $("#p-sorteo").href = pageLink("/murga/sorteo");
+        $("#p-export").href = pageLink("/murga/export");
+    }
 
     // ================= (1) FORMULARIO =================
     function initForm() {
@@ -74,6 +87,7 @@
     // ================= (3) VOLUNTADES =================
     function initVoluntades() {
         show("view-voluntades");
+        $("#v-volver").href = pageLink("/murga/panel");
         var lista = $("#v-lista"), vacio = $("#v-vacio"), deneg = $("#v-denegado"), total = $("#v-total");
 
         function render(items) {
@@ -104,7 +118,8 @@
     // ================= (4) SORTEO =================
     function initSorteo() {
         show("view-sorteo");
-        var ruleta = $("#ruleta"), info = $("#s-info"), deneg = $("#s-denegado");
+        $("#s-volver").href = pageLink("/murga/panel");
+        var ruleta = $("#ruleta"), info = $("#s-info"), deneg = $("#s-denegado"), cel = $("#s-cel");
         var btnGo = $("#s-go"), btnGan = $("#s-ganador"), chkExcluir = $("#s-excluir");
         var participantes = [];   // lista completa (con flag excluido)
         var actual = null;        // ganador mostrado
@@ -143,6 +158,7 @@
             girando = true;
             btnGo.disabled = true; btnGan.classList.add("hidden");
             actual = null;
+            cel.classList.add("hidden"); cel.textContent = "";
             ruleta.classList.remove("ganador");
             ruleta.classList.add("girando");
 
@@ -158,6 +174,12 @@
                     ruleta.textContent = ganador.nombre;
                     ruleta.classList.remove("girando");
                     ruleta.classList.add("ganador");
+                    // Últimos 2 dígitos del celular, para confirmar identidad.
+                    var dig = String(ganador.celular || "").replace(/\D/g, "");
+                    if (dig.length >= 2) {
+                        cel.textContent = "Celular terminado en …" + dig.slice(-2);
+                        cel.classList.remove("hidden");
+                    }
                     actual = ganador;
                     girando = false;
                     btnGo.disabled = false;
@@ -252,7 +274,8 @@
     }
 
     // ---------- router ----------
-    if (/\/voluntades$/.test(PATH))      initVoluntades();
+    if (/\/panel$/.test(PATH))           initPanel();
+    else if (/\/voluntades$/.test(PATH)) initVoluntades();
     else if (/\/sorteo$/.test(PATH))     initSorteo();
     else if (/\/export$/.test(PATH))     initExport();
     else                                 initForm();

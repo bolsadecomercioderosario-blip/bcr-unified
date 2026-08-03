@@ -150,6 +150,7 @@ for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "
 # apunta el QR. Las vistas del presentador viven en sub-rutas y sirven el MISMO
 # SPA: el JS mira location.pathname para decidir qué mostrar, y valida el token
 # (?k=...) contra el API. Se registran antes del mount estático para precedencia.
+@app.get("/murga/panel")
 @app.get("/murga/voluntades")
 @app.get("/murga/sorteo")
 @app.get("/murga/export")
