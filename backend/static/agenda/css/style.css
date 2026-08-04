@@ -723,11 +723,18 @@ body[data-view="santi"] #btn-new-activity {
     .logo span {
         display: none; /* Hide 'Comu BCR' text, keep icon */
     }
-    .btn-new-activity span {
-        display: none; /* Hide text, keep plus icon */
+    /* Botón "Nueva Actividad" solo con el "+" en mobile (el id es el selector
+       correcto; antes se usaba .btn-new-activity como clase y no aplicaba, por
+       eso el texto se veía cortado). */
+    #btn-new-activity span {
+        display: none;
     }
-    .btn-new-activity {
+    #btn-new-activity {
         padding: 0.6rem;
+    }
+    /* Archivados se oculta en mobile para descongestionar la barra (queda en desktop). */
+    #btn-archived {
+        display: none !important;
     }
     .view-container {
         padding: 1rem;

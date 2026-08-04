@@ -31,8 +31,18 @@ const efemeridesSheet = document.getElementById('efemerides-sheet');
 const archivedSheet = document.getElementById('archived-sheet');
 const globalSearch = document.getElementById('global-search');
 
+// Recordamos qué vista se renderizó por última vez para saber si un re-render
+// es "en el lugar" (misma vista → preservar scroll) o un cambio de vista (ir arriba).
+let lastRenderedView = null;
+
 // Router/View Switcher
 function updateUI() {
+    // Guardamos la posición de scroll ANTES de reconstruir la lista. Abrir/guardar
+    // una actividad dispara un re-render; sin esto, la lista vuelve al inicio y se
+    // pierde el lugar donde estabas.
+    const sameView = (state.view === lastRenderedView);
+    const prevScroll = viewContainer ? viewContainer.scrollTop : 0;
+
     const navItems = document.querySelectorAll('.nav-item');
 
     // Expose current view on <body> for view-conditional styles (e.g. mobile)
@@ -91,6 +101,13 @@ function updateUI() {
     if (window.lucide) {
         window.lucide.createIcons();
     }
+
+    // Restaurar el scroll: si seguimos en la misma vista (re-render por editar,
+    // guardar o polling), volvemos a donde estabas; si cambiaste de vista, arriba.
+    if (viewContainer) {
+        viewContainer.scrollTop = sameView ? prevScroll : 0;
+    }
+    lastRenderedView = state.view;
 }
 
 // Event Listeners
