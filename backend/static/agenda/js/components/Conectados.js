@@ -130,6 +130,9 @@ export function renderConectados(container) {
             <button id="btn-add-block" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #0891b2;">
                 <i data-lucide="plus-circle"></i> Bloque
             </button>
+            <button id="btn-copy-titles" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: #475569;">
+                <i data-lucide="copy"></i> Copiar títulos
+            </button>
         </div>
     `;
     wrapper.appendChild(header);
@@ -318,6 +321,37 @@ export function renderConectados(container) {
     wrapper.querySelector('#btn-gen-newsletter').onclick = () => {
         openNewsletterPreview(listContainer);
     };
+
+    // Copiar al portapapeles el listado de títulos de Conectados (uno por línea),
+    // en el mismo orden en que se muestran. Botón visible sólo en mobile (CSS).
+    const btnCopy = wrapper.querySelector('#btn-copy-titles');
+    if (btnCopy) {
+        btnCopy.onclick = async () => {
+            const text = conectadosActivities
+                .map(a => (a.title || '').trim() || '(sin título)')
+                .join('\n');
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (e) {
+                // Fallback para navegadores/contextos sin Clipboard API.
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                try { document.execCommand('copy'); } catch (_) {}
+                ta.remove();
+            }
+            const original = btnCopy.innerHTML;
+            btnCopy.innerHTML = '<i data-lucide="check"></i> ¡Copiado!';
+            if (window.lucide) window.lucide.createIcons();
+            setTimeout(() => {
+                btnCopy.innerHTML = original;
+                if (window.lucide) window.lucide.createIcons();
+            }, 1600);
+        };
+    }
 
     if (window.lucide) window.lucide.createIcons();
 }
