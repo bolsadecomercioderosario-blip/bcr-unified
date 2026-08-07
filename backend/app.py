@@ -24,11 +24,9 @@ from migrate import migrate
 # antes de create_all (side effect del import).
 import agenda_models  # noqa: F401
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
-import conversatorio.models  # noqa: F401  — registra Sugerencia
 import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
 import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
-import disponibilidad.models  # noqa: F401  — registra tabla disp_responses
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 
 # Routers de cada módulo
@@ -36,14 +34,12 @@ from agenda.router import router as agenda_api
 from bot.router import router as bot_api
 from buscador.router import router as buscador_api
 from compromisos.router import router as compromisos_api
-from conversatorio.router import router as conversatorio_api
 from capacita.router import router as capacita_api
 from lluvias.router import router as lluvias_api
 from metricas.router import router as metricas_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
 from aapresid.router import router as aapresid_api
-from disponibilidad.router import router as disponibilidad_api
 from murga.router import router as murga_api
 
 
@@ -96,12 +92,10 @@ app.include_router(agenda_api)
 app.include_router(semana_datos_api)
 app.include_router(bot_api)
 app.include_router(buscador_api)
-app.include_router(conversatorio_api)
 app.include_router(capacita_api)
 app.include_router(metricas_api)
 app.include_router(compromisos_api)
 app.include_router(aapresid_api)
-app.include_router(disponibilidad_api)
 app.include_router(murga_api)
 
 
@@ -140,7 +134,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "disponibilidad", "murga"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -161,18 +155,6 @@ async def _murga_presentador():
     )
 
 
-# Disponibilidad — vista de resultados en URL aparte (/disponibilidad/admin).
-# Sirve el MISMO SPA que la vista pública; el JS detecta la ruta y muestra sólo
-# los resultados (detrás de contraseña). El público no tiene ningún botón/enlace
-# a esta vista. Se registra antes del mount estático para tener precedencia.
-@app.get("/disponibilidad/admin")
-async def _disponibilidad_admin():
-    return HTMLResponse(
-        content=get_module_html("disponibilidad"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
 # ---------------------------------------------------------
 # Agenda de Compromisos institucionales (vista pública para autoridades BCR).
 # URL: /compromisos/{token}  — el token se valida en el frontend contra el API.
@@ -183,33 +165,6 @@ async def _disponibilidad_admin():
 async def _compromisos_page(token: str):  # noqa: ARG001 — token usado por el JS, no acá
     return HTMLResponse(
         content=get_module_html("compromisos"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
-# Conversatorio a la carta — dos páginas: form público (/conversatorio/) y
-# admin (/conversatorio/admin). No usan __VERSION__ porque todo el CSS/JS
-# vive inline en cada HTML, así que vamos directo con FileResponse.
-_CONV_DIR = os.path.join(STATIC_DIR, "conversatorio")
-
-
-@app.get("/conversatorio")
-async def _conv_redirect():
-    return RedirectResponse(url="/conversatorio/", status_code=307)
-
-
-@app.get("/conversatorio/")
-async def _conv_index():
-    return FileResponse(
-        os.path.join(_CONV_DIR, "index.html"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
-@app.get("/conversatorio/admin")
-async def _conv_admin():
-    return FileResponse(
-        os.path.join(_CONV_DIR, "admin.html"),
         headers={"Cache-Control": "no-cache, must-revalidate"},
     )
 
@@ -276,11 +231,9 @@ app.mount("/social", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "soci
 app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agenda"), html=False), name="agenda_ui")
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
-app.mount("/conversatorio", NoCacheStaticFiles(directory=_CONV_DIR, html=False), name="conversatorio_ui")
 app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
 app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
-app.mount("/disponibilidad", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "disponibilidad"), html=False), name="disponibilidad_ui")
 app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
 
 
