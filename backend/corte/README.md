@@ -17,14 +17,16 @@ estático). Sin dependencias nuevas.
 
 ## Cómo funciona
 
-- **Encuesta**: pide el nombre y muestra los 24 bloques agrupados por sección
-  narrativa. Al tildar, una barra fija abajo muestra `MM:SS / 30:00`, cambia de
-  color por zona (margen / ideal / extendida / pasado) y **bloquea el envío si
-  supera 35:00**. El total se recalcula server-side al guardar (no se confía en
-  el cliente).
-- **Re-editar**: no hay login. Se guarda por nombre (upsert). Si la persona
-  vuelve con el mismo nombre (o desde el mismo celular), se le carga su selección
-  anterior para editarla.
+- **Encuesta**: la persona elige su nombre de una **lista fija de murguistas**
+  (roster en `data.py`, ver `NOMBRES`) y marca los 24 bloques agrupados por
+  sección narrativa. Al tildar, una barra fija abajo muestra `MM:SS / 30:00`,
+  cambia de color por zona (margen / ideal / extendida / pasado) y **bloquea el
+  envío si supera 35:00**. El total se recalcula server-side al guardar.
+- **Una respuesta por murguista**: al enviar, el nombre queda "tomado" y aparece
+  tildado/deshabilitado en la lista; nadie puede volver a usarlo (validado en el
+  server: reintentar el mismo nombre da 409). No hay re-edición: para corregir
+  una respuesta, el organizador la borra (botón de reset) y esa persona vuelve a
+  cargar.
 - **Resultados**: total de respuestas + tabla de bloques con votos, % y duración,
   ordenable por votos o por orden del show. Tildando filas se calcula la
   **duración del corte resultante**; el botón "Auto ~30'" arma un corte inicial

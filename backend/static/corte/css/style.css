@@ -54,6 +54,18 @@ input[type=text]::placeholder { color: #a7a49c; }
 input[type=text]:focus { outline: none; border-color: var(--oro); box-shadow: 0 0 0 3px rgba(217,180,74,.28); }
 .cargado { margin-top: 8px; font-size: .88rem; color: var(--oro-deep); font-weight: 600; }
 
+/* Lista de nombres (roster) — una sola respuesta por murguista */
+.nombres { display: flex; flex-wrap: wrap; gap: 8px; }
+.nom {
+    font-family: inherit; font-size: .98rem; font-weight: 700; padding: 10px 14px;
+    border-radius: 999px; border: 1.5px solid var(--linea); background: var(--bg-card);
+    color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: border-color .12s, background .12s, color .12s;
+}
+.nom:hover { border-color: #d8d0bd; }
+.nom.sel { background: var(--oro); border-color: var(--oro); color: var(--ink); }
+.nom.taken { color: #b7b3a8; background: #f3efe5; border-color: #ece7da; cursor: not-allowed; }
+
 /* ---------- Grupos y bloques ---------- */
 .grupos { display: flex; flex-direction: column; gap: 20px; }
 .cargando { color: var(--ink-soft); font-style: italic; padding: 20px 0; text-align: center; }

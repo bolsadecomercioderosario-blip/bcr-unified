@@ -50,9 +50,9 @@
         show("view-encuesta");
         var barra = $("#barra"), bTime = $("#b-time"), bFill = $("#b-fill"),
             bEstado = $("#b-estado"), bEnviar = $("#b-enviar"),
-            nombre = $("#c-nombre"), cargado = $("#c-cargado"), cont = $("#grupos");
-        var sel = {};   // id -> true
-        var cargadoPara = "";   // nombre para el que ya cargamos selección previa
+            cont = $("#grupos"), nombresBox = $("#c-nombres"), nadie = $("#c-nadie");
+        var sel = {};       // id -> true
+        var selName = "";   // nombre elegido del roster
 
         function total() {
             var t = 0;
@@ -65,18 +65,7 @@
             bTime.textContent = fmt(t);
             bFill.style.width = Math.min(t / MAX, 1) * 100 + "%";
             bEstado.textContent = z.txt;
-            bEnviar.disabled = !(nombre.value.trim() && n > 0 && t <= MAX);
-        }
-
-        function pintarChecks() {
-            var boxes = cont.querySelectorAll(".bloque");
-            for (var i = 0; i < boxes.length; i++) {
-                var id = boxes[i].getAttribute("data-id");
-                var on = !!sel[id];
-                boxes[i].classList.toggle("on", on);
-                var cb = boxes[i].querySelector("input");
-                if (cb) cb.checked = on;
-            }
+            bEnviar.disabled = !(selName && n > 0 && t <= MAX);
         }
 
         function render() {
@@ -113,23 +102,19 @@
             });
         }
 
-        function loadMine(name) {
-            var n = (name || "").trim();
-            if (!n || n.toLowerCase() === cargadoPara) return;
-            // Solo autocargamos si la persona todavía no eligió nada, para no
-            // pisar una selección en curso.
-            if (Object.keys(sel).some(function (k) { return sel[k]; })) return;
-            fetch(API + "/mine?name=" + encodeURIComponent(n))
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (d.existe && d.seleccion && d.seleccion.length) {
-                        sel = {};
-                        d.seleccion.forEach(function (id) { sel[id] = true; });
-                        cargadoPara = n.toLowerCase();
-                        cargado.classList.remove("hidden");
-                        pintarChecks(); refrescar();
-                    }
-                })
+        function renderNombres(items) {
+            var libres = 0;
+            nombresBox.innerHTML = items.map(function (o) {
+                if (!o.tomado) libres++;
+                var cls = "nom" + (o.tomado ? " taken" : "") + (o.nombre === selName ? " sel" : "");
+                return '<button type="button" class="' + cls + '" data-nombre="' + esc(o.nombre) + '"' +
+                       (o.tomado ? " disabled" : "") + ">" + esc(o.nombre) + (o.tomado ? " ✓" : "") + "</button>";
+            }).join("");
+            nadie.classList.toggle("hidden", libres > 0);
+        }
+        function cargarNombres() {
+            return fetch(API + "/nombres").then(function (r) { return r.json(); })
+                .then(function (d) { renderNombres(d.nombres || []); })
                 .catch(function () {});
         }
 
@@ -142,48 +127,44 @@
                 BLOQUES.forEach(function (b) { DUR[b.id] = b.dur; });
                 render();
                 barra.classList.remove("hidden");
-                // Nombre recordado de una visita anterior (este dispositivo).
-                var prev = localStorage.getItem("corte_nombre");
-                if (prev) { nombre.value = prev; loadMine(prev); }
+                cargarNombres();
                 refrescar();
             })
             .catch(function () { cont.innerHTML = '<div class="cargando">No se pudo cargar. Refrescá la página.</div>'; });
 
-        nombre.addEventListener("input", function () { cargado.classList.add("hidden"); refrescar(); });
-        nombre.addEventListener("change", function () {
-            var n = nombre.value.trim();
-            if (n) localStorage.setItem("corte_nombre", n);
-            loadMine(n);
+        nombresBox.addEventListener("click", function (ev) {
+            var b = ev.target.closest(".nom");
+            if (!b || b.disabled) return;
+            selName = b.getAttribute("data-nombre");
+            var all = nombresBox.querySelectorAll(".nom");
+            for (var i = 0; i < all.length; i++) all[i].classList.toggle("sel", all[i] === b);
+            refrescar();
         });
 
         bEnviar.addEventListener("click", function () {
-            var n = nombre.value.trim();
             var ids = Object.keys(sel).filter(function (k) { return sel[k]; }).map(Number);
-            if (!n) { toast("Poné tu nombre."); nombre.focus(); return; }
+            if (!selName) { toast("Elegí tu nombre."); return; }
             if (!ids.length) { toast("Elegí al menos una parte."); return; }
             bEnviar.disabled = true; bEnviar.textContent = "Enviando…";
             fetch(API + "/responder", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nombre: n, seleccion: ids })
+                body: JSON.stringify({ nombre: selName, seleccion: ids })
             })
-            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
             .then(function (res) {
+                if (res.status === 409) {   // el nombre ya cargó (p. ej. desde otro celular)
+                    toast("Ese nombre ya cargó su selección.");
+                    selName = ""; cargarNombres();
+                    throw new Error("dup");
+                }
                 if (!res.ok) throw new Error((res.d && res.d.detail) || "Error");
-                localStorage.setItem("corte_nombre", n);
                 $("#g-msg").textContent = "¡Listo! Tu selección dura " + fmt(res.d.total_seg) + ".";
                 barra.classList.add("hidden");
                 show("view-gracias");
                 window.scrollTo({ top: 0, behavior: "smooth" });
             })
-            .catch(function (e) { toast(e.message || "No se pudo enviar."); })
-            .finally(function () { bEnviar.disabled = false; bEnviar.textContent = "Enviar mi selección"; });
-        });
-
-        $("#g-editar").addEventListener("click", function () {
-            show("view-encuesta");
-            barra.classList.remove("hidden");
-            refrescar();
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            .catch(function (e) { if (e.message !== "dup") toast(e.message || "No se pudo enviar."); })
+            .finally(function () { bEnviar.disabled = false; bEnviar.textContent = "Enviar mi selección"; refrescar(); });
         });
     }
 

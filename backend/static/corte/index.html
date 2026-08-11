@@ -22,9 +22,9 @@
             </header>
 
             <div class="field">
-                <label class="label" for="c-nombre">¿Quién sos?</label>
-                <input id="c-nombre" type="text" placeholder="Tu nombre" autocomplete="name" required>
-                <div id="c-cargado" class="cargado hidden">Cargamos tu selección anterior. Editá y reenviá cuando quieras.</div>
+                <label class="label">¿Quién sos?</label>
+                <div id="c-nombres" class="nombres"><div class="cargando">Cargando nombres…</div></div>
+                <div id="c-nadie" class="cargado hidden">Ya respondieron todos. Si necesitás cambiar tu respuesta, avisale al organizador.</div>
             </div>
 
             <div id="grupos" class="grupos"><div class="cargando">Cargando el espectáculo…</div></div>
@@ -37,8 +37,7 @@
             <div class="card card-center">
                 <div class="halo">✦</div>
                 <h1 class="titulo" id="g-msg">¡Listo!</h1>
-                <p class="bajada">Quedó guardada tu propuesta. Si querés cambiarla, podés volver a entrar con el mismo nombre y editarla.</p>
-                <button id="g-editar" type="button" class="btn btn-line">Editar mi selección</button>
+                <p class="bajada">Quedó guardada tu propuesta. ¡Gracias por armar tu corte!</p>
             </div>
         </section>
 

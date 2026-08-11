@@ -58,11 +58,28 @@ def get_bloques():
     }
 
 
+@router.get("/nombres")
+def nombres(db: Session = Depends(get_db)):
+    """Roster de murguistas + cuáles ya respondieron (para deshabilitarlos)."""
+    rows = db.query(m.CorteRespuesta.nombre).all()
+    tomados = {(r[0] or "").strip().lower() for r in rows}
+    return {"nombres": [{"nombre": n, "tomado": n.lower() in tomados} for n in data.NOMBRES]}
+
+
+def _canonico(nombre):
+    """Devuelve el nombre del roster que coincide (case-insensitive), o None."""
+    n = (nombre or "").strip().lower()
+    for x in data.NOMBRES:
+        if x.lower() == n:
+            return x
+    return None
+
+
 @router.post("/responder")
 def responder(payload: m.RespuestaIn, db: Session = Depends(get_db)):
-    nombre = (payload.nombre or "").strip()
+    nombre = _canonico(payload.nombre)
     if not nombre:
-        raise HTTPException(status_code=400, detail="Poné tu nombre.")
+        raise HTTPException(status_code=400, detail="Elegí tu nombre de la lista.")
 
     # Ids válidos, sin duplicados, preservando sólo los que existen.
     ids = [i for i in dict.fromkeys(payload.seleccion or []) if i in data.BLOQUES_POR_ID]
@@ -76,18 +93,15 @@ def responder(payload: m.RespuestaIn, db: Session = Depends(get_db)):
             detail="Tu selección supera el máximo de 35 minutos. Sacá alguna parte.",
         )
 
+    # Una sola respuesta por murguista: si el nombre ya cargó, se rechaza.
     existing = db.query(m.CorteRespuesta).filter(
         func.lower(m.CorteRespuesta.nombre) == nombre.lower()
     ).first()
     if existing:
-        existing.nombre = nombre
-        existing.seleccion = json.dumps(ids)
-        existing.total_seg = total
-        db.commit()
-    else:
-        db.add(m.CorteRespuesta(nombre=nombre, seleccion=json.dumps(ids), total_seg=total))
-        db.commit()
+        raise HTTPException(status_code=409, detail="Ese nombre ya cargó su selección.")
 
+    db.add(m.CorteRespuesta(nombre=nombre, seleccion=json.dumps(ids), total_seg=total))
+    db.commit()
     return {"ok": True, "total_seg": total}
 
 

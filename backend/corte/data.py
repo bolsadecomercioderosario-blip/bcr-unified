@@ -12,6 +12,15 @@ OBJETIVO_SEG = 30 * 60   # 30:00
 MAX_SEG = 35 * 60        # 35:00
 
 
+# Roster de murguistas. La encuesta ofrece SOLO estos nombres (una respuesta por
+# persona); al enviar, el nombre queda tomado. Orden alfabético.
+NOMBRES = [
+    "Brandon", "Cabe", "Cacha", "Charo", "Chimi", "Desi", "Elías", "Fabio",
+    "Fermín", "Gabi H", "Gabi M", "Joaqui", "Juanma", "Lucas", "Martín",
+    "Mica", "Santi", "Tacho", "Vir1", "Vir2",
+]
+
+
 # Grupos narrativos, en orden de aparición en el espectáculo.
 GRUPOS = [
     {"id": "apertura",  "label": "Apertura"},
