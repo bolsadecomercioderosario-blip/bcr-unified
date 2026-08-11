@@ -261,6 +261,23 @@
         $("#r-sort-votos").addEventListener("click", function () { setSort("votos"); });
         $("#r-sort-orden").addEventListener("click", function () { setSort("orden"); });
         $("#r-clear").addEventListener("click", function () { cut = {}; render(); refrescarBarra(); });
+        $("#r-reset").addEventListener("click", function () {
+            if (!confirm("¿Borrar TODAS las respuestas de la encuesta?\n\nEsto no se puede deshacer.")) return;
+            if (!confirm("Última confirmación: se borran todas las selecciones cargadas. ¿Continuar?")) return;
+            fetch(API + "/reset?k=" + encodeURIComponent(TOKEN), { method: "POST" })
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (d) {
+                    total = 0;
+                    bloques.forEach(function (b) { b.votos = 0; b.pct = 0; });
+                    cut = {};
+                    $("#r-total").textContent = 0;
+                    $("#r-total-lbl").textContent = "personas respondieron";
+                    render(); refrescarBarra();
+                    toast("Listo: se borraron " + (d.borradas || 0) + " respuesta(s).");
+                })
+                .catch(function () { toast("No se pudo borrar. Reintentá."); });
+        });
+
         $("#r-auto").addEventListener("click", function () {
             // Arma un corte de arranque: agrega los más votados hasta llegar a ~30',
             // sin pasar el máximo. Después el organizador lo ajusta a mano.

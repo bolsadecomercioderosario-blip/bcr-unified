@@ -167,6 +167,12 @@ input[type=text]:focus { outline: none; border-color: var(--oro); box-shadow: 0 
 .tabla input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--oro); }
 .tabla tr.on { background: #fffdf5; }
 
+.danger-zone { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--linea); }
+.danger-zone .mini { font-size: .85rem; color: var(--ink-soft); font-style: italic; margin-bottom: 10px; }
+.danger-zone .mini b { color: var(--ink); font-style: normal; }
+.chip-danger { color: var(--err); border-color: var(--err); background: transparent; }
+.chip-danger:hover { background: var(--err); color: #fff; }
+
 .denegado { display: none; margin-top: 18px; padding: 16px; border-radius: 12px; background: rgba(192,73,47,.08); border: 1px solid var(--err); color: var(--err); font-weight: 600; text-align: center; }
 
 /* ---------- Toast ---------- */

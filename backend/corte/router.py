@@ -139,3 +139,12 @@ def resultados(_: bool = Depends(require_token), db: Session = Depends(get_db)):
         "max_seg": data.MAX_SEG,
         "bloques": bloques,
     }
+
+
+@router.post("/reset")
+def reset(_: bool = Depends(require_token), db: Session = Depends(get_db)):
+    """Borra TODAS las respuestas de la encuesta (limpiar pruebas / resetear).
+    Irreversible — el frontend pide confirmación antes de llamarlo."""
+    borradas = db.query(m.CorteRespuesta).delete()
+    db.commit()
+    return {"ok": True, "borradas": borradas}
