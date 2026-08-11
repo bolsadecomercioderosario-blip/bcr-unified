@@ -28,6 +28,7 @@ import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
 import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
+import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -41,6 +42,7 @@ from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
 from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
+from corte.router import router as corte_api
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -97,6 +99,7 @@ app.include_router(metricas_api)
 app.include_router(compromisos_api)
 app.include_router(aapresid_api)
 app.include_router(murga_api)
+app.include_router(corte_api)
 
 
 # ---------------------------------------------------------
@@ -134,10 +137,21 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
+
+
+# Corte — encuesta de la versión reducida. El home (/corte/) es la encuesta
+# pública; /corte/resultados sirve el MISMO SPA y el JS muestra los resultados
+# tras validar el token contra el API. Antes del mount estático para precedencia.
+@app.get("/corte/resultados")
+async def _corte_resultados():
+    return HTMLResponse(
+        content=get_module_html("corte"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
 
 
 # Murga — sorteo del estreno. El home (/murga/) es el formulario público al que
@@ -235,6 +249,7 @@ app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), 
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
 app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
 app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
+app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte"), html=False), name="corte_ui")
 
 
 @app.get("/")

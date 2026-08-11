@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Armemos El Más Acá 30' — Y Parió La Abuela</title>
+    <meta name="theme-color" content="#FAF6EE">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+    <main class="stage">
+
+        <!-- ================= ENCUESTA (público) ================= -->
+        <section id="view-encuesta" class="view">
+            <header class="intro">
+                <div class="kicker">Y Parió La Abuela</div>
+                <h1 class="titulo">Armemos <i>El Más Acá</i> versión 30'</h1>
+                <p class="bajada">Elegí las partes que más te gustaría conservar en una versión reducida del espectáculo. Tratá de armar una propuesta cercana a los <b>30 minutos</b>. Tenemos margen hasta <b>35</b>.</p>
+            </header>
+
+            <div class="field">
+                <label class="label" for="c-nombre">¿Quién sos?</label>
+                <input id="c-nombre" type="text" placeholder="Tu nombre" autocomplete="name" required>
+                <div id="c-cargado" class="cargado hidden">Cargamos tu selección anterior. Editá y reenviá cuando quieras.</div>
+            </div>
+
+            <div id="grupos" class="grupos"><div class="cargando">Cargando el espectáculo…</div></div>
+
+            <div class="fondo-barra"></div>
+        </section>
+
+        <!-- ================= CONFIRMACIÓN ================= -->
+        <section id="view-gracias" class="view">
+            <div class="card card-center">
+                <div class="halo">✦</div>
+                <h1 class="titulo" id="g-msg">¡Listo!</h1>
+                <p class="bajada">Quedó guardada tu propuesta. Si querés cambiarla, podés volver a entrar con el mismo nombre y editarla.</p>
+                <button id="g-editar" type="button" class="btn btn-line">Editar mi selección</button>
+            </div>
+        </section>
+
+        <!-- ================= RESULTADOS (organizador) ================= -->
+        <section id="view-resultados" class="view view-admin">
+            <h1 class="titulo">Resultados</h1>
+            <p class="bajada"><b id="r-total">0</b> <span id="r-total-lbl">personas respondieron</span>. Tildá partes para probar un corte y ver cuánto dura.</p>
+
+            <div class="r-controls">
+                <button id="r-sort-votos" type="button" class="chip chip-on">Por votos</button>
+                <button id="r-sort-orden" type="button" class="chip">Por orden del show</button>
+                <span class="r-sep"></span>
+                <button id="r-auto" type="button" class="chip chip-line">Auto ~30'</button>
+                <button id="r-clear" type="button" class="chip chip-line">Limpiar</button>
+            </div>
+
+            <div class="tabla-wrap">
+                <table id="r-tabla" class="tabla">
+                    <thead>
+                        <tr><th class="c-check"></th><th>Parte</th><th class="c-num">Votos</th><th class="c-num">%</th><th class="c-num">Dur.</th></tr>
+                    </thead>
+                    <tbody id="r-body"></tbody>
+                </table>
+            </div>
+
+            <div id="r-denegado" class="denegado">Acceso restringido. Falta el token en la URL (…?k=…).</div>
+            <div class="fondo-barra"></div>
+        </section>
+
+    </main>
+
+    <!-- Barra fija: contador de la encuesta -->
+    <div id="barra" class="barra hidden">
+        <div class="barra-top">
+            <div class="barra-time"><span id="b-time">0:00</span><span class="barra-obj"> / 30:00</span></div>
+            <div id="b-estado" class="barra-estado">Elegí partes</div>
+        </div>
+        <div class="barra-track"><div id="b-fill" class="barra-fill"></div></div>
+        <button id="b-enviar" class="btn btn-oro" disabled>Enviar mi selección</button>
+    </div>
+
+    <!-- Barra fija: duración del corte en resultados -->
+    <div id="barra-r" class="barra hidden">
+        <div class="barra-top">
+            <div class="barra-time">Corte: <span id="br-time">0:00</span><span class="barra-obj"> / 30:00</span></div>
+            <div id="br-estado" class="barra-estado"><span id="br-count">0</span> partes</div>
+        </div>
+        <div class="barra-track"><div id="br-fill" class="barra-fill"></div></div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>
