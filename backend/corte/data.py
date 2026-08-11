@@ -60,6 +60,7 @@ BLOQUES = [
     {"id": 22, "grupo": "final",     "nombre": "Intervención 8 – Resolución personaje/pitonisa", "tipo": "Intervención",       "dur": _m(4, 45)},
     {"id": 23, "grupo": "final",     "nombre": "Canción Final",                                "tipo": "Canción",              "dur": _m(2, 45)},
     {"id": 24, "grupo": "final",     "nombre": "Retirada",                                     "tipo": "Canción · Retirada",   "dur": _m(5, 35)},
+    {"id": 25, "grupo": "final",     "nombre": "Pre-bajada (Árbol + Abel Pintos) / Bajada",     "tipo": "Canción · Bajada",     "dur": _m(1, 57)},
 ]
 
 
