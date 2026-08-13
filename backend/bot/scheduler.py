@@ -218,14 +218,6 @@ def _startup_catchup() -> None:
         # (último timestamp encontrado, umbral, función a correr, id del job catchup)
         sources = [
             (
-                db.query(db_models.PrecioPizarra.scraped_at)
-                .order_by(db_models.PrecioPizarra.scraped_at.desc()).first(),
-                timedelta(hours=30),  # diario
-                _run_scrape_precios_pizarra,
-                "catchup_precios_pizarra",
-                "precios_pizarra",
-            ),
-            (
                 db.query(db_models.IngestedComentario.ingested_at)
                 .order_by(db_models.IngestedComentario.ingested_at.desc()).first(),
                 timedelta(hours=30),  # diario
@@ -240,46 +232,6 @@ def _startup_catchup() -> None:
                 _run_scrape_informativo,
                 "catchup_informativo",
                 "informativo",
-            ),
-            (
-                db.query(db_models.EstimacionGea.scraped_at)
-                .order_by(db_models.EstimacionGea.scraped_at.desc()).first(),
-                timedelta(hours=30),  # diario
-                _run_scrape_gea_panel,
-                "catchup_gea_panel",
-                "gea_panel",
-            ),
-            (
-                db.query(db_models.IngestedGeaReport.ingested_at)
-                .order_by(db_models.IngestedGeaReport.ingested_at.desc()).first(),
-                timedelta(days=8),  # semanal
-                _run_scrape_gea_informes,
-                "catchup_gea_informes",
-                "gea_informes",
-            ),
-            (
-                db.query(db_models.CursoCapacita.scraped_at)
-                .order_by(db_models.CursoCapacita.scraped_at.desc()).first(),
-                timedelta(days=8),  # semanal
-                _run_scrape_capacita,
-                "catchup_capacita",
-                "capacita",
-            ),
-            (
-                db.query(db_models.IngestedNovedadInnova.ingested_at)
-                .order_by(db_models.IngestedNovedadInnova.ingested_at.desc()).first(),
-                timedelta(days=8),  # semanal
-                _run_scrape_innova_novedades,
-                "catchup_innova_novedades",
-                "innova_novedades",
-            ),
-            (
-                db.query(db_models.StartupInnova.scraped_at)
-                .order_by(db_models.StartupInnova.scraped_at.desc()).first(),
-                timedelta(days=8),  # semanal
-                _run_scrape_startups_innova,
-                "catchup_startups_innova",
-                "startups_innova",
             ),
         ]
 
@@ -323,21 +275,6 @@ def start() -> None:
     if scheduler.running:
         return
 
-    # Precios pizarra: tres firings al día (10:30, 13:00, 17:00 ART).
-    # La BCR publica el card "del día" a las ~10:00 pero la tabla histórica
-    # debajo tarda más; varios firings cubren la ventana sin tener que
-    # adivinar el horario exacto. Scraper idempotente y barato (1 request,
-    # 20-25 upserts), así que correr de más no molesta.
-    scheduler.add_job(
-        _run_scrape_precios_pizarra,
-        CronTrigger(hour="10,13,17", minute=30),
-        id="scrape_precios_pizarra",
-        replace_existing=True,
-        max_instances=1,  # No dejar arrancar otro tick si el anterior aún corre
-        coalesce=True,    # Si nos perdimos ticks (por restart), correr UNO solo
-        misfire_grace_time=_DAILY_GRACE_S,
-    )
-
     # Comentarios diarios: 17:00 ART. La BCR suele publicar a la tarde —
     # dejamos margen para que ya esté el del día.
     scheduler.add_job(
@@ -357,66 +294,6 @@ def start() -> None:
         _run_scrape_informativo,
         CronTrigger(day_of_week="fri", hour="13,18", minute=0),
         id="scrape_informativo_viernes",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=_WEEKLY_GRACE_S,
-    )
-
-    # Panel GEA (estimaciones de producción): el sitio actualiza esporádicamente
-    # — corremos diario a las 9:00 ART. Idempotente, no hace daño correr de más.
-    scheduler.add_job(
-        _run_scrape_gea_panel,
-        CronTrigger(hour=9, minute=0),
-        id="scrape_gea_panel_diario",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=_DAILY_GRACE_S,
-    )
-
-    # Informes GEA (estimaciones nacionales mensuales): semanal los lunes
-    # a las 9:30 ART. Idempotente — sólo sube los slugs nuevos.
-    scheduler.add_job(
-        _run_scrape_gea_informes,
-        CronTrigger(day_of_week="mon", hour=9, minute=30),
-        id="scrape_gea_informes_semanal",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=_WEEKLY_GRACE_S,
-    )
-
-    # Cursos de BCR Capacita: semanal los lunes 10:00 ART. El catálogo se
-    # actualiza esporádicamente; semanal es suficiente y barato.
-    scheduler.add_job(
-        _run_scrape_capacita,
-        CronTrigger(day_of_week="mon", hour=10, minute=0),
-        id="scrape_capacita_semanal",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=_WEEKLY_GRACE_S,
-    )
-
-    # Novedades de BCR Innova: semanal los lunes 10:15 ART. Espaciado del
-    # job de capacita para no abrir 2 sockets HTTP a BCR a la vez.
-    scheduler.add_job(
-        _run_scrape_innova_novedades,
-        CronTrigger(day_of_week="mon", hour=10, minute=15),
-        id="scrape_innova_novedades_semanal",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=_WEEKLY_GRACE_S,
-    )
-
-    # Startup Network: semanal los lunes 10:30 ART. Una sola request a BCR,
-    # ~120-150 upserts en DB; barato.
-    scheduler.add_job(
-        _run_scrape_startups_innova,
-        CronTrigger(day_of_week="mon", hour=10, minute=30),
-        id="scrape_startups_innova_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
