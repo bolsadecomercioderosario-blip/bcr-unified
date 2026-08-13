@@ -193,11 +193,25 @@ def _parse_iso_date(value: str | None, fallback: date) -> date:
         return fallback
 
 
+_DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def _fecha_legible(iso: str) -> str:
+    """'2026-08-13' -> 'Miércoles 13/8' (día de la semana + D/M). Lo calculamos
+    en Python porque el LLM suele equivocar el día de la semana de una fecha."""
+    try:
+        d = date.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return iso
+    return f"{_DIAS_SEMANA[d.weekday()].capitalize()} {d.day}/{d.month}"
+
+
 def _activity_to_compact_dict(activity: agenda_models.Activity) -> dict[str, Any]:
     """Proyecta una Activity a un dict mínimo. Sólo campos relevantes para el
     bot — todo lo de Drive/Instagram/LinkedIn/copy es ruido para el LLM."""
     return {
         "fecha": activity.date,
+        "fecha_legible": _fecha_legible(activity.date),
         "hora": activity.time,
         "titulo": activity.title,
         "descripcion": (activity.description or "").strip() or None,
