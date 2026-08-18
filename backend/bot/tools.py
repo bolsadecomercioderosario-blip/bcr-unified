@@ -14,7 +14,9 @@ Tools registradas (bot cerrado para la Mesa Ejecutiva):
 - buscar_informativo / buscar_comentario_diario: búsqueda RAG sobre los vector
   stores del Informativo Semanal y de los Comentarios Diarios del mercado.
 - get_precios_pizarra: precios exactos (soja/trigo/maíz) del Mercado Físico de Rosario.
-- consultar_coyuntura: lee el Google Doc vivo de coyuntura que mantiene Comunicación.
+- consultar_asuntos_publicos: combina dos Google Docs públicos (Agenda de Asuntos
+  Públicos = posición institucional + Documento Vivo = estado actual) en una sola
+  fuente de temas estratégicos de la BCR.
 """
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
-from config import BOT_OPENAI_MODEL, BOT_COYUNTURA_DOC_ID
+from config import BOT_OPENAI_MODEL, BOT_COYUNTURA_DOC_ID, BOT_ASUNTOS_PUBLICOS_DOC_ID
 
 from bot.openai_vector_stores import get_vector_store_id
 
@@ -197,18 +199,19 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "type": "function",
-        "name": "consultar_coyuntura",
+        "name": "consultar_asuntos_publicos",
         "description": (
-            "Consulta el DOCUMENTO VIVO DE COYUNTURA de la BCR — el documento CURADO "
-            "y ACTUALIZADO que mantiene el equipo de Comunicación con la información "
-            "de contexto/actualidad de mayor interés institucional del momento: "
-            "mercado de granos, campaña agrícola, proyecciones de producción, "
-            "estimaciones, comercio exterior, economía, política y posición de la "
-            "BCR. Es una fuente de referencia amplia y confiable: consultala SIEMPRE "
-            "que la pregunta toque estos temas, en combinación con el informativo o "
-            "los comentarios si hace falta, y SIEMPRE antes de responder que 'no "
-            "encontraste' un dato de mercado/campaña/coyuntura. Devuelve el texto del "
-            "documento; respondé sólo con lo que dice."
+            "Consulta los TEMAS ESTRATÉGICOS / DE ASUNTOS PÚBLICOS de la BCR — los "
+            "temas institucionales que la Bolsa impulsa y sigue (ej.: Vía Navegable "
+            "Troncal / Hidrovía, régimen de concesiones, IVA en el peaje, comercio "
+            "exterior, retenciones, infraestructura, economía y política agropecuaria, "
+            "posición de la BCR). Combina dos capas por tema: la POSICIÓN institucional "
+            "(qué sostiene/impulsa la BCR, estable) y el ESTADO ACTUAL (novedades del "
+            "momento). Es la fuente CURADA y de referencia sobre qué piensa la BCR y "
+            "qué está pasando con estos temas. Usala SIEMPRE que la pregunta toque un "
+            "tema institucional/estratégico o de coyuntura, y SIEMPRE antes de "
+            "responder que 'no encontraste' algo de ese tipo. Devuelve el texto de "
+            "ambos documentos; respondé combinándolos y sólo con lo que dicen."
         ),
         "parameters": {"type": "object", "properties": {}},
     },
@@ -641,56 +644,74 @@ def get_precios_pizarra(
 
 
 # ---------------------------------------------------------------------------
-# Implementación: consultar_coyuntura (Google Doc vivo que mantiene Comunicación).
-# Lee el texto exportado del doc público, con una cachecita de 5 min para que los
-# cambios se reflejen rápido sin pegarle a Google en cada consulta. Si el fetch
-# falla, cae al último texto cacheado (si hay).
+# Implementación: consultar_asuntos_publicos.
+# Combina DOS Google Docs públicos que mantiene Comunicación en una sola fuente,
+# alineados por tema estratégico:
+#   - Agenda de Asuntos Públicos → la POSICIÓN institucional (estable) de la BCR.
+#   - Documento Vivo de coyuntura → el ESTADO ACTUAL / novedades de esos temas.
+# Cada doc se lee con su propia cachecita de 5 min (los cambios se reflejan rápido
+# sin pegarle a Google en cada consulta). Si el fetch falla, cae al último texto
+# cacheado (si hay).
 # ---------------------------------------------------------------------------
 _COYUNTURA_CACHE: dict[str, Any] = {"text": None, "fetched_at": 0.0}
-_COYUNTURA_TTL_S = 300
+_ASUNTOS_PUBLICOS_CACHE: dict[str, Any] = {"text": None, "fetched_at": 0.0}
+_DOC_TTL_S = 300
 
 
-def _fetch_coyuntura_doc() -> str | None:
-    doc_id = (BOT_COYUNTURA_DOC_ID or "").strip()
+def _fetch_google_doc_txt(doc_id: str | None, cache: dict[str, Any]) -> str | None:
+    """Lee el texto exportado de un Google Doc público, con caché de 5 min.
+
+    Cada doc trae su propio dict de caché ({"text", "fetched_at"}). Ante un
+    error de red, devuelve el último texto cacheado si lo hay.
+    """
+    doc_id = (doc_id or "").strip()
     if not doc_id:
         return None
     now = time.time()
-    if _COYUNTURA_CACHE["text"] is not None and (now - _COYUNTURA_CACHE["fetched_at"]) < _COYUNTURA_TTL_S:
-        return _COYUNTURA_CACHE["text"]
+    if cache["text"] is not None and (now - cache["fetched_at"]) < _DOC_TTL_S:
+        return cache["text"]
     url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
     try:
         resp = requests.get(url, timeout=10, allow_redirects=True)
         resp.raise_for_status()
         text = (resp.text or "").replace("﻿", "").strip()
         if text:
-            _COYUNTURA_CACHE["text"] = text
-            _COYUNTURA_CACHE["fetched_at"] = now
-        return text or _COYUNTURA_CACHE["text"]
+            cache["text"] = text
+            cache["fetched_at"] = now
+        return text or cache["text"]
     except Exception:
-        return _COYUNTURA_CACHE["text"]
+        return cache["text"]
 
 
-def consultar_coyuntura(ctx: ToolContext) -> dict[str, Any]:
-    text = _fetch_coyuntura_doc()
-    if not text:
+def consultar_asuntos_publicos(ctx: ToolContext) -> dict[str, Any]:
+    # Tope alto (~15k tokens por doc): la Agenda de Asuntos Públicos ya ronda los
+    # 47k chars y va a crecer hasta 2027; no queremos cortar temas por la mitad.
+    MAX = 60000
+    posicion = _fetch_google_doc_txt(BOT_ASUNTOS_PUBLICOS_DOC_ID, _ASUNTOS_PUBLICOS_CACHE)
+    estado = _fetch_google_doc_txt(BOT_COYUNTURA_DOC_ID, _COYUNTURA_CACHE)
+
+    if not posicion and not estado:
         return {
-            "fuente": "coyuntura",
-            "error": "documento_no_disponible",
+            "fuente": "asuntos_publicos",
+            "error": "documentos_no_disponibles",
             "detalle": (
-                "No pude leer el documento de coyuntura (no configurado o no "
-                "accesible). Decile al usuario que esa información no está "
-                "disponible en este momento."
+                "No pude leer ni la Agenda de Asuntos Públicos ni el Documento "
+                "Vivo (no configurados o no accesibles). Decile al usuario que "
+                "esa información no está disponible en este momento."
             ),
         }
-    MAX = 30000  # ~7500 tokens; cubre un doc largo sin inflar de más el prompt
     return {
-        "fuente": "coyuntura",
+        "fuente": "asuntos_publicos",
         "descripcion": (
-            "Documento vivo de temas de coyuntura de interés, mantenido por el "
-            "equipo de Comunicación de la BCR."
+            "Temas estratégicos / de asuntos públicos de la BCR. Por cada tema hay "
+            "dos capas: la POSICIÓN institucional (qué impulsa la BCR, estable) y el "
+            "ESTADO ACTUAL (novedades del momento). Respondé combinando ambas: qué "
+            "sostiene la BCR sobre el tema y qué está pasando ahora con eso."
         ),
-        "contenido": text[:MAX],
-        "truncado": len(text) > MAX,
+        "posicion_institucional": (posicion or "")[:MAX] or None,
+        "estado_actual": (estado or "")[:MAX] or None,
+        "posicion_truncada": bool(posicion and len(posicion) > MAX),
+        "estado_truncado": bool(estado and len(estado) > MAX),
     }
 
 
@@ -702,7 +723,7 @@ _TOOL_REGISTRY = {
     "buscar_informativo": buscar_informativo,
     "buscar_comentario_diario": buscar_comentario_diario,
     "get_precios_pizarra": get_precios_pizarra,
-    "consultar_coyuntura": consultar_coyuntura,
+    "consultar_asuntos_publicos": consultar_asuntos_publicos,
 }
 
 

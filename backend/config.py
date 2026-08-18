@@ -75,12 +75,20 @@ BOT_TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+141
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")
 
-# Documento vivo de "temas de coyuntura" (Google Doc PÚBLICO) que mantiene el
-# equipo de Comunicación. El bot lo lee para responder sobre temas de actualidad
-# de interés institucional. Es un doc público (no secreto), así que el ID va con
-# default; se puede sobreescribir por env var BOT_COYUNTURA_DOC_ID.
+# Insumos institucionales del bot (Google Docs PÚBLICOS). El bot los combina en
+# una sola herramienta (consultar_asuntos_publicos): por cada tema estratégico da
+# la POSICIÓN institucional (Agenda de Asuntos Públicos) + el ESTADO ACTUAL /
+# novedades (Documento Vivo de coyuntura). Ambos docs son públicos (no secretos),
+# así que los IDs van con default; se pueden sobreescribir por env var.
+#
+# Documento Vivo de coyuntura (estado actual / novedades por tema).
 BOT_COYUNTURA_DOC_ID = os.environ.get(
     "BOT_COYUNTURA_DOC_ID", "1wsKg3RKriJleK5_LKif0iz6nD0zbx24fFfCN1i94chE"
+)
+# Agenda de Asuntos Públicos de la BCR (maestro de temas + posición institucional
+# que se presentará a candidatos en las elecciones 2027).
+BOT_ASUNTOS_PUBLICOS_DOC_ID = os.environ.get(
+    "BOT_ASUNTOS_PUBLICOS_DOC_ID", "1IuZKvJaXh8gA5ah419rU61TG_1MSXHc8"
 )
 
 
