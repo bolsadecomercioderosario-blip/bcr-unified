@@ -33,15 +33,16 @@
         clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 2600);
     }
 
-    var OBJ = 1800, MAX = 2100;   // se sobreescriben con la respuesta del server
+    var OBJ = 1380, MAX = 1500;   // se sobreescriben con la respuesta del server
     var BLOQUES = [], GRUPOS = [], DUR = {};   // DUR: id -> segundos
 
-    // Zona según el total (en segundos). Umbrales: <28 / 28–32 / 32–35 / >35.
+    // Zona según el total (en segundos), relativa al objetivo (OBJ) y al máximo
+    // (MAX): <obj-1' margen · [obj-1', max-1'] ideal · último minuto extendida · >max pasado.
     function zona(t) {
-        if (t === 0)       return { cls: "z-neutral", txt: "Elegí partes" };
-        if (t < 28 * 60)   return { cls: "z-neutral", txt: "Todavía tenés margen" };
-        if (t <= 32 * 60)  return { cls: "z-ideal",   txt: "Zona ideal 🎯" };
-        if (t <= MAX)      return { cls: "z-ext",     txt: "Versión extendida" };
+        if (t === 0)        return { cls: "z-neutral", txt: "Elegí canciones" };
+        if (t < OBJ - 60)   return { cls: "z-neutral", txt: "Todavía tenés margen" };
+        if (t <= MAX - 60)  return { cls: "z-ideal",   txt: "Zona ideal 🎯" };
+        if (t <= MAX)       return { cls: "z-ext",     txt: "Versión extendida" };
         return { cls: "z-over", txt: "Te pasaste del máximo" };
     }
 
