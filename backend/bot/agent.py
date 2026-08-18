@@ -212,9 +212,16 @@ def run_agent(
     # turno anterior) o None si es el primer mensaje de la conversación.
     current_response_id: str | None = previous_response_id
 
+    # IMPORTANTE: las instrucciones del sistema hay que mandarlas en CADA
+    # llamada. La Responses API NO arrastra las `instructions` de un turno al
+    # siguiente cuando encadenás con `previous_response_id` — si sólo las
+    # mandáramos en el primer mensaje, todos los mensajes posteriores de la
+    # conversación correrían SIN system prompt (y el modelo volvería a su
+    # comportamiento por defecto: ofrecer cosas, ignorar el formato, etc.).
+    system_instructions = _build_system_instructions(date.today())
+
     # Primera iteración: mandamos el mensaje del usuario. Si hay memoria
-    # previa, encadenamos vía previous_response_id; si no, mandamos las
-    # instrucciones del sistema.
+    # previa, encadenamos vía previous_response_id.
     next_input: list[dict[str, Any]] = [{"role": "user", "content": message}]
 
     for iteration in range(_MAX_TOOL_ITERATIONS):
@@ -222,11 +229,9 @@ def run_agent(
             "model": BOT_OPENAI_MODEL,
             "input": next_input,
             "tools": tools.TOOL_DEFINITIONS,
+            "instructions": system_instructions,
         }
-        if current_response_id is None:
-            # Primer turno de la conversación — pasamos las instrucciones.
-            create_kwargs["instructions"] = _build_system_instructions(date.today())
-        else:
+        if current_response_id is not None:
             create_kwargs["previous_response_id"] = current_response_id
 
         response = client.responses.create(**create_kwargs)
