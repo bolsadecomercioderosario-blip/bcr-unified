@@ -199,13 +199,16 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "type": "function",
         "name": "consultar_coyuntura",
         "description": (
-            "Consulta el DOCUMENTO VIVO DE COYUNTURA de la BCR — un documento que "
-            "mantiene y actualiza el equipo de Comunicación con los temas de "
-            "actualidad de interés institucional (contexto, posición de la BCR, "
-            "mensajes clave del momento). Usá esta herramienta cuando la pregunta "
-            "sea sobre temas de actualidad/coyuntura que NO estén en la agenda, el "
-            "informativo semanal ni los comentarios diarios de mercado. Devuelve el "
-            "texto del documento; respondé sólo con lo que dice."
+            "Consulta el DOCUMENTO VIVO DE COYUNTURA de la BCR — el documento CURADO "
+            "y ACTUALIZADO que mantiene el equipo de Comunicación con la información "
+            "de contexto/actualidad de mayor interés institucional del momento: "
+            "mercado de granos, campaña agrícola, proyecciones de producción, "
+            "estimaciones, comercio exterior, economía, política y posición de la "
+            "BCR. Es una fuente de referencia amplia y confiable: consultala SIEMPRE "
+            "que la pregunta toque estos temas, en combinación con el informativo o "
+            "los comentarios si hace falta, y SIEMPRE antes de responder que 'no "
+            "encontraste' un dato de mercado/campaña/coyuntura. Devuelve el texto del "
+            "documento; respondé sólo con lo que dice."
         ),
         "parameters": {"type": "object", "properties": {}},
     },
