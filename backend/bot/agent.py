@@ -193,7 +193,9 @@ def run_agent(
             debug={"error": "missing_openai_api_key"},
         )
 
-    client = OpenAI(api_key=BOT_OPENAI_API_KEY)
+    # timeout/max_retries acotados: si OpenAI se cuelga, no queremos bloquear el
+    # background task indefinidamente (mejor un error que un silencio eterno).
+    client = OpenAI(api_key=BOT_OPENAI_API_KEY, timeout=60.0, max_retries=1)
     ctx = tools.ToolContext(db=db, openai_client=client)
 
     tools_used: list[str] = []

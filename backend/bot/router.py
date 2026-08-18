@@ -19,11 +19,11 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from auth import require_auth
-from database import get_db
+from database import get_db, SessionLocal
 
 from bot import agent, db_models, models, twilio_client
 
@@ -102,11 +102,64 @@ def _get_or_create_session(db: Session, from_phone: str) -> tuple[db_models.BotS
     return session, session.last_response_id
 
 
+def _process_message(from_phone: str, body: str) -> None:
+    """Corre el agente y manda la respuesta por REST. Va en SEGUNDO PLANO
+    (BackgroundTask) para no colgar el webhook de Twilio, que corta a los ~15s
+    — el ciclo de herramientas (varias llamadas a OpenAI + DB) puede pasarse de
+    ahí. Usa su PROPIA sesión de DB porque la del request ya está cerrada."""
+    db = SessionLocal()
+    try:
+        session, previous_response_id = _get_or_create_session(db, from_phone)
+
+        exchange = db_models.BotExchange(from_phone=from_phone, message=body, reply="")
+        db.add(exchange)
+
+        try:
+            result = agent.run_agent(
+                message=body,
+                from_phone=from_phone,
+                db=db,
+                previous_response_id=previous_response_id,
+            )
+            reply_text = result.reply
+            exchange.reply = reply_text
+            exchange.response_id = result.response_id
+            exchange.tools_used = list(result.tools_used)
+            exchange.iterations = result.iterations
+            exchange.success = True
+            session.last_response_id = result.response_id
+            session.last_message_at = datetime.utcnow()
+        except Exception as exc:  # noqa: BLE001
+            tb = traceback.format_exc()
+            print(f"[bot.twilio-webhook] Agente falló: {exc}\n{tb}")
+            reply_text = (
+                "Disculpá, tuve un problema procesando tu consulta. Intentá de "
+                "nuevo en un momento."
+            )
+            exchange.reply = reply_text
+            exchange.success = False
+            exchange.error = f"{type(exc).__name__}: {exc}"
+
+        db.commit()
+
+        try:
+            twilio_client.send_whatsapp(to=from_phone, body=reply_text)
+        except twilio_client.TwilioNotConfigured:
+            print("[bot.twilio-webhook] Twilio no configurado; no se mandó respuesta.")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[bot.twilio-webhook] Falló envío Twilio: {exc}")
+    except Exception as exc:  # noqa: BLE001 — un background task nunca debe reventar
+        print(f"[bot.twilio-webhook] _process_message falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 @router.post("/twilio-webhook", include_in_schema=False)
-async def twilio_webhook(request: Request, db: Session = Depends(get_db)) -> Response:
-    """Recibe un POST de Twilio cuando llega un WhatsApp. Devuelve TwiML vacío
-    y dispara la respuesta saliente vía REST API (más confiable que TwiML
-    para mensajes largos o que pueden tardar)."""
+async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) -> Response:
+    """Recibe un POST de Twilio cuando llega un WhatsApp. Le contesta a Twilio
+    AL INSTANTE (TwiML vacío) y procesa el agente en segundo plano, mandando la
+    respuesta por REST cuando termina. Así el ciclo de herramientas puede tardar
+    sin que Twilio corte el webhook (~15s) y deje al usuario sin respuesta."""
     form = await request.form()
     params = {k: str(form[k]) for k in form.keys()}
 
@@ -137,57 +190,8 @@ async def twilio_webhook(request: Request, db: Session = Depends(get_db)) -> Res
                 print(f"[bot.twilio-webhook] Falló mandar respuesta no-text: {exc}")
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
-    # Recuperamos memoria conversacional (o creamos sesión).
-    session, previous_response_id = _get_or_create_session(db, from_phone)
-
-    exchange = db_models.BotExchange(
-        from_phone=from_phone,
-        message=body,
-        reply="",  # lo completamos al final
-    )
-    db.add(exchange)
-
-    try:
-        result = agent.run_agent(
-            message=body,
-            from_phone=from_phone,
-            db=db,
-            previous_response_id=previous_response_id,
-        )
-        reply_text = result.reply
-        exchange.reply = reply_text
-        exchange.response_id = result.response_id
-        exchange.tools_used = list(result.tools_used)
-        exchange.iterations = result.iterations
-        exchange.success = True
-
-        # Actualizamos memoria conversacional.
-        session.last_response_id = result.response_id
-        session.last_message_at = datetime.utcnow()
-
-    except Exception as exc:  # noqa: BLE001
-        tb = traceback.format_exc()
-        print(f"[bot.twilio-webhook] Agente falló: {exc}\n{tb}")
-        reply_text = (
-            "Disculpá, tuve un problema procesando tu consulta. Intentá de nuevo "
-            "en un momento."
-        )
-        exchange.reply = reply_text
-        exchange.success = False
-        exchange.error = f"{type(exc).__name__}: {exc}"
-
-    db.commit()
-
-    # Mandamos la respuesta saliente vía Twilio REST. Si falla, queda el
-    # exchange logueado pero el usuario no recibe nada — peor el silencio
-    # que tirar 500 a Twilio (que reintentaría disparando duplicados).
-    try:
-        twilio_client.send_whatsapp(to=from_phone, body=reply_text)
-    except twilio_client.TwilioNotConfigured:
-        print("[bot.twilio-webhook] Twilio no configurado; no se mandó respuesta.")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[bot.twilio-webhook] Falló envío Twilio: {exc}")
-
+    # Procesamos en segundo plano y le contestamos a Twilio YA.
+    background_tasks.add_task(_process_message, from_phone, body)
     return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
 
