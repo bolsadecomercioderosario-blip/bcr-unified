@@ -29,6 +29,7 @@ import metricas.models  # noqa: F401  — registra Programa + Instancia
 import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
+import canciones.models  # noqa: F401  — registra tabla canciones_respuestas (encuesta versión B, solo canciones)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -43,6 +44,7 @@ from semana_datos.router import router as semana_datos_api
 from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
 from corte.router import router as corte_api
+from canciones.router import router as canciones_api
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -100,6 +102,7 @@ app.include_router(compromisos_api)
 app.include_router(aapresid_api)
 app.include_router(murga_api)
 app.include_router(corte_api)
+app.include_router(canciones_api)
 
 
 # ---------------------------------------------------------
@@ -137,7 +140,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte", "canciones"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -150,6 +153,16 @@ for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "
 async def _corte_resultados():
     return HTMLResponse(
         content=get_module_html("corte"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
+# Canciones — versión B (misma lógica, sólo canciones). /canciones/resultados
+# sirve el mismo SPA y el JS valida el token contra el API.
+@app.get("/canciones/resultados")
+async def _canciones_resultados():
+    return HTMLResponse(
+        content=get_module_html("canciones"),
         headers={"Cache-Control": "no-cache, must-revalidate"},
     )
 
@@ -250,6 +263,7 @@ app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), 
 app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
 app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
 app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte"), html=False), name="corte_ui")
+app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")
 
 
 @app.get("/")
