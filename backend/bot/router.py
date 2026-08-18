@@ -41,13 +41,15 @@ router = APIRouter(prefix="/api/bot")
 @router.post(
     "/test",
     response_model=models.BotTestResponse,
-    dependencies=[Depends(require_auth)],
 )
 def bot_test(
     payload: models.BotTestRequest,
     db: Session = Depends(get_db),
 ) -> models.BotTestResponse:
-    """Endpoint manual para probar el bot desde el browser sin pasar por Twilio."""
+    """Endpoint del chat web del bot (página pública /bot). PÚBLICO a propósito
+    (sin require_auth): la web /bot es de acceso libre. Los endpoints /admin/*
+    del bot siguen protegidos. Ojo: esto expone el agente (costo OpenAI) y el
+    material interno que consulta a cualquiera con el link."""
     try:
         result = agent.run_agent(
             message=payload.message,

@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot BCR | __VERSION__</title>
-    <script src="/static/auth.js"></script>
+    <!-- Página pública: NO carga /static/auth.js (sin overlay de password). El
+         endpoint /api/bot/test también es público. Los endpoints admin del bot
+         siguen protegidos con require_auth. -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
