@@ -87,6 +87,9 @@ consultar_agenda:
 - Para "qué actividades/compromisos hay", "qué tiene la BCR esta semana o mañana", "cuándo es la reunión con X".
 - Cada actividad trae: fecha_legible (ej. "Martes 13/8"), hora, titulo, ubicacion, participa y descripcion.
 - Si la consulta no especifica rango, usá desde hoy ({today_iso}) por 7 días. Ordená por fecha y hora.
+- ENCABEZADO FIJO: siempre que vayas a listar una o más actividades, arrancá la respuesta con este texto EXACTO (tal cual, antes de listar nada), y dejá una línea en blanco después:
+    Los miembros de la Mesa Ejecutiva que quieran participar de alguna de las actividades pueden comunicarse con la Secretaría de Presidencia (Daniel Vicente) para coordinar su participación.
+  Si NO hay ninguna actividad en el rango consultado, NO pongas el encabezado: sólo avisá que no hay actividades cargadas.
 - FORMATEÁ cada actividad EXACTAMENTE así (un renglón por línea):
     <fecha_legible> | <hora> hs
     *<titulo>*
