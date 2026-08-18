@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import require_auth
@@ -329,6 +330,68 @@ def trigger_scrape_gea_informes(
     from bot.scraper_gea import scrape_gea_informes
 
     return scrape_gea_informes(db, max_pages=max_pages, max_upload_per_run=max_upload)
+
+
+# ---------------------------------------------------------------------------
+# Archivo de newsletters "Conectados" — la app de Agenda de Comunicación
+# (o la carga de la semilla histórica) postea acá para archivar un newsletter
+# en el vector store del bot.
+# ---------------------------------------------------------------------------
+class _ConectadoBloque(BaseModel):
+    titulo: Optional[str] = None
+    texto: Optional[str] = None
+
+
+class _ArchivarConectadoRequest(BaseModel):
+    fecha: str  # 'YYYY-MM-DD'
+    titulo: Optional[str] = None
+    semana_key: Optional[str] = None
+    # Uno de los dos: bloques (desde la app) o contenido ya armado (semilla).
+    bloques: Optional[list[_ConectadoBloque]] = None
+    contenido: Optional[str] = None
+
+
+@router.post(
+    "/admin/archivar-conectado",
+    dependencies=[Depends(require_auth)],
+)
+def archivar_conectado_endpoint(
+    payload: _ArchivarConectadoRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Archiva un newsletter Conectados en el vector store del bot.
+
+    Acepta dos formas: `bloques` (título+texto por actividad, como los manda la
+    app al exportar) o `contenido` (texto ya armado, para la semilla histórica).
+    Idempotente por fecha/semana_key: re-archivar la misma semana reemplaza.
+    """
+    from config import BOT_OPENAI_API_KEY
+    from openai import OpenAI
+    from bot.ingest_conectados import archivar_conectado, construir_texto_conectado
+
+    if not BOT_OPENAI_API_KEY:
+        return {"status": "error", "error": "missing_openai_api_key"}
+
+    if payload.contenido and payload.contenido.strip():
+        contenido = payload.contenido.strip()
+        n_bloques = None
+    elif payload.bloques:
+        bloques = [{"titulo": b.titulo, "texto": b.texto} for b in payload.bloques]
+        contenido = construir_texto_conectado(f"CONECTADOS — {payload.fecha}", bloques)
+        n_bloques = sum(1 for b in bloques if (b.get("titulo") or b.get("texto")))
+    else:
+        return {"status": "error", "error": "falta_contenido_o_bloques"}
+
+    client = OpenAI(api_key=BOT_OPENAI_API_KEY, timeout=60.0, max_retries=2)
+    return archivar_conectado(
+        db,
+        client,
+        fecha=payload.fecha,
+        contenido=contenido,
+        titulo=payload.titulo,
+        semana_key=payload.semana_key,
+        n_bloques=n_bloques,
+    )
 
 
 @router.post(

@@ -242,3 +242,22 @@ class StartupInnova(Base):
     __table_args__ = (
         UniqueConstraint("nombre", "edicion", name="uix_startup_nombre_edicion"),
     )
+
+
+class IngestedConectado(Base):
+    """Tracking de cada newsletter "Conectados" archivado para el bot.
+
+    La key estable es `semana_key` (normalmente la fecha del newsletter,
+    YYYY-MM-DD): re-archivar la misma semana REEMPLAZA el registro y su
+    archivo en el vector store, en lugar de duplicar. `openai_file_id`
+    guarda el file del vector store para poder borrarlo al reemplazar.
+    """
+    __tablename__ = "ingested_conectados"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    semana_key = Column(String, nullable=False, unique=True, index=True)  # ej '2026-06-12'
+    fecha = Column(String, nullable=False, index=True)  # YYYY-MM-DD
+    titulo = Column(Text, nullable=True)  # etiqueta legible, ej 'Conectados 12/06/2026'
+    n_bloques = Column(Integer, nullable=True)
+    openai_file_id = Column(String, nullable=True)
+    ingested_at = Column(DateTime, nullable=False, default=datetime.utcnow)

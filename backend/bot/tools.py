@@ -16,6 +16,8 @@ Tools registradas (bot cerrado para la Mesa Ejecutiva):
 - get_precios_pizarra: precios exactos (soja/trigo/maíz) del Mercado Físico de Rosario.
 - get_estimaciones_gea / buscar_informe_gea: estimaciones de producción nacional de
   GEA (área/rinde/producción estructurada) + RAG sobre los informes mensuales de GEA.
+- buscar_conectados: RAG sobre el archivo de newsletters semanales "Conectados"
+  (qué hizo/comunicó la BCR cada semana).
 - consultar_asuntos_publicos: combina dos Google Docs públicos (Agenda de Asuntos
   Públicos = posición institucional + Documento Vivo = estado actual) en una sola
   fuente de temas estratégicos de la BCR.
@@ -241,6 +243,30 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "consulta": {
                     "type": "string",
                     "description": "Consulta a buscar en los informes GEA.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "buscar_conectados",
+        "description": (
+            "Busca en el archivo de newsletters SEMANALES 'Conectados' de la BCR — "
+            "el resumen de lo que la institución HIZO y COMUNICÓ cada semana: "
+            "reuniones, visitas (embajadores, autoridades), participaciones en "
+            "congresos y comisiones, capacitaciones, actividades culturales, "
+            "novedades, presencia en medios, etc. Usá esta tool para preguntas "
+            "retrospectivas del tipo 'qué se habló/hizo en tal reunión', 'qué pasó "
+            "con X actividad', 'quiénes participaron', 'cuándo fue tal evento'. Si el "
+            "documento trae la fecha del newsletter, citala."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Consulta a buscar en el archivo de Conectados.",
                 },
             },
             "required": ["consulta"],
@@ -779,6 +805,36 @@ def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
     )
 
 
+def buscar_conectados(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    result = _search_in_vector_store(
+        ctx,
+        vector_store_id=get_vector_store_id(ctx.db, "conectados"),
+        consulta=consulta,
+        fuente_nombre="conectados",
+        hint=(
+            "Los documentos son los newsletters semanales 'Conectados' de la BCR: "
+            "qué hizo y comunicó la institución cada semana (reuniones, visitas, "
+            "participaciones en congresos/comisiones, capacitaciones, actividades "
+            "culturales, novedades, presencia en medios). Cada archivo corresponde a "
+            "una semana y arranca con su fecha. Si encontrás la fecha, incluila, y "
+            "detallá quiénes participaron si la consulta lo pide."
+        ),
+    )
+    # Igual que informativo/comentarios: sumamos las últimas semanas archivadas
+    # para que el agente sepa qué tan reciente es el archivo.
+    from bot.db_models import IngestedConectado
+    recientes = (
+        ctx.db.query(IngestedConectado)
+        .order_by(IngestedConectado.fecha.desc())
+        .limit(8)
+        .all()
+    )
+    result["recientes_por_fecha"] = [
+        {"fecha": r.fecha, "titulo": r.titulo} for r in recientes
+    ]
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Implementación: consultar_asuntos_publicos.
 # Combina DOS Google Docs públicos que mantiene Comunicación en una sola fuente,
@@ -861,6 +917,7 @@ _TOOL_REGISTRY = {
     "get_precios_pizarra": get_precios_pizarra,
     "get_estimaciones_gea": get_estimaciones_gea,
     "buscar_informe_gea": buscar_informe_gea,
+    "buscar_conectados": buscar_conectados,
     "consultar_asuntos_publicos": consultar_asuntos_publicos,
 }
 

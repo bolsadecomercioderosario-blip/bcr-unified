@@ -63,6 +63,9 @@ BOT_VS_INSTITUCIONAL = os.environ.get("BOT_VS_INSTITUCIONAL")
 BOT_VS_INFORMATIVO = os.environ.get("BOT_VS_INFORMATIVO")
 BOT_VS_COMENTARIOS = os.environ.get("BOT_VS_COMENTARIOS")
 BOT_VS_GEA = os.environ.get("BOT_VS_GEA")
+# Archivo de newsletters "Conectados" (RAG). Sin env var por defecto → el
+# vector store se auto-crea la primera vez que se archiva un newsletter.
+BOT_VS_CONECTADOS = os.environ.get("BOT_VS_CONECTADOS")
 
 # Twilio — reservado para el chunk 2.5 (webhook + envío de WhatsApp).
 # Importante: NUNCA hardcodear estas credenciales en código. Si las ves

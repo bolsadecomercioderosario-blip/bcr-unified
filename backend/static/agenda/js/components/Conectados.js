@@ -582,6 +582,9 @@ function openNewsletterPreview(listContainer) {
                 <button id="copy-newsletter-html" class="btn-primary" style="flex: 1; background: #0742ab;">
                     <i data-lucide="copy"></i> Copiar Código HTML
                 </button>
+                <button id="save-newsletter-bot" class="btn-primary" style="flex: 1; background: #0891b2;" title="Guarda este newsletter en el archivo que consulta el bot de la Mesa Ejecutiva">
+                    <i data-lucide="bot"></i> Guardar para el bot
+                </button>
                 <button id="btn-close-preview" class="btn-primary" style="background: #64748b; padding: 0.5rem 1.5rem;">
                     Cerrar
                 </button>
@@ -601,6 +604,54 @@ function openNewsletterPreview(listContainer) {
         const originalHTML = btn.innerHTML;
         btn.innerHTML = '<i data-lucide="check"></i> ¡Copiado!';
         setTimeout(() => btn.innerHTML = originalHTML, 2000);
+    };
+
+    // Guardar el newsletter en el archivo del bot (RAG). Manda los bloques
+    // estructurados (título + texto) al backend; el fetch lleva el token de
+    // auth automáticamente (monkey patch de /static/auth.js).
+    modal.querySelector('#save-newsletter-bot').onclick = async () => {
+        const btn = modal.querySelector('#save-newsletter-bot');
+        const bloques = liveActivities.map(a => ({
+            titulo: (a.title || '').trim(),
+            texto: (blockBodyText(a) || '').trim(),
+        })).filter(b => b.titulo || b.texto);
+        if (bloques.length === 0) {
+            alert('No hay bloques para guardar.');
+            return;
+        }
+        // Fecha del newsletter: fin de la edición actual (o hoy si no está seteada).
+        const endAt = (state.newsletterSettings && state.newsletterSettings.edition_end_at) || '';
+        const fecha = endAt ? endAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader"></i> Guardando…';
+        if (window.lucide) window.lucide.createIcons();
+        try {
+            const res = await fetch('/api/bot/admin/archivar-conectado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha, titulo: `Conectados ${fecha}`, bloques }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.status === 'ok') {
+                btn.innerHTML = data.replaced
+                    ? '<i data-lucide="check"></i> ¡Actualizado!'
+                    : '<i data-lucide="check"></i> ¡Guardado!';
+            } else {
+                btn.innerHTML = '<i data-lucide="alert-triangle"></i> Error';
+                console.error('archivar-conectado:', data);
+            }
+        } catch (e) {
+            btn.innerHTML = '<i data-lucide="alert-triangle"></i> Error';
+            console.error(e);
+        }
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = original;
+            if (window.lucide) window.lucide.createIcons();
+        }, 2800);
     };
 
     if (window.lucide) window.lucide.createIcons();
