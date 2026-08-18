@@ -13,8 +13,13 @@ en las tarjetas. Módulo aparte para no tocar la versión A, que sigue viva.
 | `/canciones/resultados?k=TOKEN` | Organizador | Ranking de canciones por votos + calculadora de duración |
 
 Mecánica idéntica a `corte`: roster fijo de 20 murguistas, una respuesta por
-persona (nombre tomado tras enviar; reintento → 409), contador con objetivo 30' /
-máx 35', y en resultados el ranking + calculadora + botón de reset.
+persona (nombre tomado tras enviar; reintento → 409), contador en vivo y en
+resultados el ranking + calculadora + botón de reset.
+
+**Objetivo/máximo propios**: como acá se eligen sólo canciones (el resto del
+show reducido son intervenciones), el objetivo es **~22/23'** y el máximo **25'**
+(`OBJETIVO_SEG` / `MAX_SEG` en `data.py`). Las zonas del contador se calculan
+relativas a esos valores.
 
 ## Datos
 

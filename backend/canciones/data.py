@@ -7,9 +7,10 @@ eso hay saltos (faltan los ids de las intervenciones). No importa: acá son sól
 claves estables de cada canción.
 """
 
-# Objetivo y máximo (en segundos). Mismos que la versión completa.
-OBJETIVO_SEG = 30 * 60   # 30:00
-MAX_SEG = 35 * 60        # 35:00
+# Objetivo y máximo (en segundos). Versión B: sólo canciones ~22/23'; el resto
+# del tiempo del show reducido se usa para las intervenciones.
+OBJETIVO_SEG = 23 * 60   # 23:00
+MAX_SEG = 25 * 60        # 25:00
 
 
 # Roster de murguistas (mismo que la versión A). Orden alfabético.
