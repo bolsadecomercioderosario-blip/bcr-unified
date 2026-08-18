@@ -13,6 +13,7 @@ Tools registradas (bot cerrado para la Mesa Ejecutiva):
 - consultar_agenda: Agenda de Compromisos (actividades de Secretaría) por rango de fechas.
 - buscar_informativo / buscar_comentario_diario: búsqueda RAG sobre los vector
   stores del Informativo Semanal y de los Comentarios Diarios del mercado.
+- get_precios_pizarra: precios exactos (soja/trigo/maíz) del Mercado Físico de Rosario.
 - consultar_coyuntura: lee el Google Doc vivo de coyuntura que mantiene Comunicación.
 """
 from __future__ import annotations
@@ -160,6 +161,38 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 },
             },
             "required": ["consulta"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_precios_pizarra",
+        "description": (
+            "Devuelve los precios pizarra del Mercado Físico de Rosario para "
+            "soja, trigo, maíz y otros granos, con la(s) fecha(s) de los últimos "
+            "días disponibles. Es DATA ESTRUCTURADA (números exactos), distinto "
+            "de los comentarios narrativos. Usá esta tool cuando la pregunta "
+            "pida un valor numérico concreto: 'cuánto está la soja hoy', "
+            "'precio del trigo', 'cotización del maíz ayer'. Para análisis o "
+            "contexto, usá buscar_comentario_diario."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "producto": {
+                    "type": "string",
+                    "description": (
+                        "Producto a consultar: 'soja', 'trigo', 'maiz', 'girasol' "
+                        "o 'todos' para traer todos los disponibles."
+                    ),
+                },
+                "fecha": {
+                    "type": "string",
+                    "description": (
+                        "Fecha específica YYYY-MM-DD. Si se omite, devuelve la "
+                        "última fecha disponible."
+                    ),
+                },
+            },
         },
     },
     {
@@ -498,6 +531,115 @@ def buscar_comentario_diario(ctx: ToolContext, consulta: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Implementación: get_precios_pizarra (DB — tabla que llena el scraper diario).
+# ---------------------------------------------------------------------------
+def get_precios_pizarra(
+    ctx: ToolContext,
+    producto: str | None = None,
+    fecha: str | None = None,
+) -> dict[str, Any]:
+    """Lee la tabla precios_pizarra que mantiene el scraper.
+
+    - Sin filtros → precios de la última fecha disponible.
+    - Con `producto` → filtra por ese (case/acento-insensitive).
+    - Con `fecha` → esa fecha; si no existe, devuelve 'fecha_no_disponible'
+      con los datos de la fecha más reciente que sí tenemos.
+    - Tabla vacía → estado 'sin_datos'.
+    """
+    from bot.db_models import PrecioPizarra
+
+    base_query = ctx.db.query(PrecioPizarra)
+
+    if producto:
+        producto_norm = (
+            "".join(
+                ch for ch in __import__("unicodedata").normalize("NFKD", producto.strip().lower())
+                if not __import__("unicodedata").combining(ch)
+            )
+        )
+        if producto_norm != "todos":
+            base_query = base_query.filter(PrecioPizarra.producto == producto_norm)
+
+    latest_fecha_row = (
+        base_query.with_entities(PrecioPizarra.fecha)
+        .order_by(PrecioPizarra.fecha.desc())
+        .first()
+    )
+    latest_fecha = latest_fecha_row[0] if latest_fecha_row else None
+
+    if latest_fecha is None:
+        return {
+            "fuente": "precios_pizarra",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay precios cargados en la base. El scraper diario "
+                "corre varias veces al día; si todavía no corrió, mostrale al usuario "
+                "https://www.bcr.com.ar/es/mercados/mercado-de-granos/"
+                "cotizaciones/cotizaciones-locales-0."
+            ),
+            "consulta": {"producto": producto, "fecha": fecha},
+        }
+
+    def _serialize(rows):
+        return [
+            {
+                "producto": r.producto,
+                "fecha": r.fecha,
+                "precio_ars_tn": r.precio_ars_tn,
+                "actualizado_en_art": _utc_naive_to_art_iso(r.scraped_at),
+            }
+            for r in rows
+        ]
+
+    if fecha:
+        rows = (
+            base_query.filter(PrecioPizarra.fecha == fecha)
+            .order_by(PrecioPizarra.producto.asc())
+            .all()
+        )
+        if rows:
+            return {
+                "fuente": "precios_pizarra",
+                "estado": "ok",
+                "moneda": "ARS",
+                "unidad": "pesos por tonelada",
+                "filas": _serialize(rows),
+            }
+        latest_rows = (
+            base_query.filter(PrecioPizarra.fecha == latest_fecha)
+            .order_by(PrecioPizarra.producto.asc())
+            .all()
+        )
+        return {
+            "fuente": "precios_pizarra",
+            "estado": "fecha_no_disponible",
+            "fecha_pedida": fecha,
+            "ultima_fecha_disponible": latest_fecha,
+            "moneda": "ARS",
+            "unidad": "pesos por tonelada",
+            "filas": _serialize(latest_rows),
+            "detalle": (
+                f"No hay datos para {fecha}. Devolvemos los precios de la "
+                f"última fecha que sí tenemos: {latest_fecha}. El agente debe "
+                "decirle eso al usuario explícitamente."
+            ),
+        }
+
+    rows = (
+        base_query.filter(PrecioPizarra.fecha == latest_fecha)
+        .order_by(PrecioPizarra.producto.asc())
+        .all()
+    )
+    return {
+        "fuente": "precios_pizarra",
+        "estado": "ok",
+        "moneda": "ARS",
+        "unidad": "pesos por tonelada",
+        "filas": _serialize(rows),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Implementación: consultar_coyuntura (Google Doc vivo que mantiene Comunicación).
 # Lee el texto exportado del doc público, con una cachecita de 5 min para que los
 # cambios se reflejen rápido sin pegarle a Google en cada consulta. Si el fetch
@@ -558,6 +700,7 @@ _TOOL_REGISTRY = {
     "consultar_agenda": consultar_agenda,
     "buscar_informativo": buscar_informativo,
     "buscar_comentario_diario": buscar_comentario_diario,
+    "get_precios_pizarra": get_precios_pizarra,
     "consultar_coyuntura": consultar_coyuntura,
 }
 

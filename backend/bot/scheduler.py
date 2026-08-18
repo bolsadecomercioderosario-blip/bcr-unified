@@ -218,6 +218,14 @@ def _startup_catchup() -> None:
         # (último timestamp encontrado, umbral, función a correr, id del job catchup)
         sources = [
             (
+                db.query(db_models.PrecioPizarra.scraped_at)
+                .order_by(db_models.PrecioPizarra.scraped_at.desc()).first(),
+                timedelta(hours=30),  # diario
+                _run_scrape_precios_pizarra,
+                "catchup_precios_pizarra",
+                "precios_pizarra",
+            ),
+            (
                 db.query(db_models.IngestedComentario.ingested_at)
                 .order_by(db_models.IngestedComentario.ingested_at.desc()).first(),
                 timedelta(hours=30),  # diario
@@ -274,6 +282,21 @@ def start() -> None:
     está corriendo (ej. uvicorn --reload), no hace nada."""
     if scheduler.running:
         return
+
+    # Precios pizarra: tres firings al día (10:30, 13:00, 17:00 ART).
+    # La BCR publica el card "del día" a las ~10:00 pero la tabla histórica
+    # debajo tarda más; varios firings cubren la ventana sin tener que
+    # adivinar el horario exacto. Scraper idempotente y barato (1 request,
+    # 20-25 upserts), así que correr de más no molesta.
+    scheduler.add_job(
+        _run_scrape_precios_pizarra,
+        CronTrigger(hour="10,13,17", minute=30),
+        id="scrape_precios_pizarra",
+        replace_existing=True,
+        max_instances=1,  # No dejar arrancar otro tick si el anterior aún corre
+        coalesce=True,    # Si nos perdimos ticks (por restart), correr UNO solo
+        misfire_grace_time=_DAILY_GRACE_S,
+    )
 
     # Comentarios diarios: 17:00 ART. La BCR suele publicar a la tarde —
     # dejamos margen para que ya esté el del día.
