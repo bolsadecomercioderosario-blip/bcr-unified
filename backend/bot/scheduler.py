@@ -241,6 +241,22 @@ def _startup_catchup() -> None:
                 "catchup_informativo",
                 "informativo",
             ),
+            (
+                db.query(db_models.EstimacionGea.scraped_at)
+                .order_by(db_models.EstimacionGea.scraped_at.desc()).first(),
+                timedelta(hours=30),  # diario
+                _run_scrape_gea_panel,
+                "catchup_gea_panel",
+                "gea_panel",
+            ),
+            (
+                db.query(db_models.IngestedGeaReport.ingested_at)
+                .order_by(db_models.IngestedGeaReport.ingested_at.desc()).first(),
+                timedelta(days=8),  # semanal
+                _run_scrape_gea_informes,
+                "catchup_gea_informes",
+                "gea_informes",
+            ),
         ]
 
         now = datetime.utcnow()
@@ -317,6 +333,30 @@ def start() -> None:
         _run_scrape_informativo,
         CronTrigger(day_of_week="fri", hour="13,18", minute=0),
         id="scrape_informativo_viernes",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Panel GEA (estimaciones de producción): el sitio actualiza esporádicamente
+    # — corremos diario a las 9:00 ART. Idempotente, no hace daño correr de más.
+    scheduler.add_job(
+        _run_scrape_gea_panel,
+        CronTrigger(hour=9, minute=0),
+        id="scrape_gea_panel_diario",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_DAILY_GRACE_S,
+    )
+
+    # Informes GEA (estimaciones nacionales mensuales): semanal los lunes
+    # a las 9:30 ART. Idempotente — sólo sube los slugs nuevos.
+    scheduler.add_job(
+        _run_scrape_gea_informes,
+        CronTrigger(day_of_week="mon", hour=9, minute=30),
+        id="scrape_gea_informes_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

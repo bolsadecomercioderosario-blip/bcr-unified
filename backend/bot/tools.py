@@ -14,6 +14,8 @@ Tools registradas (bot cerrado para la Mesa Ejecutiva):
 - buscar_informativo / buscar_comentario_diario: búsqueda RAG sobre los vector
   stores del Informativo Semanal y de los Comentarios Diarios del mercado.
 - get_precios_pizarra: precios exactos (soja/trigo/maíz) del Mercado Físico de Rosario.
+- get_estimaciones_gea / buscar_informe_gea: estimaciones de producción nacional de
+  GEA (área/rinde/producción estructurada) + RAG sobre los informes mensuales de GEA.
 - consultar_asuntos_publicos: combina dos Google Docs públicos (Agenda de Asuntos
   Públicos = posición institucional + Documento Vivo = estado actual) en una sola
   fuente de temas estratégicos de la BCR.
@@ -195,6 +197,53 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     ),
                 },
             },
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_estimaciones_gea",
+        "description": (
+            "Devuelve las estimaciones de producción nacional de GEA (Guía "
+            "Estratégica para el Agro de la BCR) para soja, trigo y maíz: área "
+            "sembrada, rinde y producción de la campaña vigente y la anterior. "
+            "Es DATA ESTRUCTURADA. Usá esta tool cuando la pregunta sea sobre "
+            "cuánto se va a producir, área sembrada, rindes proyectados a nivel "
+            "nacional. Para análisis o detalle del informe, usá buscar_informe_gea."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "cultivo": {
+                    "type": "string",
+                    "description": (
+                        "Cultivo a consultar: 'soja', 'trigo', 'maiz' o 'todos'."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "name": "buscar_informe_gea",
+        "description": (
+            "Busca en los INFORMES DE ESTIMACIÓN NACIONAL DE PRODUCCIÓN de GEA. "
+            "Son reportes mensuales firmados (ej. por Cristián Russo) con análisis "
+            "técnico de campañas agrícolas: condiciones climáticas, reservas de "
+            "agua, decisiones de siembra, ajustes de producción, etc. Usá esta "
+            "tool para preguntas sobre el porqué de los cambios en estimaciones "
+            "('por qué cae la siembra de trigo', 'cómo afectaron las lluvias a "
+            "la soja'), o cuando la pregunta pida narrativa/explicación. Para "
+            "los números puros usá get_estimaciones_gea."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "Consulta a buscar en los informes GEA.",
+                },
+            },
+            "required": ["consulta"],
         },
     },
     {
@@ -644,6 +693,93 @@ def get_precios_pizarra(
 
 
 # ---------------------------------------------------------------------------
+# Implementación: get_estimaciones_gea (tabla estructurada) + buscar_informe_gea
+# (RAG sobre el vector store de informes GEA). El scraper de GEA llena la tabla
+# estimaciones_gea y sube los informes al vector store.
+# ---------------------------------------------------------------------------
+def get_estimaciones_gea(
+    ctx: ToolContext,
+    cultivo: str | None = None,
+) -> dict[str, Any]:
+    """Lee la tabla estimaciones_gea que mantiene el scraper de GEA.
+
+    - Sin filtros → trae todas las filas (todas las campañas para todos los cultivos)
+    - Con `cultivo` ('soja', 'trigo', 'maiz', 'girasol') → filtra por ese.
+      Acepta también acentos ('maíz' se normaliza a 'maiz').
+
+    Si la tabla está vacía, devuelve estado especial para que el agente
+    pueda avisar al usuario sin alucinar números.
+    """
+    import unicodedata
+
+    from bot.db_models import EstimacionGea
+
+    query = ctx.db.query(EstimacionGea)
+    if cultivo:
+        cultivo_norm = "".join(
+            ch for ch in unicodedata.normalize("NFKD", cultivo.strip().lower())
+            if not unicodedata.combining(ch)
+        )
+        if cultivo_norm != "todos":
+            query = query.filter(EstimacionGea.cultivo == cultivo_norm)
+
+    rows = query.order_by(
+        EstimacionGea.cultivo.asc(),
+        EstimacionGea.campania.desc(),
+    ).all()
+
+    if not rows:
+        return {
+            "fuente": "estimaciones_gea",
+            "estado": "sin_datos",
+            "detalle": (
+                "Todavía no hay estimaciones de GEA cargadas en la base. El scraper "
+                "va a llenar la tabla automáticamente. Mientras tanto, sugerile al "
+                "usuario que mire https://www.bcr.com.ar/es/mercados/gea."
+            ),
+            "consulta": {"cultivo": cultivo},
+        }
+
+    return {
+        "fuente": "estimaciones_gea",
+        "estado": "ok",
+        "unidades": {
+            "area_sembrada": "millones de hectáreas",
+            "rinde": "quintales por hectárea",
+            "produccion": "millones de toneladas",
+        },
+        "filas": [
+            {
+                "cultivo": r.cultivo,
+                "campania": r.campania,
+                "area_sembrada_mha": r.area_sembrada_mha,
+                "rinde_qq_ha": r.rinde_qq_ha,
+                "produccion_mtn": r.produccion_mtn,
+                "actualizado_en_art": _utc_naive_to_art_iso(r.scraped_at),
+            }
+            for r in rows
+        ],
+    }
+
+
+def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
+    return _search_in_vector_store(
+        ctx,
+        vector_store_id=get_vector_store_id(ctx.db, "gea"),
+        consulta=consulta,
+        fuente_nombre="informe_gea",
+        hint=(
+            "Los documentos son informes mensuales de Estimación Nacional de "
+            "Producción de la Guía Estratégica para el Agro (GEA) de la BCR. "
+            "Cubren campañas de soja, trigo, maíz, girasol y otros, con análisis "
+            "de área sembrada, rinde, producción, clima, reservas de agua, decisiones "
+            "de siembra. Si el documento trae fecha del informe o autor (ej. "
+            "Cristián Russo), incluilos en el resumen."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Implementación: consultar_asuntos_publicos.
 # Combina DOS Google Docs públicos que mantiene Comunicación en una sola fuente,
 # alineados por tema estratégico:
@@ -723,6 +859,8 @@ _TOOL_REGISTRY = {
     "buscar_informativo": buscar_informativo,
     "buscar_comentario_diario": buscar_comentario_diario,
     "get_precios_pizarra": get_precios_pizarra,
+    "get_estimaciones_gea": get_estimaciones_gea,
+    "buscar_informe_gea": buscar_informe_gea,
     "consultar_asuntos_publicos": consultar_asuntos_publicos,
 }
 
