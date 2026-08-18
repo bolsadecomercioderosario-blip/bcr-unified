@@ -266,11 +266,9 @@ def consultar_agenda(
     """Devuelve actividades de la BCR en el rango. Compara fechas como strings
     porque están almacenadas en YYYY-MM-DD (orden lexicográfico === cronológico).
 
-    Sólo expone al bot las actividades con el canal 'Bot' tildado en la
-    agenda (channels contiene "Bot"). El filtrado se hace en Python para
-    ser DB-agnóstico (JSON contains varía entre Postgres y SQLite); con el
-    tamaño de la agenda (decenas a cientos de filas) no hay riesgo de
-    performance.
+    Sólo expone la Agenda de Compromisos: las actividades que carga Secretaría
+    (origen='secretaria') y que no están archivadas. El canal 'Bot' de la
+    agenda de Comunicación era de una lógica anterior y ya no se usa.
     """
     today = date.today()
     desde_d = _parse_iso_date(desde, today)
