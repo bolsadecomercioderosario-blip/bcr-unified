@@ -880,7 +880,10 @@ def consultar_asuntos_publicos(ctx: ToolContext) -> dict[str, Any]:
     # 47k chars y va a crecer hasta 2027; no queremos cortar temas por la mitad.
     MAX = 60000
     posicion = _fetch_google_doc_txt(BOT_ASUNTOS_PUBLICOS_DOC_ID, _ASUNTOS_PUBLICOS_CACHE)
-    estado = _fetch_google_doc_txt(BOT_COYUNTURA_DOC_ID, _COYUNTURA_CACHE)
+    # El "estado actual" ya NO sale del Google Doc de coyuntura: lo reemplazó la
+    # coyuntura automática (búsqueda web + aprobación humana). Leemos lo APROBADO.
+    from bot import coyuntura_auto
+    estado = coyuntura_auto.get_estado_actual_aprobado(ctx.db)
 
     if not posicion and not estado:
         return {

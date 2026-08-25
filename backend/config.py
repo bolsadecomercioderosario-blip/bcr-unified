@@ -94,6 +94,12 @@ BOT_ASUNTOS_PUBLICOS_DOC_ID = os.environ.get(
     "BOT_ASUNTOS_PUBLICOS_DOC_ID", "1IuZKvJaXh8gA5ah419rU61TG_1MSXHc8"
 )
 
+# Modelo para el job de coyuntura automática (búsqueda web + resumen por tema).
+# Separado de BOT_OPENAI_MODEL porque este job necesita un modelo que soporte la
+# herramienta `web_search` de la Responses API. Se puede sobreescribir por env var
+# si el modelo del bot no la soporta.
+BOT_COYUNTURA_AUTO_MODEL = os.environ.get("BOT_COYUNTURA_AUTO_MODEL", BOT_OPENAI_MODEL)
+
 
 # ---------------------------------------------------------------------------
 # Cloudinary (CDN para imágenes del newsletter Conectados).

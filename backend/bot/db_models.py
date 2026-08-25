@@ -244,6 +244,31 @@ class StartupInnova(Base):
     )
 
 
+class CoyunturaAuto(Base):
+    """Estado actual (novedades) por tema estratégico, generado automáticamente
+    por búsqueda web y con supervisión humana antes de que el bot lo use.
+
+    Por cada tema guardamos DOS versiones:
+      - aprobada (contenido_aprobado): la ÚNICA que sirve el bot. Cambia solo
+        cuando una persona aprueba un borrador.
+      - borrador (contenido_borrador): lo último que generó el job (cada 72 hs) o
+        editó una persona, esperando aprobación. `borrador_pendiente` marca si hay
+        algo sin aprobar.
+    """
+    __tablename__ = "coyuntura_auto"
+
+    tema = Column(String, primary_key=True)  # key estable, ej 'hidrovia'
+    titulo = Column(Text, nullable=False)  # legible, ej 'Hidrovía / Vía Navegable Troncal'
+    orden = Column(Integer, nullable=False, default=0)
+
+    contenido_aprobado = Column(Text, nullable=True)
+    aprobado_at = Column(DateTime, nullable=True)
+
+    contenido_borrador = Column(Text, nullable=True)
+    borrador_at = Column(DateTime, nullable=True)
+    borrador_pendiente = Column(Boolean, nullable=False, default=False)
+
+
 class IngestedConectado(Base):
     """Tracking de cada newsletter "Conectados" archivado para el bot.
 

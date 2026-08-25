@@ -396,6 +396,85 @@ def archivar_conectado_endpoint(
     )
 
 
+# ---------------------------------------------------------------------------
+# Coyuntura automática — genera borradores por búsqueda web (cada 72 hs o manual),
+# se revisan/aprueban en la página /bot/coyuntura, y recién lo aprobado lo usa el
+# bot. Todo protegido con auth (curaduría, sólo Comunicación).
+# ---------------------------------------------------------------------------
+class _CoyunturaAprobarRequest(BaseModel):
+    tema: Optional[str] = None
+    todo: bool = False
+
+
+class _CoyunturaEditarRequest(BaseModel):
+    tema: str
+    contenido: str
+
+
+@router.get("/admin/coyuntura", dependencies=[Depends(require_auth)])
+def coyuntura_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Estado de todos los temas (aprobado + borrador pendiente) para la página
+    de revisión."""
+    from bot import coyuntura_auto
+
+    return {"temas": coyuntura_auto.listar(db)}
+
+
+def _bg_generar_coyuntura() -> None:
+    """Corre la generación de borradores en segundo plano con su propia Session."""
+    from bot.coyuntura_auto import generar_borradores
+
+    db = SessionLocal()
+    try:
+        result = generar_borradores(db)
+        print(f"[bot.coyuntura] generar (bg) → status={result.get('status')} "
+              f"generados={result.get('generados')} fallidos={len(result.get('fallidos', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.coyuntura] generar (bg) falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
+@router.post("/admin/coyuntura/generar", dependencies=[Depends(require_auth)])
+def coyuntura_generar(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Dispara la generación de borradores (búsqueda web) para todos los temas, en
+    SEGUNDO PLANO (la búsqueda web de varios temas puede tardar 1-2 min). NO publica
+    nada — quedan pendientes de aprobación. Refrescá la página para ver los borradores."""
+    background_tasks.add_task(_bg_generar_coyuntura)
+    return {"status": "iniciado", "detalle": "Generando borradores en segundo plano. Refrescá en 1-2 min."}
+
+
+@router.post("/admin/coyuntura/aprobar", dependencies=[Depends(require_auth)])
+def coyuntura_aprobar(
+    payload: _CoyunturaAprobarRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Aprueba un borrador (por `tema`) o todos (`todo=true`). Recién lo aprobado
+    lo usa el bot."""
+    from bot import coyuntura_auto
+
+    if payload.todo:
+        n = coyuntura_auto.aprobar_todo(db)
+        return {"status": "ok", "aprobados": n}
+    if not payload.tema:
+        return {"status": "error", "error": "falta_tema_o_todo"}
+    ok = coyuntura_auto.aprobar(db, payload.tema)
+    return {"status": "ok" if ok else "error", "tema": payload.tema, "aprobado": ok}
+
+
+@router.post("/admin/coyuntura/editar", dependencies=[Depends(require_auth)])
+def coyuntura_editar(
+    payload: _CoyunturaEditarRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Reemplaza el borrador de un tema con texto editado a mano (queda pendiente
+    de aprobación)."""
+    from bot import coyuntura_auto
+
+    ok = coyuntura_auto.editar_borrador(db, payload.tema, payload.contenido)
+    return {"status": "ok" if ok else "error", "tema": payload.tema}
+
+
 @router.post(
     "/admin/scrape-capacita",
     dependencies=[Depends(require_auth)],

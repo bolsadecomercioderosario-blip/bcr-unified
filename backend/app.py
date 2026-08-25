@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from auth import SESSION_TOKEN, require_auth, role_for_password
-from config import STATIC_DIR, NoCacheStaticFiles, get_module_html
+from config import STATIC_DIR, NoCacheStaticFiles, get_module_html, APP_VERSION
 from database import Base, engine
 from migrate import migrate
 
@@ -165,6 +165,16 @@ async def _canciones_resultados():
         content=get_module_html("canciones"),
         headers={"Cache-Control": "no-cache, must-revalidate"},
     )
+
+
+# Bot — página de revisión/aprobación de la coyuntura automática. Protegida por
+# auth.js (a diferencia del chat /bot que es público). Se registra antes del
+# mount estático de /bot para precedencia. Sirve coyuntura.html (no index.html).
+@app.get("/bot/coyuntura")
+async def _bot_coyuntura():
+    with open(os.path.join(STATIC_DIR, "bot", "coyuntura.html"), encoding="utf-8") as f:
+        html = f.read().replace("__VERSION__", APP_VERSION)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 # Murga — sorteo del estreno. El home (/murga/) es el formulario público al que

@@ -37,6 +37,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from database import SessionLocal
 
@@ -202,6 +203,22 @@ def _run_scrape_startups_innova() -> None:
         db.close()
 
 
+def _run_coyuntura_auto() -> None:
+    """Wrapper del job cada 72 hs: genera borradores de coyuntura (búsqueda web).
+    NO publica nada — deja borradores pendientes de aprobación humana."""
+    from bot.coyuntura_auto import generar_borradores
+
+    db = SessionLocal()
+    try:
+        result = generar_borradores(db)
+        print(f"[bot.scheduler] coyuntura_auto → status={result.get('status')} "
+              f"generados={result.get('generados')} fallidos={len(result.get('fallidos', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] coyuntura_auto falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -361,6 +378,19 @@ def start() -> None:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Coyuntura automática: cada 72 hs genera borradores por búsqueda web (no
+    # publica — quedan pendientes de aprobación humana en /bot/coyuntura). El
+    # primer batch conviene dispararlo a mano (endpoint /admin/coyuntura/generar).
+    scheduler.add_job(
+        _run_coyuntura_auto,
+        IntervalTrigger(hours=72),
+        id="coyuntura_auto_72h",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_DAILY_GRACE_S,
     )
 
     scheduler.start()

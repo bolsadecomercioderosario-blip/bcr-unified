@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coyuntura · Revisión | __VERSION__</title>
+    <!-- PROTEGIDA: carga el overlay de password del hub (a diferencia del chat /bot que es público). -->
+    <script src="/static/auth.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --border: #334155; --muted: #94a3b8;
+            --text: #f1f5f9; --green: #10b981; --amber: #f59e0b; --blue: #3b82f6;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        .wrap { max-width: 900px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        h1 { font-size: 1.25rem; margin: 0; }
+        .sub { color: var(--muted); font-size: 0.85rem; margin: 0.25rem 0 1.25rem; }
+        .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        button { font-family: inherit; cursor: pointer; border-radius: 0.5rem; border: 1px solid var(--border); padding: 0.5rem 0.85rem; font-size: 0.85rem; font-weight: 600; }
+        button.primary { background: var(--blue); border-color: var(--blue); color: white; }
+        button.ok { background: var(--green); border-color: var(--green); color: #052e1a; }
+        button.ghost { background: transparent; color: var(--text); }
+        button:disabled { opacity: 0.5; cursor: default; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+        .card h2 { font-size: 1rem; margin: 0 0 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .chip { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; }
+        .chip.pend { background: rgba(245,158,11,0.15); color: var(--amber); }
+        .chip.aldia { background: rgba(16,185,129,0.15); color: var(--green); }
+        .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0.75rem 0 0.3rem; }
+        .approved { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 0.5rem; padding: 0.6rem 0.75rem; white-space: pre-wrap; font-size: 0.88rem; line-height: 1.5; }
+        .approved.empty { color: var(--muted); font-style: italic; background: transparent; border-style: dashed; }
+        textarea { width: 100%; min-height: 130px; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.6rem 0.75rem; font-family: inherit; font-size: 0.88rem; line-height: 1.5; }
+        .card-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; align-items: center; }
+        .ts { color: var(--muted); font-size: 0.72rem; }
+        #toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #111827; border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: 0.6rem; font-size: 0.85rem; display: none; }
+        .empty-state { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>Coyuntura · Revisión</h1>
+            </div>
+            <div class="actions">
+                <button class="ghost" id="btn-refresh">↻ Refrescar</button>
+                <button class="primary" id="btn-generar">⟳ Generar borradores</button>
+                <button class="ok" id="btn-aprobar-todo">✓ Aprobar todo</button>
+            </div>
+        </header>
+        <p class="sub">Los borradores los genera el bot por búsqueda web (cada 72 hs o a mano). <b>El bot sólo muestra lo APROBADO.</b> Revisá, editá si hace falta, y aprobá.</p>
+        <div id="lista"><div class="empty-state">Cargando…</div></div>
+    </div>
+    <div id="toast"></div>
+
+    <script>
+        const API = '/api/bot/admin/coyuntura';
+        const $lista = document.getElementById('lista');
+
+        function toast(msg, ms = 2600) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms);
+        }
+        function fmt(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+        function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+        async function cargar() {
+            $lista.innerHTML = '<div class="empty-state">Cargando…</div>';
+            const r = await fetch(API);
+            if (!r.ok) { $lista.innerHTML = '<div class="empty-state">No se pudo cargar.</div>'; return; }
+            const { temas } = await r.json();
+            render(temas);
+        }
+
+        function render(temas) {
+            if (!temas || !temas.length) { $lista.innerHTML = '<div class="empty-state">Sin temas.</div>'; return; }
+            $lista.innerHTML = '';
+            temas.forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                const pend = t.borrador_pendiente;
+                const aprobadoTxt = (t.contenido_aprobado || '').trim();
+                card.innerHTML = `
+                    <h2>${esc(t.titulo)}
+                        <span class="chip ${pend ? 'pend' : 'aldia'}">${pend ? 'Borrador pendiente' : 'Al día'}</span>
+                    </h2>
+                    <div class="label">Aprobado — lo que ve el bot ${t.aprobado_at ? '· <span class="ts">' + fmt(t.aprobado_at) + '</span>' : ''}</div>
+                    <div class="approved ${aprobadoTxt ? '' : 'empty'}">${aprobadoTxt ? esc(aprobadoTxt) : '— todavía nada aprobado (el bot no muestra este tema) —'}</div>
+                    <div class="label">Borrador ${t.borrador_at ? '· <span class="ts">' + fmt(t.borrador_at) + '</span>' : ''}</div>
+                    <textarea data-tema="${t.tema}">${esc(t.contenido_borrador || '')}</textarea>
+                    <div class="card-actions">
+                        <button class="ghost btn-guardar" data-tema="${t.tema}">Guardar edición</button>
+                        <button class="ok btn-aprobar" data-tema="${t.tema}">Aprobar</button>
+                    </div>
+                `;
+                $lista.appendChild(card);
+            });
+            $lista.querySelectorAll('.btn-guardar').forEach(b => b.onclick = () => guardar(b.dataset.tema));
+            $lista.querySelectorAll('.btn-aprobar').forEach(b => b.onclick = () => aprobar(b.dataset.tema));
+        }
+
+        function textareaDe(tema) { return $lista.querySelector(`textarea[data-tema="${tema}"]`); }
+
+        async function guardar(tema) {
+            const contenido = textareaDe(tema).value;
+            const r = await fetch(API + '/editar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tema, contenido }) });
+            const d = await r.json().catch(() => ({}));
+            toast(d.status === 'ok' ? 'Borrador guardado' : 'Error al guardar');
+        }
+
+        async function aprobar(tema) {
+            // Guardamos primero por si editaron el texto y no tocaron "Guardar".
+            await guardar(tema);
+            const r = await fetch(API + '/aprobar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tema }) });
+            const d = await r.json().catch(() => ({}));
+            toast(d.aprobado ? 'Aprobado ✓ (ya lo usa el bot)' : 'Error al aprobar');
+            cargar();
+        }
+
+        document.getElementById('btn-refresh').onclick = cargar;
+        document.getElementById('btn-aprobar-todo').onclick = async () => {
+            if (!confirm('¿Aprobar TODOS los borradores pendientes? El bot pasará a mostrarlos.')) return;
+            const r = await fetch(API + '/aprobar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ todo: true }) });
+            const d = await r.json().catch(() => ({}));
+            toast('Aprobados: ' + (d.aprobados ?? 0)); cargar();
+        };
+        document.getElementById('btn-generar').onclick = async () => {
+            if (!confirm('¿Generar borradores nuevos por búsqueda web? (tarda 1-2 min; no publica nada)')) return;
+            const btn = document.getElementById('btn-generar');
+            btn.disabled = true; btn.textContent = 'Generando…';
+            const r = await fetch(API + '/generar', { method: 'POST' });
+            const d = await r.json().catch(() => ({}));
+            toast(d.detalle || 'Generación iniciada. Refrescá en 1-2 min.', 5000);
+            btn.disabled = false; btn.textContent = '⟳ Generar borradores';
+        };
+
+        cargar();
+    </script>
+</body>
+</html>
