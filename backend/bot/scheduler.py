@@ -151,6 +151,36 @@ def _run_scrape_gea_informes() -> None:
         db.close()
 
 
+def _run_scrape_gea_seguimiento() -> None:
+    """Wrapper del job semanal de seguimiento de cultivos GEA (región núcleo)."""
+    from bot.scraper_gea import scrape_gea_seguimiento
+
+    db = SessionLocal()
+    try:
+        result = scrape_gea_seguimiento(db)
+        print(f"[bot.scheduler] scrape_gea_seguimiento → new_found={result.get('new_found')} "
+              f"uploaded={len(result.get('uploaded', []))} failed={len(result.get('failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_gea_seguimiento falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
+def _run_scrape_gea_noticias() -> None:
+    """Wrapper del job semanal de noticias GEA (notas puntuales)."""
+    from bot.scraper_gea import scrape_gea_noticias
+
+    db = SessionLocal()
+    try:
+        result = scrape_gea_noticias(db)
+        print(f"[bot.scheduler] scrape_gea_noticias → new_found={result.get('new_found')} "
+              f"uploaded={len(result.get('uploaded', []))} failed={len(result.get('failed', []))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] scrape_gea_noticias falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _run_scrape_capacita() -> None:
     """Wrapper para el job semanal del catálogo de BCR Capacita."""
     from bot.scraper_capacita import scrape_capacita
@@ -374,6 +404,28 @@ def start() -> None:
         _run_scrape_gea_informes,
         CronTrigger(day_of_week="mon", hour=9, minute=30),
         id="scrape_gea_informes_semanal",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Seguimiento de cultivos GEA (informe semanal región núcleo): martes 10:00.
+    scheduler.add_job(
+        _run_scrape_gea_seguimiento,
+        CronTrigger(day_of_week="tue", hour=10, minute=0),
+        id="scrape_gea_seguimiento_semanal",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=_WEEKLY_GRACE_S,
+    )
+
+    # Noticias GEA (notas puntuales, se actualizan poco): martes 10:15.
+    scheduler.add_job(
+        _run_scrape_gea_noticias,
+        CronTrigger(day_of_week="tue", hour=10, minute=15),
+        id="scrape_gea_noticias_semanal",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

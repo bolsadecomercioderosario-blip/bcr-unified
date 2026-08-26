@@ -795,12 +795,14 @@ def buscar_informe_gea(ctx: ToolContext, consulta: str) -> dict[str, Any]:
         consulta=consulta,
         fuente_nombre="informe_gea",
         hint=(
-            "Los documentos son informes mensuales de Estimación Nacional de "
-            "Producción de la Guía Estratégica para el Agro (GEA) de la BCR. "
-            "Cubren campañas de soja, trigo, maíz, girasol y otros, con análisis "
-            "de área sembrada, rinde, producción, clima, reservas de agua, decisiones "
-            "de siembra. Si el documento trae fecha del informe o autor (ej. "
-            "Cristián Russo), incluilos en el resumen."
+            "Los documentos son de la Guía Estratégica para el Agro (GEA) de la BCR "
+            "y cubren TRES cosas: (1) informes mensuales de Estimación Nacional de "
+            "Producción (soja/trigo/maíz/girasol: área, rinde, producción); (2) el "
+            "seguimiento SEMANAL de cultivos de la región núcleo (estado de la "
+            "campaña, avance de siembra/cosecha, condición de los cultivos, márgenes); "
+            "y (3) noticias/notas puntuales, sobre todo de clima (El Niño/La Niña, "
+            "lluvias, pronósticos). Si el documento trae fecha o autor (ej. Cristián "
+            "Russo), incluilos en el resumen."
         ),
     )
 

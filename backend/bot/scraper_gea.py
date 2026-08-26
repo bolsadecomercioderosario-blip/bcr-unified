@@ -38,6 +38,16 @@ _INFORMES_URL = (
     f"{_BASE}/es/mercados/gea/estimaciones-nacionales-de-produccion/"
     "estimaciones-anteriores"
 )
+# Superficie #2: Seguimiento de cultivos (informe semanal zona núcleo). El listado
+# de "informes anteriores" linkea a las notas bajo /informe-semanal-zona-nucleo/<slug>.
+_SEGUIMIENTO_URL = f"{_BASE}/es/mercados/gea/seguimiento-de-cultivos/informes-anteriores"
+_SEGUIMIENTO_HREF_RE = re.compile(
+    r"/seguimiento-de-cultivos/informe-semanal-zona-nucleo/[^/?#]+"
+)
+# Superficie #3: Noticias GEA. El listado /noticias-gea linkea a las notas bajo
+# /sobre-gea/noticias/<slug>.
+_NOTICIAS_URL = f"{_BASE}/es/mercados/gea/sobre-gea/noticias-gea"
+_NOTICIAS_HREF_RE = re.compile(r"/sobre-gea/noticias/[^/?#]+")
 
 _HEADERS = {"User-Agent": "Mozilla/5.0 (BCR Bot Scraper)"}
 _HTTP_TIMEOUT = 30
@@ -473,3 +483,208 @@ def scrape_gea_informes(
         "started_at": started_at.isoformat(),
         "finished_at": datetime.utcnow().isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Seguimiento de cultivos + Noticias GEA (superficies #2 y #3). Van al MISMO
+# vector store "gea", así la tool buscar_informe_gea cubre las tres superficies.
+# Reutilizan el tracking IngestedGeaReport prefijando el slug (seg:/not:) para no
+# colisionar con los slugs de las estimaciones.
+# ---------------------------------------------------------------------------
+def _fetch_bulletin_body(url: str) -> tuple[str, str | None]:
+    """Extrae el cuerpo de una nota "bulletin" de GEA (seguimiento/noticias). El
+    contenido vive en <section class="node-content"> / <div class="node-middle">,
+    no en el contenedor que usa _fetch_informe_body."""
+    response = requests.get(url, headers=_HEADERS, timeout=_HTTP_TIMEOUT)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    node = (
+        soup.find("section", class_=re.compile("node-content"))
+        or soup.find("div", class_=re.compile("node-middle"))
+    )
+    if node is None:
+        return "", None
+
+    for tag in node.find_all(["nav", "script", "style", "aside", "header", "footer", "form"]):
+        tag.decompose()
+
+    text = node.get_text(separator="\n", strip=True)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if "Descargar" in text:  # corta el encabezado (breadcrumb + título + "Descargar")
+        text = text.split("Descargar", 1)[1].lstrip()
+
+    autor: str | None = None
+    m_autor = re.search(r"(?:^|\n)Por\s+([A-Z][a-záéíóúñ]+(?:\s+[A-Z][a-záéíóúñ]+)*)", text)
+    if m_autor:
+        autor = m_autor.group(1).strip()
+
+    return text.strip(), autor
+
+
+def _parse_gea_listing(html: str, href_re: re.Pattern) -> list[dict[str, Any]]:
+    """Parser genérico de un listado GEA: devuelve {slug, titulo, fecha, url}."""
+    soup = BeautifulSoup(html, "html.parser")
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for link in soup.find_all("a", href=href_re):
+        href = link.get("href", "")
+        slug = href.rstrip("/").rsplit("/", 1)[-1]
+        if not slug or slug in seen:
+            continue
+        titulo = link.get_text(" ", strip=True)
+        if not titulo or len(titulo) < 8:
+            continue
+
+        container = link.find_parent(["article", "div", "li", "section"]) or link
+        ctext = container.get_text(" ", strip=True)
+        fecha_iso, fecha_legible = _parse_spanish_date(ctext)
+
+        items.append({
+            "slug": slug,
+            "titulo": titulo,
+            "fecha": fecha_iso or "1900-01-01",
+            "fecha_legible": fecha_legible,
+            "url": urljoin(_BASE + "/", href),
+        })
+        seen.add(slug)
+
+    return items
+
+
+def _format_gea_txt(item: dict[str, Any], body: str, autor: str | None, fuente: str) -> str:
+    autor_line = f"Autor: {autor}\n" if autor else ""
+    return (
+        f"Fecha: {item.get('fecha_legible') or item.get('fecha') or 's/d'} "
+        f"({item.get('fecha') or 's/d'})\n"
+        f"Fuente: {fuente}\n"
+        f"Título: {item['titulo']}\n"
+        f"{autor_line}"
+        f"URL original: {item['url']}\n"
+        f"Slug interno: {item['slug']}\n"
+        f"\n"
+        f"{body}\n"
+    )
+
+
+def _scrape_gea_source(
+    db: Session,
+    *,
+    listing_url: str,
+    href_re: re.Pattern,
+    fuente: str,
+    slug_prefix: str,
+    max_pages: int,
+    max_upload: int,
+) -> dict[str, Any]:
+    """Baja un listado GEA (seguimiento o noticias) y sube los items nuevos al
+    vector store 'gea'. Dedup por slug prefijado en IngestedGeaReport."""
+    started_at = datetime.utcnow()
+    if not BOT_OPENAI_API_KEY:
+        return {"status": "error", "stage": "config", "detail": "OPENAI_API_KEY no configurada"}
+
+    candidates: list[dict[str, Any]] = []
+    for page in range(max_pages):
+        url = listing_url if page == 0 else f"{listing_url}?page={page}"
+        try:
+            response = requests.get(url, headers=_HEADERS, timeout=_HTTP_TIMEOUT)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            return {"status": "error", "stage": "fetch_listing", "page": page, "detail": str(exc)}
+        items = _parse_gea_listing(response.text, href_re)
+        if not items:
+            break
+        candidates.extend(items)
+        time.sleep(_POLITE_DELAY_S)
+
+    for c in candidates:
+        c["tracking_slug"] = slug_prefix + c["slug"]
+
+    already = {
+        r.slug
+        for r in db.query(IngestedGeaReport.slug)
+        .filter(IngestedGeaReport.slug.in_([c["tracking_slug"] for c in candidates]))
+        .all()
+    }
+    new_items = [c for c in candidates if c["tracking_slug"] not in already]
+
+    if not new_items:
+        return {
+            "status": "ok", "total_in_listing": len(candidates), "new_found": 0,
+            "uploaded": [], "failed": [],
+            "started_at": started_at.isoformat(), "finished_at": datetime.utcnow().isoformat(),
+        }
+
+    client = OpenAI(api_key=BOT_OPENAI_API_KEY)
+    vs_id = ensure_vector_store_id(db, "gea", client)
+    to_upload = sorted(new_items, key=lambda x: x.get("fecha") or "")[:max_upload]
+
+    uploaded: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    for item in to_upload:
+        try:
+            body, autor = _fetch_bulletin_body(item["url"])
+            time.sleep(_POLITE_DELAY_S)
+            if not body:
+                failed.append({"slug": item["slug"], "error": "empty_body"})
+                continue
+            # Si el listado no traía fecha, la buscamos en el cuerpo.
+            if item["fecha"] == "1900-01-01":
+                fi, fl = _parse_spanish_date(body)
+                if fi:
+                    item["fecha"], item["fecha_legible"] = fi, fl
+            content = _format_gea_txt(item, body, autor, fuente)
+            filename = f"{item['fecha']}_{slug_prefix.strip(':')}_{item['slug']}.txt"
+            file_id = upload_text_file(client, vs_id, filename, content)
+            db.add(IngestedGeaReport(
+                slug=item["tracking_slug"],
+                fecha=item["fecha"],
+                fecha_legible=item["fecha_legible"],
+                titulo=item["titulo"],
+                autor=autor,
+                url=item["url"],
+                openai_file_id=file_id,
+                ingested_at=datetime.utcnow(),
+            ))
+            uploaded.append({"slug": item["slug"], "titulo": item["titulo"][:80]})
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"slug": item["slug"], "error": f"{type(exc).__name__}: {exc}"})
+
+    db.commit()
+    return {
+        "status": "ok" if not failed else "partial",
+        "vector_store_id": vs_id,
+        "total_in_listing": len(candidates),
+        "new_found": len(new_items),
+        "uploaded": uploaded,
+        "failed": failed,
+        "started_at": started_at.isoformat(),
+        "finished_at": datetime.utcnow().isoformat(),
+    }
+
+
+def scrape_gea_seguimiento(db: Session, max_pages: int = 1, max_upload_per_run: int = 12) -> dict[str, Any]:
+    """Superficie #2: informes semanales de seguimiento de cultivos (región núcleo)."""
+    return _scrape_gea_source(
+        db,
+        listing_url=_SEGUIMIENTO_URL,
+        href_re=_SEGUIMIENTO_HREF_RE,
+        fuente="BCR GEA — Seguimiento de cultivos (informe semanal región núcleo)",
+        slug_prefix="seg:",
+        max_pages=max_pages,
+        max_upload=max_upload_per_run,
+    )
+
+
+def scrape_gea_noticias(db: Session, max_pages: int = 1, max_upload_per_run: int = 12) -> dict[str, Any]:
+    """Superficie #3: noticias GEA (notas puntuales, sobre todo de clima)."""
+    return _scrape_gea_source(
+        db,
+        listing_url=_NOTICIAS_URL,
+        href_re=_NOTICIAS_HREF_RE,
+        fuente="BCR GEA — Noticias",
+        slug_prefix="not:",
+        max_pages=max_pages,
+        max_upload=max_upload_per_run,
+    )

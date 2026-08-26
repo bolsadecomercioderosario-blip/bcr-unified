@@ -334,6 +334,36 @@ def trigger_scrape_gea_informes(
     return scrape_gea_informes(db, max_pages=max_pages, max_upload_per_run=max_upload)
 
 
+@router.post(
+    "/admin/scrape-gea-seguimiento",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_seguimiento(
+    max_upload: int = 12,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara el scraper de Seguimiento de cultivos GEA (informe semanal región
+    núcleo). Sube al vector store 'gea' — lo cubre buscar_informe_gea."""
+    from bot.scraper_gea import scrape_gea_seguimiento
+
+    return scrape_gea_seguimiento(db, max_upload_per_run=max_upload)
+
+
+@router.post(
+    "/admin/scrape-gea-noticias",
+    dependencies=[Depends(require_auth)],
+)
+def trigger_scrape_gea_noticias(
+    max_upload: int = 12,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Dispara el scraper de Noticias GEA (notas puntuales). Sube al vector store
+    'gea' — lo cubre buscar_informe_gea."""
+    from bot.scraper_gea import scrape_gea_noticias
+
+    return scrape_gea_noticias(db, max_upload_per_run=max_upload)
+
+
 # ---------------------------------------------------------------------------
 # Archivo de newsletters "Conectados" — la app de Agenda de Comunicación
 # (o la carga de la semilla histórica) postea acá para archivar un newsletter
