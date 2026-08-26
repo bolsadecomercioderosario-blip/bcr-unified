@@ -228,6 +228,8 @@ export function renderActivityForm(container, preData = null) {
                                 <option value="Juan" ${act.responsible === 'Juan' ? 'selected' : ''}>Juan</option>
                                 <option value="Paku" ${act.responsible === 'Paku' ? 'selected' : ''}>Paku</option>
                                 <option value="Guillermina" ${act.responsible === 'Guillermina' ? 'selected' : ''}>Guillermina</option>
+                                <option value="Ana" ${act.responsible === 'Ana' ? 'selected' : ''}>Ana</option>
+                                <option value="Nico" ${act.responsible === 'Nico' ? 'selected' : ''}>Nico</option>
                                 <option value="Externo" ${act.responsible === 'Externo' ? 'selected' : ''}>Externo</option>
                             </select>
                         </div>
