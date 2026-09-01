@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Panel · Y Parió La Abuela</title>
+    <meta name="theme-color" content="#20212B">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+
+    <!-- ============ LOGIN ============ -->
+    <div id="login" class="login">
+        <form id="login-form" class="login-card">
+            <div class="login-kicker">Y Parió La Abuela</div>
+            <h1 class="login-title">Panel interno</h1>
+            <p class="login-sub">Caja · Ensayos · Toques</p>
+            <input id="login-pass" type="password" placeholder="Contraseña" autocomplete="current-password">
+            <div id="login-err" class="login-err"></div>
+            <button type="submit" class="btn btn-oro">Entrar</button>
+        </form>
+    </div>
+
+    <!-- ============ APP ============ -->
+    <div id="app" class="app hidden">
+        <header class="topbar">
+            <div class="topbar-in">
+                <span class="tb-brand">La Abuela · <b id="tb-section">Caja</b></span>
+                <button id="btn-logout" class="tb-logout" title="Salir">Salir</button>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- CAJA -->
+            <section id="tab-caja" class="tab active">
+                <div id="caja-resumen" class="resumen"></div>
+                <div class="subnav">
+                    <button class="chip chip-on" data-caja="movimientos">Movimientos</button>
+                    <button class="chip" data-caja="proyeccion">Proyección</button>
+                    <button class="chip" data-caja="remeras">Remeras</button>
+                </div>
+                <div id="caja-body"></div>
+            </section>
+
+            <!-- ENSAYOS -->
+            <section id="tab-ensayos" class="tab">
+                <div id="ensayos-body" class="placeholder">En camino — lo activo en el próximo paso.</div>
+            </section>
+
+            <!-- TOQUES -->
+            <section id="tab-toques" class="tab">
+                <div id="toques-body" class="placeholder">En camino — lo activo en el próximo paso.</div>
+            </section>
+        </main>
+
+        <nav class="tabbar">
+            <button class="tabbtn active" data-tab="caja"><span>Caja</span></button>
+            <button class="tabbtn" data-tab="ensayos"><span>Ensayos</span></button>
+            <button class="tabbtn" data-tab="toques"><span>Toques</span></button>
+        </nav>
+
+        <!-- FAB -->
+        <button id="fab" class="fab hidden" aria-label="Agregar">+</button>
+    </div>
+
+    <!-- ============ MODAL ============ -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-card">
+            <div class="modal-head"><h2 id="modal-title">—</h2><button id="modal-close" class="modal-x" aria-label="Cerrar">✕</button></div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>

@@ -126,6 +126,11 @@ def migrate():
     from aapresid.seed import seed_aapresid_if_empty
     seed_aapresid_if_empty()
 
+    # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
+    # toques) la primera vez que las tablas ab_ están vacías.
+    from abuela.seed import seed_abuela_if_empty
+    seed_abuela_if_empty()
+
 
 def backfill_origen_from_channel():
     """Migra el viejo canal "Agenda Compromisos" al nuevo campo `origen`.

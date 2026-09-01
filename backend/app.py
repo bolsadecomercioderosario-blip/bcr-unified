@@ -30,6 +30,7 @@ import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapres
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
 import canciones.models  # noqa: F401  — registra tabla canciones_respuestas (encuesta versión B, solo canciones)
+import abuela.models  # noqa: F401  — registra tablas ab_* (panel interno de la murga: caja, ensayos, toques)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -45,6 +46,7 @@ from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
 from corte.router import router as corte_api
 from canciones.router import router as canciones_api
+from abuela.router import router as abuela_api
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -103,6 +105,7 @@ app.include_router(aapresid_api)
 app.include_router(murga_api)
 app.include_router(corte_api)
 app.include_router(canciones_api)
+app.include_router(abuela_api)
 
 
 # ---------------------------------------------------------
@@ -140,7 +143,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte", "canciones"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte", "canciones", "abuela"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -274,6 +277,7 @@ app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aa
 app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
 app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte"), html=False), name="corte_ui")
 app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")
+app.mount("/abuela", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "abuela"), html=False), name="abuela_ui")
 
 
 @app.get("/")
