@@ -159,6 +159,39 @@ def normalizar_fechas_toques():
                     t.fecha = f"{ml.group(3)}/{ml.group(2)}/{ml.group(1)}"
                 t.lugar = ""
                 cambiadas += 1
+            # Otros "Didi" traen la fecha como texto libre al inicio del Lugar
+            # (ej "14/1, Rosario (Parque Urquiza)" o "Pj 19/12"). La separamos:
+            # fecha = DD/MM(/AAAA), y el resto queda como Lugar.
+            if not (t.fecha or "").strip():
+                txt = re.match(
+                    r"^\s*([A-Za-zÀ-ÿ.]{1,4}\s+)?(\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b[\s,.\-]*(.*)$",
+                    (t.lugar or "").strip())
+                if txt:
+                    pref = (txt.group(1) or "").strip()
+                    parts = txt.group(2).split("/")
+                    dd, mm = parts[0].zfill(2), parts[1].zfill(2)
+                    if len(parts) == 3:
+                        yy = parts[2]
+                        yy = ("20" + yy) if len(yy) == 2 else yy
+                        t.fecha = f"{dd}/{mm}/{yy}"
+                    else:
+                        t.fecha = f"{dd}/{mm}"
+                    resto = txt.group(3).strip().strip(",.-").strip()
+                    t.lugar = (pref + " " + resto).strip() if pref else resto
+                    cambiadas += 1
+            # Normalizar cualquier fecha tipo D/M o D/M/AA a DD/MM(/AAAA).
+            mf = re.match(r"^(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?$", (t.fecha or "").strip().rstrip(" :;,.-"))
+            if mf:
+                dd, mm = mf.group(1).zfill(2), mf.group(2).zfill(2)
+                if mf.group(3):
+                    yy = mf.group(3)
+                    yy = ("20" + yy) if len(yy) == 2 else yy
+                    nf = f"{dd}/{mm}/{yy}"
+                else:
+                    nf = f"{dd}/{mm}"
+                if nf != (t.fecha or ""):
+                    t.fecha = nf
+                    cambiadas += 1
         if cambiadas:
             db.commit()
         print(f"Normalización fechas toques: {cambiadas} corregidas.")

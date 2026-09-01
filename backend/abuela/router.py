@@ -202,6 +202,15 @@ def _sortkey(e):
     return f if _ISO.match(f) else "0000-00-00"
 
 
+def _en_rango(e, desde):
+    """¿El ensayo cae en el rango (fecha >= desde)? Sin desde = todo. Las fechas
+    no-ISO (viejas raras) solo entran en 'todo'."""
+    f = e.fecha or ""
+    if not _ISO.match(f):
+        return not desde
+    return (not desde) or (f[:10] >= desde)
+
+
 @router.post("/ensayos")
 def ensayo_crear(payload: m.EnsayoIn, _: bool = A, db: Session = Depends(get_db)):
     fecha = (payload.fecha or "").strip()
@@ -233,14 +242,7 @@ def ensayo_todos(_: bool = A, db: Session = Depends(get_db)):
 def ensayo_puntaje(desde: str = "", _: bool = A, db: Session = Depends(get_db)):
     """Ranking de puntaje sobre los ensayos con fecha >= desde (ISO). Sin desde = todo."""
     ens = db.query(m.Ensayo).all()
-
-    def en_rango(e):
-        f = e.fecha or ""
-        if not _ISO.match(f):
-            return not desde       # las no-ISO solo entran en "Todo"
-        return (not desde) or (f[:10] >= desde)
-
-    eids = [e.id for e in ens if en_rango(e)]
+    eids = [e.id for e in ens if _en_rango(e, desde)]
     activos = {r.nombre for r in db.query(m.Murguista).filter(m.Murguista.activo == True).all()}  # noqa: E712
     agg = {}
     if eids:
@@ -260,18 +262,21 @@ def ensayo_puntaje(desde: str = "", _: bool = A, db: Session = Depends(get_db)):
 
 
 @router.get("/ensayos/murguista")
-def ensayo_murguista(nombre: str, limit: int = 16, _: bool = A, db: Session = Depends(get_db)):
-    """Evolución reciente de un murguista: sus últimos N ensayos con el código."""
-    ens = sorted(db.query(m.Ensayo).all(), key=_sortkey, reverse=True)[:max(1, min(limit, 40))]
+def ensayo_murguista(nombre: str, desde: str = "", limit: int = 30, _: bool = A, db: Session = Depends(get_db)):
+    """Evolución de un murguista dentro del rango (desde): sus marcas en los
+    ensayos del período. El puntaje es sobre TODO el rango; las celdas muestran
+    los `limit` ensayos más recientes del rango."""
+    ens = sorted([e for e in db.query(m.Ensayo).all() if _en_rango(e, desde)], key=_sortkey, reverse=True)
     ids = [e.id for e in ens]
     marcas = {}
     if ids:
         for a in db.query(m.EnsayoAsist).filter(
                 m.EnsayoAsist.nombre == nombre, m.EnsayoAsist.ensayo_id.in_(ids)).all():
             marcas[a.ensayo_id] = a.codigo
-    evo = [{"fecha": e.fecha, "codigo": marcas.get(e.id, "")} for e in ens]
-    pts = round(sum(m.PUNTAJE.get(x["codigo"], 0) for x in evo), 1)
-    return {"nombre": nombre, "evolucion": evo, "puntaje": pts}
+    pts = round(sum(m.PUNTAJE.get(marcas.get(e.id, ""), 0) for e in ens), 1)
+    recientes = ens[:max(1, min(limit, 60))]
+    evo = [{"fecha": e.fecha, "codigo": marcas.get(e.id, "")} for e in recientes]
+    return {"nombre": nombre, "evolucion": evo, "puntaje": pts, "total": len(ens)}
 
 
 @router.post("/ensayos/marca")

@@ -293,8 +293,9 @@
     }).catch(function () { $("#rank-list").innerHTML = '<div class="empty">Error al cargar.</div>'; });
   }
 
+  var RANGO_LBL = { mes: "el último mes", "3meses": "los últimos 3 meses", "2026": "2026", todo: "todo el registro" };
   function openEvolucion(nombre) {
-    api("/ensayos/murguista?nombre=" + encodeURIComponent(nombre) + "&limit=16").then(function (d) {
+    api("/ensayos/murguista?nombre=" + encodeURIComponent(nombre) + "&desde=" + encodeURIComponent(desdeRango(ensRango))).then(function (d) {
       var evo = (d.evolucion || []).slice().reverse();  // izquierda = más viejo, derecha = más nuevo
       var cells = evo.map(function (x) {
         var cod = x.codigo || "", cls = cod ? "evo-" + cod : "evo-none";
@@ -303,9 +304,12 @@
       var ult = evo.slice(-5);
       var faltas = ult.filter(function (x) { return !x.codigo || x.codigo === "A" || x.codigo === "X"; }).length;
       var alerta = (ult.length >= 3 && faltas >= 3) ? '<div class="evo-alerta">⚠ Viene faltando en los últimos ensayos.</div>' : "";
+      var cuerpo = evo.length
+        ? '<div class="evo-wrap">' + cells + '</div>' + alerta
+        : '<div class="empty">Sin ensayos en este tramo.</div>';
       abrirModal(nombre,
-        '<div class="marca-help">Evolución reciente (← más viejo · más nuevo →). Puntaje del tramo: <b>' + d.puntaje + '</b></div>' +
-        '<div class="evo-wrap">' + cells + '</div>' + alerta +
+        '<div class="marca-help">Evolución en <b>' + (RANGO_LBL[ensRango] || "") + '</b> (← más viejo · más nuevo →). Puntaje: <b>' + d.puntaje + '</b> · ' + d.total + ' ensayos</div>' +
+        cuerpo +
         '<div class="marca-help">P presente · T tarde · M muy tarde · A ausente c/aviso · X ausente s/aviso · &nbsp;·&nbsp; sin registro</div>');
     }).catch(function () { toast("No se pudo abrir."); });
   }
