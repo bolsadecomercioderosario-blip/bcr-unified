@@ -57,14 +57,15 @@
       document.querySelectorAll(".tabbtn").forEach(function (x) { x.classList.toggle("active", x === b); });
       document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.id === "tab-" + tabActual); });
       $("#tb-section").textContent = SECCIONES[tabActual];
+      if (tabActual === "ensayos" && !ensayosInit) { ensayosInit = true; initEnsayos(); }
       actualizarFab();
     });
   });
 
   // ---------- modal ----------
-  var modal = $("#modal");
-  function abrirModal(titulo, html) { $("#modal-title").textContent = titulo; $("#modal-body").innerHTML = html; modal.classList.remove("hidden"); }
-  function cerrarModal() { modal.classList.add("hidden"); }
+  var modal = $("#modal"), _onModalClose = null;
+  function abrirModal(titulo, html) { _onModalClose = null; $("#modal-title").textContent = titulo; $("#modal-body").innerHTML = html; modal.classList.remove("hidden"); }
+  function cerrarModal() { modal.classList.add("hidden"); if (_onModalClose) { var f = _onModalClose; _onModalClose = null; f(); } }
   $("#modal-close").addEventListener("click", cerrarModal);
   modal.addEventListener("click", function (e) { if (e.target === modal) cerrarModal(); });
 
@@ -74,6 +75,8 @@
     if (tabActual === "caja") {
       fab.classList.remove("hidden");
       fab.onclick = (cajaSub === "remeras") ? formRemera : function () { formMovimiento(cajaSub === "proyeccion"); };
+    } else if (tabActual === "ensayos") {
+      fab.classList.remove("hidden"); fab.onclick = formNuevoEnsayo;
     } else { fab.classList.add("hidden"); }
   }
 
@@ -219,6 +222,145 @@
       api("/remeras", { method: "POST", body: { nombre: nombre, monto: parseFloat($("#r-monto").value) || 20000, nota: $("#r-nota").value.trim(), pago: $("#r-pago").checked } })
         .then(function () { cerrarModal(); toast("Agregada."); renderRemeras(); })
         .catch(function (e) { err.textContent = e.message; $("#r-save").disabled = false; });
+    });
+  }
+
+  // ============================================================
+  // ENSAYOS
+  // ============================================================
+  var ensayosInit = false, ensPeriodo = "", ensSub = "ensayos", ensPeriodosList = [], rosterActivos = null;
+  var DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+  function fechaLarga(f) {
+    var mt = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || "");
+    if (!mt) return f || "";
+    var d = new Date(+mt[1], +mt[2] - 1, +mt[3]);
+    return DOW[d.getDay()] + " " + mt[3] + "/" + mt[2] + "/" + mt[1].slice(2);
+  }
+  function proximoEnsayo() {  // próximo martes o sábado (días de ensayo)
+    var d = new Date();
+    for (var i = 0; i < 7; i++) { var g = d.getDay(); if (g === 2 || g === 6) break; d.setDate(d.getDate() + 1); }
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function cargarRoster(cb) {
+    if (rosterActivos) { cb(); return; }
+    api("/roster").then(function (d) { rosterActivos = d.murguistas.filter(function (x) { return x.activo; }); cb(); }).catch(function () { rosterActivos = []; cb(); });
+  }
+  function refreshPeriodos(cb) {
+    api("/ensayos/periodos").then(function (d) {
+      ensPeriodosList = d.periodos.map(function (p) { return p.periodo; });
+      var sel = $("#ens-periodo");
+      sel.innerHTML = d.periodos.map(function (p) { return '<option value="' + esc(p.periodo) + '">' + esc(p.periodo) + " (" + p.ensayos + ")</option>"; }).join("");
+      if (!ensPeriodo && ensPeriodosList.length) ensPeriodo = ensPeriodosList[0];
+      if (ensPeriodo) sel.value = ensPeriodo;
+      if (cb) cb();
+    }).catch(function () { if (cb) cb(); });
+  }
+
+  function initEnsayos() {
+    refreshPeriodos(function () {
+      $("#ens-periodo").onchange = function () { ensPeriodo = $("#ens-periodo").value; renderEnsayosSub(); };
+      document.querySelectorAll("[data-ens]").forEach(function (c) {
+        c.addEventListener("click", function () {
+          ensSub = c.getAttribute("data-ens");
+          document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x === c); });
+          renderEnsayosSub();
+        });
+      });
+      renderEnsayosSub();
+    });
+  }
+  function renderEnsayosSub() { if (ensSub === "ranking") renderRanking(); else renderEnsayosList(); }
+
+  function renderEnsayosList() {
+    var body = $("#ensayos-body");
+    if (!ensPeriodo) { body.innerHTML = '<div class="empty">Sin ensayos todavía. Tocá el + para crear el primero.</div>'; return; }
+    body.innerHTML = '<div class="empty">Cargando…</div>';
+    api("/ensayos?periodo=" + encodeURIComponent(ensPeriodo)).then(function (d) {
+      var items = (d.ensayos || []).slice().reverse();  // más nuevos primero
+      if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos en este período. Tocá el + para agregar.</div>'; return; }
+      body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span><span class="lh-sub">' + items.length + '</span></div><div class="list">' +
+        items.map(function (e) {
+          return '<button class="ens-row" data-id="' + e.id + '" data-fecha="' + esc(e.fecha) + '">' +
+            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' marcadas</div></div><span class="earr">›</span></button>';
+        }).join("") + "</div>";
+      body.querySelectorAll(".ens-row").forEach(function (r) {
+        r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); });
+      });
+    }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
+  }
+
+  function openMarcado(id, fecha) {
+    cargarRoster(function () {
+      api("/ensayos/" + id).then(function (d) {
+        var marcas = d.marcas || {}, CODES = ["P", "T", "M", "A", "X"];
+        var rows = rosterActivos.map(function (mu) {
+          var cur = marcas[mu.nombre] || "";
+          return '<div class="marca-row" data-nom="' + esc(mu.nombre) + '"><span class="marca-nom">' + esc(mu.nombre) + '</span><div class="marca-btns">' +
+            CODES.map(function (cd) { return '<button class="mb mb-' + cd + (cur === cd ? " on" : "") + '" data-cod="' + cd + '">' + cd + "</button>"; }).join("") + "</div></div>";
+        }).join("");
+        abrirModal("Ensayo · " + fechaLarga(fecha),
+          '<div class="marca-help">P presente · T tarde · M muy tarde · A ausente c/aviso · X ausente s/aviso. Tocá de nuevo para desmarcar.</div>' +
+          rows + '<button class="btn btn-danger modal-del" id="ens-del">Borrar este ensayo</button>');
+        _onModalClose = renderEnsayosList;
+        $("#modal-body").querySelectorAll(".marca-row").forEach(function (row) {
+          var nom = row.getAttribute("data-nom");
+          row.querySelectorAll(".mb").forEach(function (b) {
+            b.addEventListener("click", function () {
+              var nuevo = b.classList.contains("on") ? "" : b.getAttribute("data-cod");
+              api("/ensayos/marca", { method: "POST", body: { ensayo_id: +id, nombre: nom, codigo: nuevo } }).then(function () {
+                row.querySelectorAll(".mb").forEach(function (x) { x.classList.remove("on"); });
+                if (nuevo) b.classList.add("on");
+              }).catch(function () { toast("No se pudo."); });
+            });
+          });
+        });
+        $("#ens-del").addEventListener("click", function () {
+          if (!confirm("¿Borrar este ensayo y todas sus marcas?")) return;
+          api("/ensayos/" + id, { method: "DELETE" }).then(function () {
+            _onModalClose = null; cerrarModal(); toast("Ensayo borrado."); refreshPeriodos(renderEnsayosList);
+          }).catch(function () { toast("No se pudo."); });
+        });
+      }).catch(function () { toast("No se pudo abrir."); });
+    });
+  }
+
+  function renderRanking() {
+    var body = $("#ensayos-body");
+    if (!ensPeriodo) { body.innerHTML = '<div class="empty">Sin datos.</div>'; return; }
+    body.innerHTML = '<div class="empty">Cargando…</div>';
+    api("/ensayos/ranking/" + encodeURIComponent(ensPeriodo)).then(function (d) {
+      var r = d.ranking || [];
+      if (!r.length) { body.innerHTML = '<div class="empty">Sin marcas en este período.</div>'; return; }
+      body.innerHTML = '<div class="list-head"><span class="lh-t">Puntaje</span><span class="lh-sub">' + esc(ensPeriodo) + '</span></div><div class="list">' +
+        r.map(function (x, i) {
+          return '<div class="rank-row ' + (x.activo ? "" : "inact") + '"><span class="rank-pos">' + (i + 1) + '</span>' +
+            '<div class="rank-main"><div class="rank-nom">' + esc(x.nombre) + (x.activo ? "" : " · histórico") + '</div>' +
+            '<div class="rank-detalle">P' + x.P + " · T" + x.T + " · M" + x.M + " · A" + x.A + " · X" + x.X + '</div></div>' +
+            '<span class="rank-pts">' + x.puntaje + "</span></div>";
+        }).join("") + "</div>";
+    }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
+  }
+
+  function formNuevoEnsayo() {
+    var dl = ensPeriodosList.map(function (p) { return '<option value="' + esc(p) + '"></option>'; }).join("");
+    abrirModal("Nuevo ensayo",
+      '<div class="field"><label>Período</label><input id="ne-per" list="ne-perlist" placeholder="Ej: 2026-2do Semestre"><datalist id="ne-perlist">' + dl + '</datalist></div>' +
+      '<div class="field"><label>Fecha</label><input id="ne-fecha" type="date" value="' + proximoEnsayo() + '"></div>' +
+      '<div class="marca-help">Sugerida: el próximo martes o sábado (días de ensayo).</div>' +
+      '<div class="form-err" id="ne-err"></div><button class="btn btn-oro" id="ne-save">Crear y marcar</button>');
+    $("#ne-per").value = ensPeriodo || "";
+    $("#ne-save").addEventListener("click", function () {
+      var per = $("#ne-per").value.trim(), fecha = $("#ne-fecha").value, err = $("#ne-err");
+      if (!per) { err.textContent = "Poné un período."; return; }
+      if (!fecha) { err.textContent = "Elegí una fecha."; return; }
+      $("#ne-save").disabled = true;
+      api("/ensayos", { method: "POST", body: { periodo: per, fecha: fecha } }).then(function (nw) {
+        _onModalClose = null; cerrarModal(); toast("Ensayo creado.");
+        ensPeriodo = per; ensSub = "ensayos";
+        document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x.getAttribute("data-ens") === "ensayos"); });
+        refreshPeriodos(function () { renderEnsayosList(); openMarcado(nw.id, nw.fecha); });
+      }).catch(function (e) { err.textContent = e.message; $("#ne-save").disabled = false; });
     });
   }
 
