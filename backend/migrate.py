@@ -130,6 +130,43 @@ def migrate():
     # toques) la primera vez que las tablas ab_ están vacías.
     from abuela.seed import seed_abuela_if_empty
     seed_abuela_if_empty()
+    normalizar_fechas_toques()
+
+
+def normalizar_fechas_toques():
+    """Deja las fechas de los toques en formato DD/MM/AAAA (las que vienen en
+    ISO del Excel). Idempotente: las que ya están DD/MM/AAAA o son texto raro
+    (sin año) se dejan igual."""
+    import re
+    from abuela.models import Toque
+
+    iso = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+    db = SessionLocal()
+    try:
+        cambiadas = 0
+        for t in db.query(Toque).all():
+            mt = iso.match((t.fecha or "").strip())
+            if mt:
+                nueva = f"{mt.group(3)}/{mt.group(2)}/{mt.group(1)}"
+                if nueva != t.fecha:
+                    t.fecha = nueva
+                    cambiadas += 1
+            # Algunos toques (import "Didi") traen una fecha metida en el campo
+            # Lugar (la celda "Lugar y fecha" era una fecha): la movemos a fecha.
+            ml = iso.match((t.lugar or "").strip())
+            if ml:
+                if not (t.fecha or "").strip():
+                    t.fecha = f"{ml.group(3)}/{ml.group(2)}/{ml.group(1)}"
+                t.lugar = ""
+                cambiadas += 1
+        if cambiadas:
+            db.commit()
+        print(f"Normalización fechas toques: {cambiadas} corregidas.")
+    except Exception as e:
+        print(f"Error normalizando fechas de toques: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def backfill_origen_from_channel():

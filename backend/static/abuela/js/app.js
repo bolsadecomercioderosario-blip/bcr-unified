@@ -17,6 +17,14 @@
     var p = String(f).slice(0, 10).split("-");
     return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0].slice(2) : f;
   }
+  function fechaDMY(f) {  // deja las fechas en DD/MM/AAAA cuando se puede
+    f = String(f || "").trim();
+    var iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(f);
+    if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
+    var dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(f);
+    if (dmy) return dmy[1].padStart(2, "0") + "/" + dmy[2].padStart(2, "0") + "/" + dmy[3];
+    return f;
+  }
   function toast(msg) { var t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 2600); }
 
   function api(path, opts) {
@@ -75,7 +83,7 @@
   function actualizarFab() {
     if (tabActual === "caja") {
       fab.classList.remove("hidden");
-      fab.onclick = (cajaSub === "remeras") ? formRemera : function () { formMovimiento(cajaSub === "proyeccion"); };
+      fab.onclick = function () { formMovimiento(cajaSub === "proyeccion"); };
     } else if (tabActual === "ensayos") {
       fab.classList.remove("hidden"); fab.onclick = formNuevoEnsayo;
     } else if (tabActual === "toques") {
@@ -107,8 +115,6 @@
       var neg = d.saldo < 0;
       var html = '<div class="r-lbl">Saldo real</div>' +
         '<div class="r-saldo ' + (neg ? "neg" : "") + '">' + fmt(d.saldo) + '</div>' +
-        '<div class="r-io"><span class="ing">Ingresos <b>' + fmt(d.ingresos) + '</b></span>' +
-        '<span class="egr">Egresos <b>' + fmt(d.egresos) + '</b></span></div>' +
         '<div class="r-cuentas">' + d.cuentas.map(function (c) {
           return '<div class="r-cuenta"><span class="cu">' + esc(c.cuenta) + '</span><span class="sa">' + fmt(c.saldo) + '</span></div>';
         }).join("") + '</div>';
@@ -119,19 +125,14 @@
     }).catch(function () {});
   }
 
-  function renderCajaSub() {
-    if (cajaSub === "remeras") return renderRemeras();
-    renderMovimientos(cajaSub === "proyeccion");
-  }
+  function renderCajaSub() { renderMovimientos(cajaSub === "proyeccion"); }
 
   function renderMovimientos(proy) {
     var body = $("#caja-body");
     body.innerHTML = '<div class="empty">Cargando…</div>';
     api("/caja/movimientos?proyectado=" + (proy ? "true" : "false")).then(function (d) {
       var items = d.movimientos || [];
-      var total = items.reduce(function (a, x) { return a + (x.tipo.toLowerCase() === "ingreso" ? x.monto : -x.monto); }, 0);
-      var head = '<div class="list-head"><span class="lh-t">' + (proy ? "Proyección" : "Movimientos") + '</span>' +
-        '<span class="lh-sub">' + items.length + ' · neto ' + fmt(total) + '</span></div>';
+      var head = '<div class="list-head"><span class="lh-t">' + (proy ? "Proyección" : "Movimientos") + '</span></div>';
       if (!items.length) { body.innerHTML = head + '<div class="empty">Sin movimientos. Tocá el + para agregar.</div>'; return; }
       body.innerHTML = head + '<div class="list">' + items.map(function (x) {
         var ing = x.tipo.toLowerCase() === "ingreso";
@@ -182,120 +183,66 @@
     });
   }
 
-  // ---------- Remeras ----------
-  function renderRemeras() {
-    var body = $("#caja-body");
-    body.innerHTML = '<div class="empty">Cargando…</div>';
-    api("/remeras").then(function (d) {
-      var head = '<div class="list-head"><span class="lh-t">Remeras</span>' +
-        '<span class="lh-sub">' + d.pagas + ' pagas · ' + d.deben + ' deben · ' + fmt(d.recaudado) + '</span></div>';
-      if (!d.remeras.length) { body.innerHTML = head + '<div class="empty">Sin remeras. Tocá el + para agregar.</div>'; return; }
-      body.innerHTML = head + '<div class="list">' + d.remeras.map(function (r) {
-        return '<div class="row ' + (r.pago ? "paga" : "") + '" data-id="' + r.id + '">' +
-          '<button class="rem-toggle ' + (r.pago ? "on" : "") + '" title="Marcar pago"></button>' +
-          '<div class="rc-main"><div class="rc-concepto">' + esc(r.nombre) + '</div>' +
-          (r.nota ? '<div class="rc-meta">' + esc(r.nota) + '</div>' : "") + '</div>' +
-          '<div class="rc-monto">' + fmt(r.monto) + '</div>' +
-          '<button class="rc-del" title="Borrar">🗑</button></div>';
-      }).join("") + '</div>';
-      body.querySelectorAll(".row").forEach(function (row) {
-        var id = row.getAttribute("data-id");
-        row.querySelector(".rem-toggle").addEventListener("click", function () {
-          api("/remeras/" + id + "/toggle", { method: "POST" }).then(function () { renderRemeras(); }).catch(function () {});
-        });
-        row.querySelector(".rc-del").addEventListener("click", function () {
-          if (!confirm("¿Borrar de la lista?")) return;
-          api("/remeras/" + id, { method: "DELETE" }).then(function () { renderRemeras(); }).catch(function () {});
-        });
-      });
-    }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
-  }
-
-  function formRemera() {
-    abrirModal("Nueva remera",
-      '<div class="field"><label>Nombre</label><input id="r-nombre" type="text" placeholder="Nombre"></div>' +
-      '<div class="field"><label>Monto</label><input id="r-monto" type="number" inputmode="numeric" value="20000"></div>' +
-      '<div class="field"><label>Nota (opcional)</label><input id="r-nota" type="text" placeholder="Ej: familia, seña…"></div>' +
-      '<label style="display:flex;gap:9px;align-items:center;margin-bottom:14px;font-weight:600;color:var(--soft)"><input id="r-pago" type="checkbox" style="width:20px;height:20px;accent-color:var(--ok)"> Ya pagó</label>' +
-      '<div class="form-err" id="r-err"></div><button class="btn btn-oro" id="r-save">Agregar</button>');
-    $("#r-save").addEventListener("click", function () {
-      var nombre = $("#r-nombre").value.trim(), err = $("#r-err");
-      if (!nombre) { err.textContent = "Falta el nombre."; return; }
-      $("#r-save").disabled = true;
-      api("/remeras", { method: "POST", body: { nombre: nombre, monto: parseFloat($("#r-monto").value) || 20000, nota: $("#r-nota").value.trim(), pago: $("#r-pago").checked } })
-        .then(function () { cerrarModal(); toast("Agregada."); renderRemeras(); })
-        .catch(function (e) { err.textContent = e.message; $("#r-save").disabled = false; });
-    });
-  }
-
   // ============================================================
-  // ENSAYOS
+  // ENSAYOS  (registro histórico único · puntaje por rango · evolución)
   // ============================================================
-  var ensayosInit = false, ensPeriodo = "", ensSub = "ensayos", ensPeriodosList = [], rosterActivos = null;
+  var ensayosInit = false, ensSub = "ensayos", ensRango = "mes", rosterActivos = null;
   var DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
   function fechaLarga(f) {
     var mt = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || "");
     if (!mt) return f || "";
     var d = new Date(+mt[1], +mt[2] - 1, +mt[3]);
-    return DOW[d.getDay()] + " " + mt[3] + "/" + mt[2] + "/" + mt[1].slice(2);
+    return DOW[d.getDay()] + " " + mt[3] + "/" + mt[2] + "/" + mt[1];
   }
   function proximoEnsayo() {  // próximo martes o sábado (días de ensayo)
     var d = new Date();
     for (var i = 0; i < 7; i++) { var g = d.getDay(); if (g === 2 || g === 6) break; d.setDate(d.getDate() + 1); }
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
+  function desdeRango(r) {
+    var d = new Date();
+    if (r === "mes") d.setMonth(d.getMonth() - 1);
+    else if (r === "3meses") d.setMonth(d.getMonth() - 3);
+    else if (r === "2026") return "2026-01-01";
+    else return "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
   function cargarRoster(cb) {
     if (rosterActivos) { cb(); return; }
     api("/roster").then(function (d) { rosterActivos = d.murguistas.filter(function (x) { return x.activo; }); cb(); }).catch(function () { rosterActivos = []; cb(); });
   }
-  function refreshPeriodos(cb) {
-    api("/ensayos/periodos").then(function (d) {
-      ensPeriodosList = d.periodos.map(function (p) { return p.periodo; });
-      var sel = $("#ens-periodo");
-      sel.innerHTML = d.periodos.map(function (p) { return '<option value="' + esc(p.periodo) + '">' + esc(p.periodo) + " (" + p.ensayos + ")</option>"; }).join("");
-      if (!ensPeriodo && ensPeriodosList.length) ensPeriodo = ensPeriodosList[0];
-      if (ensPeriodo) sel.value = ensPeriodo;
-      if (cb) cb();
-    }).catch(function () { if (cb) cb(); });
-  }
 
   function initEnsayos() {
-    refreshPeriodos(function () {
-      $("#ens-periodo").onchange = function () { ensPeriodo = $("#ens-periodo").value; renderEnsayosSub(); };
-      document.querySelectorAll("[data-ens]").forEach(function (c) {
-        c.addEventListener("click", function () {
-          ensSub = c.getAttribute("data-ens");
-          document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x === c); });
-          renderEnsayosSub();
-        });
+    document.querySelectorAll("[data-ens]").forEach(function (c) {
+      c.addEventListener("click", function () {
+        ensSub = c.getAttribute("data-ens");
+        document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x === c); });
+        renderEnsayosSub();
       });
-      renderEnsayosSub();
     });
+    renderEnsayosSub();
   }
-  function renderEnsayosSub() { if (ensSub === "ranking") renderRanking(); else renderEnsayosList(); }
+  function renderEnsayosSub() { if (ensSub === "puntaje") renderPuntaje(); else renderEnsayosList(); }
 
   function renderEnsayosList() {
     var body = $("#ensayos-body");
-    if (!ensPeriodo) { body.innerHTML = '<div class="empty">Sin ensayos todavía. Tocá el + para crear el primero.</div>'; return; }
     body.innerHTML = '<div class="empty">Cargando…</div>';
-    api("/ensayos?periodo=" + encodeURIComponent(ensPeriodo)).then(function (d) {
-      var items = (d.ensayos || []).slice().reverse();  // más nuevos primero
-      if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos en este período. Tocá el + para agregar.</div>'; return; }
-      body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span><span class="lh-sub">' + items.length + '</span></div><div class="list">' +
+    api("/ensayos/todos").then(function (d) {
+      var items = d.ensayos || [];
+      if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos. Tocá el + para registrar uno.</div>'; return; }
+      body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span></div><div class="list">' +
         items.map(function (e) {
           return '<button class="ens-row" data-id="' + e.id + '" data-fecha="' + esc(e.fecha) + '">' +
             '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' marcadas</div></div><span class="earr">›</span></button>';
         }).join("") + "</div>";
-      body.querySelectorAll(".ens-row").forEach(function (r) {
-        r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); });
-      });
+      body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); }); });
     }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
   }
 
   function openMarcado(id, fecha) {
     cargarRoster(function () {
-      api("/ensayos/" + id).then(function (d) {
+      api("/ensayos/id/" + id).then(function (d) {
         var marcas = d.marcas || {}, CODES = ["P", "T", "M", "A", "X"];
         var rows = rosterActivos.map(function (mu) {
           var cur = marcas[mu.nombre] || "";
@@ -320,49 +267,62 @@
         });
         $("#ens-del").addEventListener("click", function () {
           if (!confirm("¿Borrar este ensayo y todas sus marcas?")) return;
-          api("/ensayos/" + id, { method: "DELETE" }).then(function () {
-            _onModalClose = null; cerrarModal(); toast("Ensayo borrado."); refreshPeriodos(renderEnsayosList);
-          }).catch(function () { toast("No se pudo."); });
+          api("/ensayos/id/" + id, { method: "DELETE" }).then(function () { _onModalClose = null; cerrarModal(); toast("Ensayo borrado."); renderEnsayosList(); }).catch(function () { toast("No se pudo."); });
         });
       }).catch(function () { toast("No se pudo abrir."); });
     });
   }
 
-  function renderRanking() {
+  function renderPuntaje() {
     var body = $("#ensayos-body");
-    if (!ensPeriodo) { body.innerHTML = '<div class="empty">Sin datos.</div>'; return; }
-    body.innerHTML = '<div class="empty">Cargando…</div>';
-    api("/ensayos/ranking/" + encodeURIComponent(ensPeriodo)).then(function (d) {
-      var r = d.ranking || [];
-      if (!r.length) { body.innerHTML = '<div class="empty">Sin marcas en este período.</div>'; return; }
-      body.innerHTML = '<div class="list-head"><span class="lh-t">Puntaje</span><span class="lh-sub">' + esc(ensPeriodo) + '</span></div><div class="list">' +
+    var opts = [["mes", "Último mes"], ["3meses", "Últimos 3 meses"], ["2026", "2026"], ["todo", "Todo"]];
+    var chips = opts.map(function (r) { return '<button class="chip' + (ensRango === r[0] ? " chip-on" : "") + '" data-rango="' + r[0] + '">' + r[1] + "</button>"; }).join("");
+    body.innerHTML = '<div class="subnav" style="margin-bottom:12px">' + chips + '</div><div id="rank-list"><div class="empty">Cargando…</div></div>';
+    body.querySelectorAll("[data-rango]").forEach(function (c) { c.addEventListener("click", function () { ensRango = c.getAttribute("data-rango"); renderPuntaje(); }); });
+    api("/ensayos/puntaje?desde=" + encodeURIComponent(desdeRango(ensRango))).then(function (d) {
+      var r = d.ranking || [], cont = $("#rank-list");
+      if (!r.length) { cont.innerHTML = '<div class="empty">Sin datos.</div>'; return; }
+      cont.innerHTML = '<div class="list-head"><span class="lh-t">Puntaje</span><span class="lh-sub">' + d.ensayos + ' ensayos</span></div><div class="list">' +
         r.map(function (x, i) {
-          return '<div class="rank-row ' + (x.activo ? "" : "inact") + '"><span class="rank-pos">' + (i + 1) + '</span>' +
+          return '<button class="rank-row ' + (x.activo ? "" : "inact") + '" data-nom="' + esc(x.nombre) + '"><span class="rank-pos">' + (i + 1) + '</span>' +
             '<div class="rank-main"><div class="rank-nom">' + esc(x.nombre) + (x.activo ? "" : " · histórico") + '</div>' +
             '<div class="rank-detalle">P' + x.P + " · T" + x.T + " · M" + x.M + " · A" + x.A + " · X" + x.X + '</div></div>' +
-            '<span class="rank-pts">' + x.puntaje + "</span></div>";
+            '<span class="rank-pts">' + x.puntaje + "</span></button>";
         }).join("") + "</div>";
-    }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
+      cont.querySelectorAll(".rank-row").forEach(function (row) { row.addEventListener("click", function () { openEvolucion(row.getAttribute("data-nom")); }); });
+    }).catch(function () { $("#rank-list").innerHTML = '<div class="empty">Error al cargar.</div>'; });
+  }
+
+  function openEvolucion(nombre) {
+    api("/ensayos/murguista?nombre=" + encodeURIComponent(nombre) + "&limit=16").then(function (d) {
+      var evo = (d.evolucion || []).slice().reverse();  // izquierda = más viejo, derecha = más nuevo
+      var cells = evo.map(function (x) {
+        var cod = x.codigo || "", cls = cod ? "evo-" + cod : "evo-none";
+        return '<span class="evo-cell ' + cls + '" title="' + esc(fechaLarga(x.fecha)) + '">' + (cod || "·") + "</span>";
+      }).join("");
+      var ult = evo.slice(-5);
+      var faltas = ult.filter(function (x) { return !x.codigo || x.codigo === "A" || x.codigo === "X"; }).length;
+      var alerta = (ult.length >= 3 && faltas >= 3) ? '<div class="evo-alerta">⚠ Viene faltando en los últimos ensayos.</div>' : "";
+      abrirModal(nombre,
+        '<div class="marca-help">Evolución reciente (← más viejo · más nuevo →). Puntaje del tramo: <b>' + d.puntaje + '</b></div>' +
+        '<div class="evo-wrap">' + cells + '</div>' + alerta +
+        '<div class="marca-help">P presente · T tarde · M muy tarde · A ausente c/aviso · X ausente s/aviso · &nbsp;·&nbsp; sin registro</div>');
+    }).catch(function () { toast("No se pudo abrir."); });
   }
 
   function formNuevoEnsayo() {
-    var dl = ensPeriodosList.map(function (p) { return '<option value="' + esc(p) + '"></option>'; }).join("");
     abrirModal("Nuevo ensayo",
-      '<div class="field"><label>Período</label><input id="ne-per" list="ne-perlist" placeholder="Ej: 2026-2do Semestre"><datalist id="ne-perlist">' + dl + '</datalist></div>' +
       '<div class="field"><label>Fecha</label><input id="ne-fecha" type="date" value="' + proximoEnsayo() + '"></div>' +
       '<div class="marca-help">Sugerida: el próximo martes o sábado (días de ensayo).</div>' +
       '<div class="form-err" id="ne-err"></div><button class="btn btn-oro" id="ne-save">Crear y marcar</button>');
-    $("#ne-per").value = ensPeriodo || "";
     $("#ne-save").addEventListener("click", function () {
-      var per = $("#ne-per").value.trim(), fecha = $("#ne-fecha").value, err = $("#ne-err");
-      if (!per) { err.textContent = "Poné un período."; return; }
+      var fecha = $("#ne-fecha").value, err = $("#ne-err");
       if (!fecha) { err.textContent = "Elegí una fecha."; return; }
       $("#ne-save").disabled = true;
-      api("/ensayos", { method: "POST", body: { periodo: per, fecha: fecha } }).then(function (nw) {
-        _onModalClose = null; cerrarModal(); toast("Ensayo creado.");
-        ensPeriodo = per; ensSub = "ensayos";
+      api("/ensayos", { method: "POST", body: { fecha: fecha } }).then(function (nw) {
+        _onModalClose = null; cerrarModal(); toast("Ensayo creado."); ensSub = "ensayos";
         document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x.getAttribute("data-ens") === "ensayos"); });
-        refreshPeriodos(function () { renderEnsayosList(); openMarcado(nw.id, nw.fecha); });
+        renderEnsayosList(); openMarcado(nw.id, nw.fecha);
       }).catch(function (e) { err.textContent = e.message; $("#ne-save").disabled = false; });
     });
   }
@@ -372,7 +332,7 @@
   // ============================================================
   var toquesInit = false;
   var FICHA = [
-    { k: "nombre", l: "Nombre", t: "text" }, { k: "fecha", l: "Fecha", t: "text" },
+    { k: "nombre", l: "Título", t: "text" }, { k: "fecha", l: "Fecha (DD/MM/AAAA)", t: "text" },
     { k: "lugar", l: "Lugar", t: "text" }, { k: "evento", l: "Evento", t: "text" },
     { k: "condicion_eco", l: "Condición económica", t: "text" }, { k: "duracion", l: "Duración", t: "text" },
     { k: "horario", l: "Horario y convocatoria", t: "text" }, { k: "sonido", l: "Sonido", t: "text" },
@@ -392,7 +352,7 @@
       if (!items.length) { body.innerHTML = '<div class="empty">Sin toques. Tocá el + para agregar.</div>'; return; }
       body.innerHTML = '<div class="list-head"><span class="lh-t">Toques</span><span class="lh-sub">' + items.length + '</span></div><div class="list">' +
         items.map(function (t) {
-          var meta = [fechaCorta(t.fecha), t.lugar, t.condicion_eco].filter(Boolean).map(esc).join(" · ");
+          var meta = [fechaDMY(t.fecha), fechaDMY(t.lugar), t.condicion_eco].filter(Boolean).map(esc).join(" · ");
           return '<button class="ens-row" data-id="' + t.id + '"><div><div class="ed">' + esc(t.nombre || t.lugar || "Toque") + '</div><div class="em">' + meta + '</div></div><span class="earr">›</span></button>';
         }).join("") + "</div>";
       body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openToque(r.getAttribute("data-id")); }); });

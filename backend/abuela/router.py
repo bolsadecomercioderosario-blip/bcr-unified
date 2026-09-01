@@ -6,6 +6,7 @@ Authorization: Bearer <password>). Es uso interno, sin roles.
 Secciones: caja, remeras, ensayos, toques, roster.
 """
 import os
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -183,7 +184,7 @@ def ensayo_lista(periodo: str, _: bool = A, db: Session = Depends(get_db)):
     return {"ensayos": [{"id": e.id, "fecha": e.fecha, "marcas": counts.get(e.id, 0)} for e in rows]}
 
 
-@router.get("/ensayos/{eid}")
+@router.get("/ensayos/id/{eid}")
 def ensayo_detalle(eid: int, _: bool = A, db: Session = Depends(get_db)):
     e = db.query(m.Ensayo).filter(m.Ensayo.id == eid).first()
     if not e:
@@ -192,16 +193,85 @@ def ensayo_detalle(eid: int, _: bool = A, db: Session = Depends(get_db)):
     return {"id": e.id, "periodo": e.periodo, "fecha": e.fecha, "marcas": marcas}
 
 
+_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def _sortkey(e):
+    """Ordena por fecha: las ISO cronológicamente, las no-ISO (viejas raras) al fondo."""
+    f = e.fecha or ""
+    return f if _ISO.match(f) else "0000-00-00"
+
+
 @router.post("/ensayos")
 def ensayo_crear(payload: m.EnsayoIn, _: bool = A, db: Session = Depends(get_db)):
-    periodo = (payload.periodo or "").strip()
     fecha = (payload.fecha or "").strip()
-    if not periodo or not fecha:
-        raise HTTPException(status_code=400, detail="Faltan período y fecha.")
-    maxo = db.query(func.max(m.Ensayo.orden)).filter(m.Ensayo.periodo == periodo).scalar() or 0
+    if not fecha:
+        raise HTTPException(status_code=400, detail="Elegí una fecha.")
+    # El período ya no se usa para agrupar (registro histórico único); se guarda
+    # el año como etiqueta interna nomás.
+    periodo = (payload.periodo or "").strip() or (fecha[:4] if _ISO.match(fecha) else "Registro")
+    maxo = db.query(func.max(m.Ensayo.orden)).scalar() or 0
     e = m.Ensayo(periodo=periodo, fecha=fecha, orden=maxo + 1)
     db.add(e); db.commit(); db.refresh(e)
-    return {"id": e.id, "periodo": e.periodo, "fecha": e.fecha}
+    return {"id": e.id, "fecha": e.fecha}
+
+
+@router.get("/ensayos/todos")
+def ensayo_todos(_: bool = A, db: Session = Depends(get_db)):
+    """Todos los ensayos (registro histórico), del más nuevo al más viejo."""
+    rows = sorted(db.query(m.Ensayo).all(), key=_sortkey, reverse=True)
+    ids = [e.id for e in rows]
+    counts = {}
+    if ids:
+        for eid, n in db.query(m.EnsayoAsist.ensayo_id, func.count(m.EnsayoAsist.id)).filter(
+                m.EnsayoAsist.ensayo_id.in_(ids)).group_by(m.EnsayoAsist.ensayo_id).all():
+            counts[eid] = n
+    return {"ensayos": [{"id": e.id, "fecha": e.fecha, "marcas": counts.get(e.id, 0)} for e in rows]}
+
+
+@router.get("/ensayos/puntaje")
+def ensayo_puntaje(desde: str = "", _: bool = A, db: Session = Depends(get_db)):
+    """Ranking de puntaje sobre los ensayos con fecha >= desde (ISO). Sin desde = todo."""
+    ens = db.query(m.Ensayo).all()
+
+    def en_rango(e):
+        f = e.fecha or ""
+        if not _ISO.match(f):
+            return not desde       # las no-ISO solo entran en "Todo"
+        return (not desde) or (f[:10] >= desde)
+
+    eids = [e.id for e in ens if en_rango(e)]
+    activos = {r.nombre for r in db.query(m.Murguista).filter(m.Murguista.activo == True).all()}  # noqa: E712
+    agg = {}
+    if eids:
+        for a in db.query(m.EnsayoAsist).filter(m.EnsayoAsist.ensayo_id.in_(eids)).all():
+            d = agg.setdefault(a.nombre, {"nombre": a.nombre, "puntaje": 0.0, "P": 0, "T": 0, "M": 0, "A": 0, "X": 0})
+            d["puntaje"] += m.PUNTAJE.get(a.codigo, 0)
+            if a.codigo in d:
+                d[a.codigo] += 1
+    # incluir activos sin marcas en el rango (puntaje 0)
+    for nom in activos:
+        agg.setdefault(nom, {"nombre": nom, "puntaje": 0.0, "P": 0, "T": 0, "M": 0, "A": 0, "X": 0})
+    filas = sorted(agg.values(), key=lambda d: -d["puntaje"])
+    for f in filas:
+        f["puntaje"] = round(f["puntaje"], 1)
+        f["activo"] = f["nombre"] in activos
+    return {"desde": desde, "ensayos": len(eids), "ranking": filas}
+
+
+@router.get("/ensayos/murguista")
+def ensayo_murguista(nombre: str, limit: int = 16, _: bool = A, db: Session = Depends(get_db)):
+    """Evolución reciente de un murguista: sus últimos N ensayos con el código."""
+    ens = sorted(db.query(m.Ensayo).all(), key=_sortkey, reverse=True)[:max(1, min(limit, 40))]
+    ids = [e.id for e in ens]
+    marcas = {}
+    if ids:
+        for a in db.query(m.EnsayoAsist).filter(
+                m.EnsayoAsist.nombre == nombre, m.EnsayoAsist.ensayo_id.in_(ids)).all():
+            marcas[a.ensayo_id] = a.codigo
+    evo = [{"fecha": e.fecha, "codigo": marcas.get(e.id, "")} for e in ens]
+    pts = round(sum(m.PUNTAJE.get(x["codigo"], 0) for x in evo), 1)
+    return {"nombre": nombre, "evolucion": evo, "puntaje": pts}
 
 
 @router.post("/ensayos/marca")
@@ -225,7 +295,7 @@ def ensayo_marca(payload: m.MarcaIn, _: bool = A, db: Session = Depends(get_db))
     return {"ok": True, "codigo": cod}
 
 
-@router.delete("/ensayos/{eid}")
+@router.delete("/ensayos/id/{eid}")
 def ensayo_del(eid: int, _: bool = A, db: Session = Depends(get_db)):
     db.query(m.EnsayoAsist).filter(m.EnsayoAsist.ensayo_id == eid).delete()
     db.query(m.Ensayo).filter(m.Ensayo.id == eid).delete()

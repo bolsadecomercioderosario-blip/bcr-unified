@@ -157,6 +157,15 @@ input, select, textarea { font-family: inherit; }
 .rank-nom { font-weight: 700; font-size: 1rem; }
 .rank-detalle { font-size: .74rem; color: var(--soft); margin-top: 2px; }
 .rank-pts { font-weight: 900; font-size: 1.15rem; color: var(--oro-deep); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+button.rank-row { text-align: left; cursor: pointer; width: 100%; }
+
+/* evolución por murguista */
+.evo-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
+.evo-cell { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: .85rem; color: #fff; }
+.evo-P { background: var(--ok); } .evo-T { background: var(--oro-deep); } .evo-M { background: #d98a1f; }
+.evo-A { background: #8a8d99; } .evo-X { background: var(--err); }
+.evo-none { background: var(--line); color: var(--soft); }
+.evo-alerta { background: rgba(192,73,47,.1); border: 1px solid var(--err); color: var(--err); font-weight: 700; font-size: .9rem; padding: 10px 14px; border-radius: 10px; margin-bottom: 6px; }
 
 /* ---------- Toques ---------- */
 .tsec { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--oro-deep); font-weight: 800; margin: 20px 2px 10px; }
