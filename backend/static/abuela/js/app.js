@@ -58,6 +58,7 @@
       document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.id === "tab-" + tabActual); });
       $("#tb-section").textContent = SECCIONES[tabActual];
       if (tabActual === "ensayos" && !ensayosInit) { ensayosInit = true; initEnsayos(); }
+      if (tabActual === "toques" && !toquesInit) { toquesInit = true; renderToquesList(); }
       actualizarFab();
     });
   });
@@ -77,6 +78,8 @@
       fab.onclick = (cajaSub === "remeras") ? formRemera : function () { formMovimiento(cajaSub === "proyeccion"); };
     } else if (tabActual === "ensayos") {
       fab.classList.remove("hidden"); fab.onclick = formNuevoEnsayo;
+    } else if (tabActual === "toques") {
+      fab.classList.remove("hidden"); fab.onclick = formNuevoToque;
     } else { fab.classList.add("hidden"); }
   }
 
@@ -361,6 +364,97 @@
         document.querySelectorAll("[data-ens]").forEach(function (x) { x.classList.toggle("chip-on", x.getAttribute("data-ens") === "ensayos"); });
         refreshPeriodos(function () { renderEnsayosList(); openMarcado(nw.id, nw.fecha); });
       }).catch(function (e) { err.textContent = e.message; $("#ne-save").disabled = false; });
+    });
+  }
+
+  // ============================================================
+  // TOQUES
+  // ============================================================
+  var toquesInit = false;
+  var FICHA = [
+    { k: "nombre", l: "Nombre", t: "text" }, { k: "fecha", l: "Fecha", t: "text" },
+    { k: "lugar", l: "Lugar", t: "text" }, { k: "evento", l: "Evento", t: "text" },
+    { k: "condicion_eco", l: "Condición económica", t: "text" }, { k: "duracion", l: "Duración", t: "text" },
+    { k: "horario", l: "Horario y convocatoria", t: "text" }, { k: "sonido", l: "Sonido", t: "text" },
+    { k: "prueba_sonido", l: "Prueba de sonido", t: "text" }, { k: "camarin", l: "Camarín", t: "text" },
+    { k: "cachet", l: "Cachet / retribución", t: "text" }, { k: "factura", l: "Con/sin factura", t: "text" },
+    { k: "entradas", l: "Entradas (valor)", t: "text" }, { k: "viaticos", l: "Viáticos", t: "text" },
+    { k: "comida", l: "Comida", t: "text" }, { k: "bebida", l: "Bebida", t: "text" },
+    { k: "otros", l: "Otros", t: "textarea" }, { k: "contacto", l: "Contacto", t: "text" },
+    { k: "encargado", l: "Encargado ejecutiva", t: "text" }, { k: "repertorio", l: "Repertorio", t: "text" },
+  ];
+
+  function renderToquesList() {
+    var body = $("#toques-body");
+    body.innerHTML = '<div class="empty">Cargando…</div>';
+    api("/toques").then(function (d) {
+      var items = d.toques || [];
+      if (!items.length) { body.innerHTML = '<div class="empty">Sin toques. Tocá el + para agregar.</div>'; return; }
+      body.innerHTML = '<div class="list-head"><span class="lh-t">Toques</span><span class="lh-sub">' + items.length + '</span></div><div class="list">' +
+        items.map(function (t) {
+          var meta = [fechaCorta(t.fecha), t.lugar, t.condicion_eco].filter(Boolean).map(esc).join(" · ");
+          return '<button class="ens-row" data-id="' + t.id + '"><div><div class="ed">' + esc(t.nombre || t.lugar || "Toque") + '</div><div class="em">' + meta + '</div></div><span class="earr">›</span></button>';
+        }).join("") + "</div>";
+      body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openToque(r.getAttribute("data-id")); }); });
+    }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
+  }
+
+  function openToque(id) {
+    cargarRoster(function () {
+      api("/toques/" + id).then(function (t) {
+        var campos = FICHA.map(function (f) {
+          var v = esc(t[f.k] || "");
+          if (f.t === "textarea") return '<div class="field"><label>' + f.l + '</label><textarea data-k="' + f.k + '">' + v + "</textarea></div>";
+          return '<div class="field"><label>' + f.l + '</label><input data-k="' + f.k + '" type="text" value="' + v + '"></div>';
+        }).join("");
+        var asist = t.asistencia || {};
+        var chips = rosterActivos.map(function (mu) {
+          return '<button class="sub-chip' + (asist[mu.nombre] ? " on" : "") + '" data-nom="' + esc(mu.nombre) + '">' + esc(mu.nombre) + "</button>";
+        }).join("");
+        var subieron = Object.keys(asist).filter(function (n) { return asist[n]; }).length;
+        abrirModal(t.nombre || "Toque",
+          '<div class="tsec">Ficha del toque</div>' + campos +
+          '<div class="tsec">¿Quién subió? (' + subieron + ')</div><div class="subs" id="tq-subs">' + chips + "</div>" +
+          '<button class="btn btn-oro" id="tq-save" style="margin-top:18px">Guardar cambios</button>' +
+          '<button class="btn btn-danger modal-del" id="tq-del">Borrar toque</button>');
+        _onModalClose = renderToquesList;
+        $("#tq-subs").querySelectorAll(".sub-chip").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var nom = b.getAttribute("data-nom"), nuevo = !b.classList.contains("on");
+            api("/toques/subio", { method: "POST", body: { toque_id: +id, nombre: nom, subio: nuevo } })
+              .then(function () { b.classList.toggle("on", nuevo); }).catch(function () { toast("No se pudo."); });
+          });
+        });
+        $("#tq-save").addEventListener("click", function () {
+          var payload = {};
+          $("#modal-body").querySelectorAll("[data-k]").forEach(function (el) { payload[el.getAttribute("data-k")] = el.value; });
+          $("#tq-save").disabled = true;
+          api("/toques/" + id, { method: "PUT", body: payload }).then(function () {
+            toast("Guardado."); $("#modal-title").textContent = payload.nombre || "Toque"; $("#tq-save").disabled = false;
+          }).catch(function (e) { toast(e.message); $("#tq-save").disabled = false; });
+        });
+        $("#tq-del").addEventListener("click", function () {
+          if (!confirm("¿Borrar este toque?")) return;
+          api("/toques/" + id, { method: "DELETE" }).then(function () { _onModalClose = null; cerrarModal(); toast("Toque borrado."); renderToquesList(); }).catch(function () { toast("No se pudo."); });
+        });
+      }).catch(function () { toast("No se pudo abrir."); });
+    });
+  }
+
+  function formNuevoToque() {
+    abrirModal("Nuevo toque",
+      '<div class="field"><label>Nombre / lugar</label><input id="nt-nombre" type="text" placeholder="Ej: Carnaval Barrio X"></div>' +
+      '<div class="field"><label>Fecha</label><input id="nt-fecha" type="text" placeholder="Ej: 15/11 o 2026-11-15"></div>' +
+      '<div class="field"><label>Condición económica</label><input id="nt-cond" type="text" placeholder="Cachet / % / gratuito / viáticos"></div>' +
+      '<div class="marca-help">Después de crear se abre la ficha completa para cargar el resto.</div>' +
+      '<div class="form-err" id="nt-err"></div><button class="btn btn-oro" id="nt-save">Crear y completar</button>');
+    $("#nt-save").addEventListener("click", function () {
+      var nombre = $("#nt-nombre").value.trim(), err = $("#nt-err");
+      if (!nombre) { err.textContent = "Poné el nombre o lugar."; return; }
+      $("#nt-save").disabled = true;
+      api("/toques", { method: "POST", body: { nombre: nombre, fecha: $("#nt-fecha").value.trim(), condicion_eco: $("#nt-cond").value.trim() } })
+        .then(function (nw) { _onModalClose = null; cerrarModal(); toast("Toque creado."); renderToquesList(); openToque(nw.id); })
+        .catch(function (e) { err.textContent = e.message; $("#nt-save").disabled = false; });
     });
   }
 
