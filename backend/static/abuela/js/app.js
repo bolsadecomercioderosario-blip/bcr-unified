@@ -356,7 +356,7 @@
       if (!items.length) { body.innerHTML = '<div class="empty">Sin toques. Tocá el + para agregar.</div>'; return; }
       body.innerHTML = '<div class="list-head"><span class="lh-t">Toques</span><span class="lh-sub">' + items.length + '</span></div><div class="list">' +
         items.map(function (t) {
-          var meta = [fechaDMY(t.fecha), fechaDMY(t.lugar), t.condicion_eco].filter(Boolean).map(esc).join(" · ");
+          var meta = esc(fechaDMY(t.fecha));
           return '<button class="ens-row" data-id="' + t.id + '"><div><div class="ed">' + esc(t.nombre || t.lugar || "Toque") + '</div><div class="em">' + meta + '</div></div><span class="earr">›</span></button>';
         }).join("") + "</div>";
       body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openToque(r.getAttribute("data-id")); }); });
