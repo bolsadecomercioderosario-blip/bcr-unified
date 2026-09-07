@@ -290,12 +290,22 @@ def ensayo_todos(_: bool = A, db: Session = Depends(get_db)):
     """Todos los ensayos (registro histórico), del más nuevo al más viejo."""
     rows = sorted(db.query(m.Ensayo).all(), key=_sortkey, reverse=True)
     ids = [e.id for e in rows]
-    counts = {}
+    agg = {}  # ensayo_id -> [suma_puntaje, cantidad_marcas]
     if ids:
-        for eid, n in db.query(m.EnsayoAsist.ensayo_id, func.count(m.EnsayoAsist.id)).filter(
-                m.EnsayoAsist.ensayo_id.in_(ids)).group_by(m.EnsayoAsist.ensayo_id).all():
-            counts[eid] = n
-    return {"ensayos": [{"id": e.id, "fecha": e.fecha, "marcas": counts.get(e.id, 0)} for e in rows]}
+        for a in db.query(m.EnsayoAsist).filter(m.EnsayoAsist.ensayo_id.in_(ids)).all():
+            g = agg.setdefault(a.ensayo_id, [0.0, 0])
+            g[0] += m.PUNTAJE.get(a.codigo, 0)
+            g[1] += 1
+
+    def _pct(eid):
+        # % del máximo posible del ensayo (todos presentes = 100%).
+        g = agg.get(eid)
+        if not g or g[1] == 0:
+            return None
+        return max(0, round(100 * g[0] / g[1]))
+
+    return {"ensayos": [{"id": e.id, "fecha": e.fecha,
+                         "marcas": agg.get(e.id, [0, 0])[1], "pct": _pct(e.id)} for e in rows]}
 
 
 @router.get("/ensayos/puntaje")

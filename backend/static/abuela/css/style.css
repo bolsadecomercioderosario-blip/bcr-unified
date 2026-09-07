@@ -134,7 +134,11 @@ input, select, textarea { font-family: inherit; }
 .ens-row { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ens-row .ed { font-weight: 700; font-size: 1.02rem; }
 .ens-row .em { font-size: .82rem; color: var(--soft); }
-.ens-row .earr { color: var(--oro-deep); font-weight: 800; }
+.ens-row > div:first-child { flex: 1; min-width: 0; }
+.ens-row .earr { color: var(--oro-deep); font-weight: 800; flex: 0 0 auto; }
+.sem-pill { flex: 0 0 auto; color: #fff; font-weight: 800; font-size: .82rem; padding: 4px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.sem-pill.sem-susp { box-shadow: 0 0 0 2px rgba(143,36,23,.28); }
+.sem-pill.sem-vacio { background: var(--line); color: var(--soft); font-weight: 700; }
 
 /* marcado dentro del modal */
 .marca-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }

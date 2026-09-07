@@ -225,6 +225,14 @@
   }
   function renderEnsayosSub() { if (ensSub === "puntaje") renderPuntaje(); else renderEnsayosList(); }
 
+  // Semáforo del ensayo: 6 escalas de verde (100%) a rojo (50%); <50% rojo intenso.
+  var SEM_COLORS = ["#c0392b", "#e0632b", "#e0972b", "#c9bd2e", "#8fbf3f", "#2e9e4f"];
+  function semaforo(pct) {
+    if (pct == null) return null;
+    if (pct < 50) return { color: "#8f2417", susp: true };
+    return { color: SEM_COLORS[Math.min(5, Math.floor((pct - 50) / (50 / 6)))], susp: false };
+  }
+
   function renderEnsayosList() {
     var body = $("#ensayos-body");
     body.innerHTML = '<div class="empty">Cargando…</div>';
@@ -233,8 +241,13 @@
       if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos. Tocá el + para registrar uno.</div>'; return; }
       body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span></div><div class="list">' +
         items.map(function (e) {
+          var s = semaforo(e.pct);
+          var pill = s
+            ? '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '" title="Puntaje del ensayo">' + e.pct + '%</span>'
+            : '<span class="sem-pill sem-vacio" title="Sin marcar">—</span>';
           return '<button class="ens-row" data-id="' + e.id + '" data-fecha="' + esc(e.fecha) + '">' +
-            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' marcadas</div></div><span class="earr">›</span></button>';
+            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' marcadas</div></div>' +
+            pill + '<span class="earr">›</span></button>';
         }).join("") + "</div>";
       body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); }); });
     }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
