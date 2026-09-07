@@ -290,21 +290,27 @@ def ensayo_todos(_: bool = A, db: Session = Depends(get_db)):
     """Todos los ensayos (registro histórico), del más nuevo al más viejo."""
     rows = sorted(db.query(m.Ensayo).all(), key=_sortkey, reverse=True)
     ids = [e.id for e in rows]
-    agg = {}  # ensayo_id -> [suma_puntaje, cantidad_marcas]
+    activos = {r.nombre for r in db.query(m.Murguista).filter(m.Murguista.activo == True).all()}  # noqa: E712
+    n_act = len(activos)
+    agg = {}  # ensayo_id -> [suma_puntaje, marcas_activos] (SOLO integrantes activos)
     if ids:
         for a in db.query(m.EnsayoAsist).filter(m.EnsayoAsist.ensayo_id.in_(ids)).all():
+            if a.nombre not in activos:
+                continue
             g = agg.setdefault(a.ensayo_id, [0.0, 0])
             g[0] += m.PUNTAJE.get(a.codigo, 0)
             g[1] += 1
 
     def _pct(eid):
-        # % del máximo posible del ensayo (todos presentes = 100%).
+        # % sobre el roster activo completo (si vinieran los 20 = 100%),
+        # cuente o no cada uno con marca.
         g = agg.get(eid)
-        if not g or g[1] == 0:
+        if not g or n_act == 0:
             return None
-        return max(0, round(100 * g[0] / g[1]))
+        return max(0, min(100, round(100 * g[0] / n_act)))
 
-    return {"ensayos": [{"id": e.id, "fecha": e.fecha,
+    return {"activos": n_act,
+            "ensayos": [{"id": e.id, "fecha": e.fecha,
                          "marcas": agg.get(e.id, [0, 0])[1], "pct": _pct(e.id)} for e in rows]}
 
 

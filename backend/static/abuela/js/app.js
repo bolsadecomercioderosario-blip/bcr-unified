@@ -239,14 +239,15 @@
     api("/ensayos/todos").then(function (d) {
       var items = d.ensayos || [];
       if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos. Tocá el + para registrar uno.</div>'; return; }
+      var nact = d.activos || 20;
       body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span></div><div class="list">' +
         items.map(function (e) {
           var s = semaforo(e.pct);
           var pill = s
-            ? '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '" title="Puntaje del ensayo">' + e.pct + '%</span>'
+            ? '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '" title="Puntaje del ensayo (sobre ' + nact + ')">' + e.pct + '%</span>'
             : '<span class="sem-pill sem-vacio" title="Sin marcar">—</span>';
           return '<button class="ens-row" data-id="' + e.id + '" data-fecha="' + esc(e.fecha) + '">' +
-            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' marcadas</div></div>' +
+            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' de ' + nact + ' marcados</div></div>' +
             pill + '<span class="earr">›</span></button>';
         }).join("") + "</div>";
       body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); }); });
