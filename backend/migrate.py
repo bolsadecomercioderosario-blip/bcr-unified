@@ -132,6 +132,54 @@ def migrate():
     seed_abuela_if_empty()
     normalizar_fechas_toques()
     limpiar_import_abuela()
+    reasignar_derian_a_brandon()
+
+
+def reasignar_derian_a_brandon():
+    """En el Excel de asistencia, la fila "Derian" era en realidad Brandon. Sus
+    marcas se cargan a Brandon. Se hace una sola vez (mientras Brandon no tenga
+    asistencia). Lee del seed_data.json original (Derian ya fue borrado de la DB
+    por la limpieza)."""
+    import json
+    import os
+    from abuela.models import Ensayo, EnsayoAsist
+
+    db = SessionLocal()
+    try:
+        if db.query(EnsayoAsist).filter(EnsayoAsist.nombre == "Brandon").count() > 0:
+            return  # Brandon ya tiene asistencia cargada
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "abuela", "seed_data.json")
+        if not os.path.exists(path):
+            return
+        data = json.load(open(path, encoding="utf-8"))
+        der = {}
+        for p in data.get("ensayos", []):
+            for integ in p.get("integrantes", []):
+                if (integ.get("nombre") or "").strip().lower() == "derian":
+                    for fx, code in (integ.get("marcas") or {}).items():
+                        der[fx] = code
+        if not der:
+            return
+        fecha_ids = {}
+        for e in db.query(Ensayo).all():
+            fecha_ids.setdefault(e.fecha, []).append(e.id)
+        agregadas = 0
+        for fx, code in der.items():
+            cod = (code or "").strip().upper()
+            if cod == "MT":
+                cod = "M"
+            if cod not in ("P", "T", "M", "A", "X"):
+                continue
+            for eid in fecha_ids.get(fx, []):
+                db.add(EnsayoAsist(ensayo_id=eid, nombre="Brandon", codigo=cod))
+                agregadas += 1
+        db.commit()
+        print(f"Reasignacion Derian->Brandon: {agregadas} marcas cargadas a Brandon.")
+    except Exception as e:
+        print(f"Error reasignando Derian->Brandon: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def limpiar_import_abuela():
