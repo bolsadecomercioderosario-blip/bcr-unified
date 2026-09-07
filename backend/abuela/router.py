@@ -20,6 +20,9 @@ from abuela import models as m
 router = APIRouter(prefix="/api/abuela", tags=["abuela"])
 
 _PASSWORD = os.environ.get("ABUELA_PASSWORD") or "laabuela2026"
+# Token de solo-lectura para el respaldo automático (Google Sheets vía Apps
+# Script). Si no se setea, vale la misma contraseña del panel.
+_BACKUP_TOKEN = os.environ.get("ABUELA_BACKUP_TOKEN") or _PASSWORD
 
 
 def require_auth(authorization: Optional[str] = Header(None)) -> bool:
@@ -47,6 +50,63 @@ def login(payload: dict):
 # ---------------------------------------------------------
 # Roster
 # ---------------------------------------------------------
+@router.get("/backup")
+def backup(k: str = "", db: Session = Depends(get_db)):
+    """Respaldo completo (todo el panel) para volcar en Google Sheets desde un
+    Apps Script con disparador horario. Token de solo lectura por query (?k=)."""
+    if not k or (k != _BACKUP_TOKEN and k != _PASSWORD):
+        raise HTTPException(status_code=401, detail="Acceso restringido.")
+
+    def si(v):
+        return "Sí" if v else "No"
+
+    # Roster
+    murgs = db.query(m.Murguista).order_by(m.Murguista.activo.desc(), m.Murguista.orden).all()
+    roster_rows = [[x.nombre, x.nombre_completo, si(x.activo)] for x in murgs]
+
+    # Caja (reales + proyección)
+    caja_rows = [
+        [x.fecha, x.cuenta, x.tipo, x.monto, x.concepto, si(x.proyectado)]
+        for x in db.query(m.CajaMov).order_by(m.CajaMov.proyectado, m.CajaMov.fecha).all()
+    ]
+
+    # Ensayos (formato largo: fecha, murguista, código, puntaje)
+    ens_fecha = {e.id: e.fecha for e in db.query(m.Ensayo).all()}
+    ens_rows = []
+    for a in db.query(m.EnsayoAsist).all():
+        ens_rows.append([ens_fecha.get(a.ensayo_id, ""), a.nombre, a.codigo, m.PUNTAJE.get(a.codigo, 0)])
+    ens_rows.sort(key=lambda r: (r[0], r[1]))
+
+    # Toques (ficha) + asistencia
+    toques = db.query(m.Toque).order_by(m.Toque.orden).all()
+    tq_rows = [[
+        t.nombre, t.fecha, t.lugar, t.evento, t.condicion_eco, t.duracion, t.horario,
+        t.sonido, t.prueba_sonido, t.camarin, t.cachet, t.factura, t.entradas, t.viaticos,
+        t.comida, t.bebida, t.otros, t.contacto, t.encargado, t.repertorio,
+    ] for t in toques]
+    tnom = {t.id: t.nombre for t in toques}
+    tfec = {t.id: t.fecha for t in toques}
+    tq_asist_rows = [
+        [tnom.get(a.toque_id, ""), tfec.get(a.toque_id, ""), a.nombre, si(a.subio)]
+        for a in db.query(m.ToqueAsist).all() if a.subio
+    ]
+
+    from datetime import datetime as _dt
+    return {
+        "generado": _dt.utcnow().isoformat(timespec="seconds") + "Z",
+        "tabs": {
+            "Caja": {"header": ["Fecha", "Cuenta", "Tipo", "Monto", "Concepto", "Proyectado"], "rows": caja_rows},
+            "Ensayos": {"header": ["Fecha", "Murguista", "Código", "Puntaje"], "rows": ens_rows},
+            "Toques": {"header": ["Título", "Fecha", "Lugar", "Evento", "Condición económica", "Duración",
+                                   "Horario", "Sonido", "Prueba de sonido", "Camarín", "Cachet", "Factura",
+                                   "Entradas", "Viáticos", "Comida", "Bebida", "Otros", "Contacto",
+                                   "Encargado", "Repertorio"], "rows": tq_rows},
+            "Asistencia toques": {"header": ["Toque", "Fecha", "Murguista", "Subió"], "rows": tq_asist_rows},
+            "Roster": {"header": ["Apodo", "Nombre completo", "Activo"], "rows": roster_rows},
+        },
+    }
+
+
 @router.get("/roster")
 def roster(_: bool = A, db: Session = Depends(get_db)):
     rows = db.query(m.Murguista).order_by(m.Murguista.activo.desc(), m.Murguista.orden).all()
