@@ -137,17 +137,16 @@ def migrate():
 
 def reasignar_derian_a_brandon():
     """En el Excel de asistencia, la fila "Derian" era en realidad Brandon. Sus
-    marcas se cargan a Brandon. Se hace una sola vez (mientras Brandon no tenga
-    asistencia). Lee del seed_data.json original (Derian ya fue borrado de la DB
-    por la limpieza)."""
+    marcas se cargan a Brandon, ensayo por ensayo: sólo se agregan en los
+    ensayos donde Brandon todavía NO tiene marca (así no pisa lo que se haya
+    cargado a mano). Idempotente: al re-correr, los que ya están se saltean.
+    Lee del seed_data.json original (Derian ya fue borrado de la DB)."""
     import json
     import os
     from abuela.models import Ensayo, EnsayoAsist
 
     db = SessionLocal()
     try:
-        if db.query(EnsayoAsist).filter(EnsayoAsist.nombre == "Brandon").count() > 0:
-            return  # Brandon ya tiene asistencia cargada
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "abuela", "seed_data.json")
         if not os.path.exists(path):
             return
@@ -160,6 +159,8 @@ def reasignar_derian_a_brandon():
                         der[fx] = code
         if not der:
             return
+        # Ensayos donde Brandon ya tiene marca (para no pisarlos).
+        brandon_eids = {a.ensayo_id for a in db.query(EnsayoAsist).filter(EnsayoAsist.nombre == "Brandon").all()}
         fecha_ids = {}
         for e in db.query(Ensayo).all():
             fecha_ids.setdefault(e.fecha, []).append(e.id)
@@ -171,10 +172,14 @@ def reasignar_derian_a_brandon():
             if cod not in ("P", "T", "M", "A", "X"):
                 continue
             for eid in fecha_ids.get(fx, []):
+                if eid in brandon_eids:
+                    continue  # Brandon ya tiene marca en ese ensayo (respeta lo manual)
                 db.add(EnsayoAsist(ensayo_id=eid, nombre="Brandon", codigo=cod))
+                brandon_eids.add(eid)
                 agregadas += 1
-        db.commit()
-        print(f"Reasignacion Derian->Brandon: {agregadas} marcas cargadas a Brandon.")
+        if agregadas:
+            db.commit()
+            print(f"Reasignacion Derian->Brandon: {agregadas} marcas agregadas a Brandon.")
     except Exception as e:
         print(f"Error reasignando Derian->Brandon: {e}")
         db.rollback()
