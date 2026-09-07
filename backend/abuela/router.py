@@ -309,26 +309,30 @@ def ensayo_todos(_: bool = A, db: Session = Depends(get_db)):
     ids = [e.id for e in rows]
     activos = {r.nombre for r in db.query(m.Murguista).filter(m.Murguista.activo == True).all()}  # noqa: E712
     n_act = len(activos)
-    agg = {}  # ensayo_id -> [suma_puntaje, marcas_activos] (SOLO integrantes activos)
+    agg = {}  # ensayo_id -> [suma_puntaje, marcas_activos, asistieron] (SOLO activos)
     if ids:
         for a in db.query(m.EnsayoAsist).filter(m.EnsayoAsist.ensayo_id.in_(ids)).all():
             if a.nombre not in activos:
                 continue
-            g = agg.setdefault(a.ensayo_id, [0.0, 0])
+            g = agg.setdefault(a.ensayo_id, [0.0, 0, 0])
             g[0] += m.PUNTAJE.get(a.codigo, 0)
             g[1] += 1
+            if a.codigo in ("P", "T", "M"):  # asistió (aunque haya llegado tarde)
+                g[2] += 1
 
-    def _pct(eid):
-        # % sobre el roster activo completo (si vinieran los 20 = 100%),
-        # cuente o no cada uno con marca.
-        g = agg.get(eid)
-        if not g or n_act == 0:
-            return None
-        return max(0, min(100, round(100 * g[0] / n_act)))
+    def _out(e):
+        g = agg.get(e.id, [0.0, 0, 0])
+        if g[1] == 0 or n_act == 0:
+            return {"id": e.id, "fecha": e.fecha, "marcas": 0, "asistieron": 0, "asis_pct": None, "pct": None}
+        return {
+            "id": e.id, "fecha": e.fecha, "marcas": g[1], "asistieron": g[2],
+            # % de personas que fueron (sobre el roster), sin importar tarde/temprano
+            "asis_pct": round(100 * g[2] / n_act),
+            # % del máximo posible (ponderado por P/T/M/A/X)
+            "pct": max(0, min(100, round(100 * g[0] / n_act))),
+        }
 
-    return {"activos": n_act,
-            "ensayos": [{"id": e.id, "fecha": e.fecha,
-                         "marcas": agg.get(e.id, [0, 0])[1], "pct": _pct(e.id)} for e in rows]}
+    return {"activos": n_act, "ensayos": [_out(e) for e in rows]}
 
 
 @router.get("/ensayos/puntaje")
@@ -347,11 +351,14 @@ def ensayo_puntaje(desde: str = "", _: bool = A, db: Session = Depends(get_db)):
     # incluir activos sin marcas en el rango (puntaje 0)
     for nom in activos:
         agg.setdefault(nom, {"nombre": nom, "puntaje": 0.0, "P": 0, "T": 0, "M": 0, "A": 0, "X": 0})
+    n_ens = len(eids)
     filas = sorted(agg.values(), key=lambda d: -d["puntaje"])
     for f in filas:
+        # % de asistencia (puntaje promedio del tramo: 100% = todos los ensayos presente)
+        f["pct"] = max(0, min(100, round(100 * f["puntaje"] / n_ens))) if n_ens else 0
         f["puntaje"] = round(f["puntaje"], 1)
         f["activo"] = f["nombre"] in activos
-    return {"desde": desde, "ensayos": len(eids), "ranking": filas}
+    return {"desde": desde, "ensayos": n_ens, "ranking": filas}
 
 
 @router.get("/ensayos/murguista")

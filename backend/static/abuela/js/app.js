@@ -203,7 +203,7 @@
   // ENSAYOS  (registro histórico único · puntaje por rango · evolución)
   // ============================================================
   var ensayosInit = false, ensSub = "ensayos", ensRango = "mes", rosterActivos = null;
-  var DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  var DOW = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
   function fechaLarga(f) {
     var mt = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || "");
@@ -255,15 +255,18 @@
     api("/ensayos/todos").then(function (d) {
       var items = d.ensayos || [];
       if (!items.length) { body.innerHTML = '<div class="empty">Sin ensayos. Tocá el + para registrar uno.</div>'; return; }
-      var nact = d.activos || 20;
       body.innerHTML = '<div class="list-head"><span class="lh-t">Ensayos</span></div><div class="list">' +
         items.map(function (e) {
           var s = semaforo(e.pct);
           var pill = s
-            ? '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '" title="Puntaje del ensayo (sobre ' + nact + ')">' + e.pct + '%</span>'
+            ? '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '" title="Puntaje sobre el total posible">' + e.pct + '%</span>'
             : '<span class="sem-pill sem-vacio" title="Sin marcar">—</span>';
+          var sa = semaforo(e.asis_pct);
+          var sub = (e.asis_pct == null)
+            ? "Sin marcar"
+            : 'Asistieron ' + e.asistieron + ' murguistas · <span class="asis" style="color:' + sa.color + '">' + e.asis_pct + '% del total</span>';
           return '<button class="ens-row" data-id="' + e.id + '" data-fecha="' + esc(e.fecha) + '">' +
-            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + e.marcas + ' de ' + nact + ' marcados</div></div>' +
+            '<div><div class="ed">' + fechaLarga(e.fecha) + '</div><div class="em">' + sub + '</div></div>' +
             pill + '<span class="earr">›</span></button>';
         }).join("") + "</div>";
       body.querySelectorAll(".ens-row").forEach(function (r) { r.addEventListener("click", function () { openMarcado(r.getAttribute("data-id"), r.getAttribute("data-fecha")); }); });
@@ -312,12 +315,13 @@
     api("/ensayos/puntaje?desde=" + encodeURIComponent(desdeRango(ensRango))).then(function (d) {
       var r = d.ranking || [], cont = $("#rank-list");
       if (!r.length) { cont.innerHTML = '<div class="empty">Sin datos.</div>'; return; }
-      cont.innerHTML = '<div class="list-head"><span class="lh-t">Puntaje</span><span class="lh-sub">' + d.ensayos + ' ensayos</span></div><div class="list">' +
+      cont.innerHTML = '<div class="list-head"><span class="lh-t">Murguistas</span><span class="lh-sub">' + d.ensayos + ' ensayos</span></div><div class="list">' +
         r.map(function (x, i) {
+          var s = semaforo(x.pct) || { color: "var(--soft)" };
           return '<button class="rank-row ' + (x.activo ? "" : "inact") + '" data-nom="' + esc(x.nombre) + '"><span class="rank-pos">' + (i + 1) + '</span>' +
             '<div class="rank-main"><div class="rank-nom">' + esc(x.nombre) + (x.activo ? "" : " · histórico") + '</div>' +
             '<div class="rank-detalle">P' + x.P + " · T" + x.T + " · M" + x.M + " · A" + x.A + " · X" + x.X + '</div></div>' +
-            '<span class="rank-pts">' + x.puntaje + "</span></button>";
+            '<span class="sem-pill' + (s.susp ? " sem-susp" : "") + '" style="background:' + s.color + '">' + x.pct + '%</span></button>';
         }).join("") + "</div>";
       cont.querySelectorAll(".rank-row").forEach(function (row) { row.addEventListener("click", function () { openEvolucion(row.getAttribute("data-nom")); }); });
     }).catch(function () { $("#rank-list").innerHTML = '<div class="empty">Error al cargar.</div>'; });
