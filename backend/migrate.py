@@ -131,6 +131,48 @@ def migrate():
     from abuela.seed import seed_abuela_if_empty
     seed_abuela_if_empty()
     normalizar_fechas_toques()
+    limpiar_import_abuela()
+
+
+def limpiar_import_abuela():
+    """Limpieza de la importación de los Excels viejos (una sola vez):
+    borra los ex-integrantes (inactivos) con todas sus marcas, y los ensayos
+    con fecha rota (sin fecha real / la mal parseada 2026-12-30). Se dispara
+    sólo mientras existan integrantes inactivos; una vez limpio, no hace nada.
+    """
+    import re
+    from abuela.models import Murguista, EnsayoAsist, ToqueAsist, Ensayo
+
+    db = SessionLocal()
+    try:
+        inactivos = db.query(Murguista).filter(Murguista.activo == False).all()  # noqa: E712
+        if not inactivos:
+            return  # ya está limpio
+        nombres = [x.nombre for x in inactivos]
+
+        marcas_ens = db.query(EnsayoAsist).filter(EnsayoAsist.nombre.in_(nombres)).delete(synchronize_session=False)
+        marcas_toq = db.query(ToqueAsist).filter(ToqueAsist.nombre.in_(nombres)).delete(synchronize_session=False)
+        for x in inactivos:
+            db.delete(x)
+
+        rotos = [e for e in db.query(Ensayo).all()
+                 if not re.match(r"^\d{4}-\d{2}-\d{2}$", (e.fecha or "")) or (e.fecha == "2026-12-30")]
+        reids = [e.id for e in rotos]
+        marcas_rotas = 0
+        if reids:
+            marcas_rotas = db.query(EnsayoAsist).filter(
+                EnsayoAsist.ensayo_id.in_(reids)).delete(synchronize_session=False)
+            for e in rotos:
+                db.delete(e)
+
+        db.commit()
+        print(f"Limpieza import Abuela: {len(nombres)} ex-integrantes + {marcas_ens + marcas_toq} marcas suyas; "
+              f"{len(reids)} ensayos rotos ({marcas_rotas} marcas).")
+    except Exception as e:
+        print(f"Error en limpieza de import Abuela: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def normalizar_fechas_toques():
