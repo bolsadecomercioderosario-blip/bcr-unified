@@ -16,8 +16,9 @@ from sqlalchemy import Boolean, Column, Float, Integer, String, Text
 from database import Base
 
 
-# Puntaje de cada código de asistencia a ensayos (según hoja "Criterios").
-PUNTAJE = {"P": 1.0, "T": 0.5, "M": 0.3, "A": 0.0, "X": -0.5}
+# Puntaje de cada código de asistencia a ensayos.
+# P presente=1 · T tarde=0.75 · M muy tarde=0.5 · A ausente c/aviso=0 · X ausente s/aviso=0
+PUNTAJE = {"P": 1.0, "T": 0.75, "M": 0.5, "A": 0.0, "X": 0.0}
 
 
 class Murguista(Base):
