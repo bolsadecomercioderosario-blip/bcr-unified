@@ -170,6 +170,23 @@ def caja_add(payload: m.MovIn, _: bool = A, db: Session = Depends(get_db)):
     return _mov_out(mv)
 
 
+@router.put("/caja/movimientos/{mid}")
+def caja_edit(mid: int, payload: m.MovIn, _: bool = A, db: Session = Depends(get_db)):
+    mv = db.query(m.CajaMov).filter(m.CajaMov.id == mid).first()
+    if not mv:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    if payload.monto is None or payload.monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto tiene que ser mayor a 0.")
+    mv.fecha = (payload.fecha or "")[:10]
+    mv.cuenta = payload.cuenta.strip()
+    mv.tipo = "Ingreso" if (payload.tipo or "").lower().startswith("ing") else "Egreso"
+    mv.monto = float(payload.monto)
+    mv.concepto = payload.concepto.strip()
+    # `proyectado` no se cambia al editar (para no mover algo entre real/proyección).
+    db.commit(); db.refresh(mv)
+    return _mov_out(mv)
+
+
 @router.delete("/caja/movimientos/{mid}")
 def caja_del(mid: int, _: bool = A, db: Session = Depends(get_db)):
     mv = db.query(m.CajaMov).filter(m.CajaMov.id == mid).first()

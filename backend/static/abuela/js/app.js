@@ -134,36 +134,42 @@
       var items = d.movimientos || [];
       var head = '<div class="list-head"><span class="lh-t">' + (proy ? "Proyección" : "Movimientos") + '</span></div>';
       if (!items.length) { body.innerHTML = head + '<div class="empty">Sin movimientos. Tocá el + para agregar.</div>'; return; }
+      var byId = {}; items.forEach(function (x) { byId[x.id] = x; });
       body.innerHTML = head + '<div class="list">' + items.map(function (x) {
         var ing = x.tipo.toLowerCase() === "ingreso";
         return '<div class="row" data-id="' + x.id + '">' +
-          '<div class="rc-main"><div class="rc-concepto">' + esc(x.concepto || "(sin concepto)") + '</div>' +
+          '<div class="rc-main rc-edit"><div class="rc-concepto">' + esc(x.concepto || "(sin concepto)") + '</div>' +
           '<div class="rc-meta">' + (x.fecha ? fechaCorta(x.fecha) + " · " : "") + esc(x.cuenta || "—") + '</div></div>' +
           '<div class="rc-monto ' + (ing ? "ing" : "egr") + '">' + (ing ? "+" : "−") + fmt(x.monto) + '</div>' +
           '<button class="rc-del" title="Borrar">🗑</button></div>';
       }).join("") + '</div>';
       body.querySelectorAll(".row").forEach(function (row) {
+        var id = row.getAttribute("data-id");
+        row.querySelector(".rc-edit").addEventListener("click", function () { formMovimiento(proy, byId[id]); });
         row.querySelector(".rc-del").addEventListener("click", function () {
           if (!confirm("¿Borrar este movimiento?")) return;
-          api("/caja/movimientos/" + row.getAttribute("data-id"), { method: "DELETE" })
+          api("/caja/movimientos/" + id, { method: "DELETE" })
             .then(function () { toast("Borrado."); cargarResumen(); renderMovimientos(proy); }).catch(function () { toast("No se pudo."); });
         });
       });
     }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
   }
 
-  function formMovimiento(proy) {
-    abrirModal(proy ? "Nueva proyección" : "Nuevo movimiento",
+  // Crear (mov = null) o editar (mov = movimiento existente) un movimiento/proyección.
+  function formMovimiento(proy, mov) {
+    var esProy = mov ? mov.proyectado : proy;
+    var tipo = mov ? (mov.tipo || "Egreso") : "Egreso";
+    abrirModal(mov ? "Editar" : (esProy ? "Nueva proyección" : "Nuevo movimiento"),
       '<div class="field"><label>Tipo</label><div class="seg" id="f-seg">' +
-        '<button type="button" data-t="Egreso" class="on-egr">Egreso</button>' +
-        '<button type="button" data-t="Ingreso">Ingreso</button></div></div>' +
-      (proy ? "" : '<div class="field"><label>Cuenta</label><select id="f-cuenta"><option>ClaroPay</option><option>Brubank</option><option value="">Otra…</option></select></div>') +
-      '<div class="field"><label>Monto</label><input id="f-monto" type="number" inputmode="numeric" placeholder="0"></div>' +
-      '<div class="field"><label>Concepto</label><input id="f-concepto" type="text" placeholder="¿De qué se trata?"></div>' +
-      (proy ? "" : '<div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="' + hoy() + '"></div>') +
+        '<button type="button" data-t="Egreso" class="' + (tipo === "Egreso" ? "on-egr" : "") + '">Egreso</button>' +
+        '<button type="button" data-t="Ingreso" class="' + (tipo === "Ingreso" ? "on-ing" : "") + '">Ingreso</button></div></div>' +
+      (esProy ? "" : '<div class="field"><label>Cuenta</label><input id="f-cuenta" list="f-cuentas" value="' + esc(mov ? (mov.cuenta || "") : "ClaroPay") + '"><datalist id="f-cuentas"><option value="ClaroPay"></option><option value="Brubank"></option></datalist></div>') +
+      '<div class="field"><label>Monto</label><input id="f-monto" type="number" inputmode="numeric" placeholder="0" value="' + (mov ? mov.monto : "") + '"></div>' +
+      '<div class="field"><label>Concepto</label><input id="f-concepto" type="text" placeholder="¿De qué se trata?" value="' + esc(mov ? (mov.concepto || "") : "") + '"></div>' +
+      (esProy ? "" : '<div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="' + (mov ? (mov.fecha || hoy()) : hoy()) + '"></div>') +
       '<div class="form-err" id="f-err"></div>' +
-      '<button class="btn btn-oro" id="f-save">Guardar</button>');
-    var tipo = "Egreso";
+      '<button class="btn btn-oro" id="f-save">Guardar</button>' +
+      (mov ? '<button class="btn btn-danger" id="f-del" style="margin-top:10px">Borrar</button>' : ""));
     $("#f-seg").querySelectorAll("button").forEach(function (b) {
       b.addEventListener("click", function () {
         tipo = b.getAttribute("data-t");
@@ -174,13 +180,23 @@
     $("#f-save").addEventListener("click", function () {
       var monto = parseFloat($("#f-monto").value), err = $("#f-err");
       if (!monto || monto <= 0) { err.textContent = "Poné un monto mayor a 0."; return; }
-      var payload = { tipo: tipo, monto: monto, concepto: $("#f-concepto").value.trim(), proyectado: !!proy,
-        cuenta: proy ? "" : $("#f-cuenta").value, fecha: proy ? "" : $("#f-fecha").value };
+      var payload = { tipo: tipo, monto: monto, concepto: $("#f-concepto").value.trim(), proyectado: !!esProy,
+        cuenta: esProy ? "" : $("#f-cuenta").value, fecha: esProy ? "" : $("#f-fecha").value };
       $("#f-save").disabled = true;
-      api("/caja/movimientos", { method: "POST", body: payload })
-        .then(function () { cerrarModal(); toast("Guardado."); cargarResumen(); renderMovimientos(!!proy); })
+      var req = mov
+        ? api("/caja/movimientos/" + mov.id, { method: "PUT", body: payload })
+        : api("/caja/movimientos", { method: "POST", body: payload });
+      req.then(function () { cerrarModal(); toast(mov ? "Editado." : "Guardado."); cargarResumen(); renderMovimientos(!!esProy); })
         .catch(function (e) { err.textContent = e.message; $("#f-save").disabled = false; });
     });
+    if (mov) {
+      $("#f-del").addEventListener("click", function () {
+        if (!confirm("¿Borrar este movimiento?")) return;
+        api("/caja/movimientos/" + mov.id, { method: "DELETE" })
+          .then(function () { cerrarModal(); toast("Borrado."); cargarResumen(); renderMovimientos(!!esProy); })
+          .catch(function () { toast("No se pudo."); });
+      });
+    }
   }
 
   // ============================================================
