@@ -47,6 +47,22 @@ _ICON = {
     "mail": '<svg class="ico" viewBox="0 0 24 24"><path d="M2 5h20v14H2zm2 2v.5l8 5 8-5V7l-8 5z"/></svg>',
 }
 
+# URLs oficiales de las redes de la BCR (se usan en header y footer de todo el sitio).
+SOCIAL_URLS = {
+    "x": "https://twitter.com/bolsarosario",
+    "ig": "https://www.instagram.com/bolsadecomercioderosario/",
+    "fb": "https://www.facebook.com/BCRoficial/?locale=es_LA",
+    "yt": "https://www.youtube.com/@BolsadeRosario",
+    "in": "https://www.linkedin.com/company/7078288/",
+}
+
+
+def _social_links() -> str:
+    return "".join(
+        f'<a href="{SOCIAL_URLS[k]}" target="_blank" rel="noopener" aria-label="{k}">{_ICON[k]}</a>'
+        for k in ("x", "ig", "fb", "yt", "in")
+    )
+
 _CSS = """
 :root{--navy:#00314b;--cyan:#009ee3;--link:#0079ad;--text:#333;--muted:#6b7280;--line:#e5e7eb;--f:"Outfit",system-ui,sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -57,14 +73,13 @@ a{color:var(--link);text-decoration:none}
 .ph{background:linear-gradient(135deg,#cdd6df,#9aa7b6);position:relative;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .logo{display:flex;align-items:center;gap:12px}
-.logo-img{height:44px;width:auto;display:block}
-.foot .logo-img{height:52px}
-.logo svg{width:38px;height:38px;flex:none}
+.logo-img{height:58px;width:auto;display:block}
+.foot .logo-img{height:60px}
 .logo .txt{display:flex;flex-direction:column;line-height:1}
 .logo .n{font-weight:800;font-size:22px;color:#fff;letter-spacing:.5px}
 .logo .s{font-size:8.5px;letter-spacing:3px;color:var(--cyan);margin-top:4px;font-weight:600}
 header.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:50}
-.topbar{display:flex;align-items:center;gap:30px;height:76px}
+.topbar{display:flex;align-items:center;gap:30px;height:96px}
 nav.main{display:flex;gap:24px;align-items:center;font-weight:600;font-size:14px;position:relative}
 nav.main a{color:#fff}
 .drop{position:relative}
@@ -162,32 +177,25 @@ def _cat_menu() -> str:
 
 
 def _header() -> str:
-    socials = "".join(_ICON[k] for k in ("x", "ig", "fb", "yt", "in"))
     return f"""
 <header class="top"><div class="wrap topbar">
   <a class="logo" href="/noticias/">{_LOGO}</a>
-  <nav class="main">
-    <a href="#">Sobre Nosotros</a>
-    {_cat_menu()}
-    <a href="/noticias/kit">Kit Multimedia</a>
-    <a href="#">Contacto</a>
-  </nav>
-  <div class="top-right"><div class="socials">{socials}</div></div>
+  <nav class="main"><a href="/noticias/kit">Kit Multimedia</a></nav>
+  <div class="top-right"><div class="socials">{_social_links()}</div></div>
 </div></header>"""
 
 
 def _footer() -> str:
-    socials = "".join(_ICON[k] for k in ("x", "ig", "fb", "yt", "in"))
     return f"""
 <footer><div class="wrap foot">
   <a class="logo">{_LOGO}</a>
   <div class="col">
-    <div>54-341-5258300</div>
-    <div>masbcr.com.ar</div>
-    <div>hola@masbcr.com.ar</div>
+    <b>Contacto</b>
+    <div><a href="https://wa.me/5493416800028" target="_blank" rel="noopener" style="color:#cfe6f4">WhatsApp: +54 9 3416 80-0028</a></div>
+    <div><a href="mailto:contacto@bcr.com.ar" style="color:#cfe6f4">contacto@bcr.com.ar</a></div>
     <div>Córdoba 1402, Rosario, Santa Fe</div>
   </div>
-  <div class="col"><b>Seguinos en las redes</b><div class="socials" style="margin-top:8px">{socials}</div></div>
+  <div class="col"><b>Seguinos en las redes</b><div class="socials" style="margin-top:8px">{_social_links()}</div></div>
 </div></footer>"""
 
 
@@ -246,8 +254,18 @@ def _card_min(n) -> str:
 </article>"""
 
 
-def _promo_banner(titulo_html: str, subtitulo: str, href: str) -> str:
-    return (f'<a class="promo" href="{href}">'
+# Imágenes de fondo de los banners de la home (por ahora en el host de WP; se
+# re-hostean con el resto de las imágenes antes del cutover).
+_BG_TABLERO = "https://masbcr.com.ar/wp-content/uploads/2023/06/tablero2-1536x442.jpg"
+_BG_KIT = "https://masbcr.com.ar/wp-content/uploads/2023/06/kit2-1536x442.jpg"
+
+
+def _promo_banner(titulo_html: str, subtitulo: str, href: str, bg_url: str | None = None) -> str:
+    style = ""
+    if bg_url:
+        style = (" style=\"background:linear-gradient(rgba(0,49,75,.72),rgba(0,49,75,.72)),"
+                 f"url('{_esc(bg_url)}') center/cover\"")
+    return (f'<a class="promo"{style} href="{href}">'
             f'<div class="promo-title">{titulo_html}</div>'
             f'<div class="promo-sub">{_esc(subtitulo)}</div></a>')
 
@@ -301,12 +319,12 @@ def render_home(noticias: list, videos: list | None = None) -> tuple[str, str]:
     tablero = _promo_banner(
         "TABLERO DE <b>CULTIVOS</b>",
         "Datos estadísticos sobre las campañas de soja, trigo y maíz de los últimos 10 años",
-        "/noticias/tablero",
+        "/noticias/tablero", _BG_TABLERO,
     )
     kit = _promo_banner(
         "KIT <b>MULTIMEDIA</b>",
         "Descargá contenido para Televisión, Medios Gráficos, Medios Digitales y también para usos académicos",
-        "/noticias/kit",
+        "/noticias/kit", _BG_KIT,
     )
 
     resto_html = ""
@@ -390,7 +408,6 @@ def render_article(n, relacionadas: list, canonical: str) -> str:
   <a target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url={u}&text={t}">{_ICON['x']}</a>
   <a target="_blank" rel="noopener" href="https://www.linkedin.com/sharing/share-offsite/?url={u}">{_ICON['in']}</a>
   <a target="_blank" rel="noopener" style="background:#25d366" href="https://wa.me/?text={t}%20{u}">{_ICON['wa']}</a>
-  <a href="mailto:?subject={t}&body={u}" style="background:#6b7280">{_ICON['mail']}</a>
 </div>"""
 
     rels = ""

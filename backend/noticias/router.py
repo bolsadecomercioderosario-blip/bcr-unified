@@ -264,10 +264,12 @@ def videos_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @videos_api.post("")
 def videos_crear(payload: VideoIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    from sqlalchemy import func
     yid = _yt_id(payload.url)
     if not yid:
         raise HTTPException(400, "No pude reconocer el video de YouTube. Pegá la URL completa.")
-    v = Video(youtube_id=yid, titulo=payload.titulo)
+    maxo = db.query(func.max(Video.orden)).scalar() or 0
+    v = Video(youtube_id=yid, titulo=payload.titulo, orden=maxo + 1)
     db.add(v)
     db.commit()
     db.refresh(v)
