@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from auth import require_auth
-from config import CLOUDINARY_ENABLED, UPLOADS_DIR
+from config import CLOUDINARY_ENABLED, MASBCR_TABLERO_URL, UPLOADS_DIR
 from database import get_db
 from noticias import render
 from noticias.models import (
@@ -302,6 +302,18 @@ async def kit_index(request: Request, db: Session = Depends(get_db)):
         canonical=_canonical(request, "/noticias/kit"),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
+
+
+@site.get("/noticias/tablero", response_class=HTMLResponse)
+async def tablero(request: Request):
+    body = render.render_tablero(MASBCR_TABLERO_URL)
+    html = render.base_page(
+        title="Tablero de Cultivos — Más BCR",
+        description="Datos estadísticos de las campañas de soja, trigo y maíz de los últimos 10 años.",
+        body=body,
+        canonical=_canonical(request, "/noticias/tablero"),
+    )
+    return HTMLResponse(html, headers={"Cache-Control": "public, max-age=300"})
 
 
 @site.get("/noticias/kit/{cat}", response_class=HTMLResponse)

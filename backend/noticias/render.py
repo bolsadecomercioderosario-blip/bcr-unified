@@ -135,7 +135,17 @@ footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
 .gal span{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,49,75,.85));color:#fff;font-size:12px;font-weight:600;padding:18px 10px 8px;opacity:0;transition:.15s}
 .gal:hover span{opacity:1}
 .backlink{color:var(--link);font-weight:600;font-size:14px;display:inline-block;margin-bottom:6px}
-@media(max-width:820px){.hero,.cards,.art,.kitgrid{grid-template-columns:1fr}.share{flex-direction:row}nav.main{display:none}}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.card .exc{color:#4b5563;font-size:13.5px;margin-top:8px;line-height:1.5}
+.card .dm{color:var(--link);font-size:12px;font-weight:600;margin-top:10px}
+.promo{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;min-height:220px;margin:34px 0;padding:30px 20px;background:linear-gradient(rgba(0,49,75,.74),rgba(0,49,75,.74)),linear-gradient(135deg,#0b3145,#155)}
+.promo-title{background:#fff;color:var(--navy);font-weight:800;font-size:26px;letter-spacing:1px;padding:8px 24px;border-radius:6px;text-transform:uppercase}
+.promo-title b{color:var(--cyan)}
+.promo-sub{margin-top:16px;font-size:17px;max-width:780px}
+.tablero-embed{position:relative;width:100%;height:75vh;min-height:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tablero-embed iframe{width:100%;height:100%;border:0}
+@media(max-width:820px){.hero,.cards,.cards3,.cards4,.art,.kitgrid{grid-template-columns:1fr}.share{flex-direction:row}nav.main{display:none}}
 """
 
 
@@ -162,11 +172,17 @@ def _header() -> str:
 
 
 def _footer() -> str:
+    socials = "".join(_ICON[k] for k in ("x", "ig", "fb", "yt", "in"))
     return f"""
 <footer><div class="wrap foot">
   <a class="logo">{_LOGO}<span class="txt"><span class="n">+BCR</span><span class="s">FUENTE DE NOTICIAS</span></span></a>
-  <div class="col"><b>Contacto</b><br>54-341-5258300<br>masbcr.com.ar</div>
-  <div class="col"><b>Secciones</b><br>Sobre Nosotros<br>Categorías<br>Kit Multimedia<br>Contacto</div>
+  <div class="col">
+    <div>54-341-5258300</div>
+    <div>masbcr.com.ar</div>
+    <div>hola@masbcr.com.ar</div>
+    <div>Córdoba 1402, Rosario, Santa Fe</div>
+  </div>
+  <div class="col"><b>Seguinos en las redes</b><div class="socials" style="margin-top:8px">{socials}</div></div>
 </div></footer>"""
 
 
@@ -204,36 +220,79 @@ def _img(url: str | None) -> str:
     return '<div class="ph img"></div>'
 
 
-def _card(n) -> str:
+def _card_full(n) -> str:
+    """Tarjeta con copete (para las 3 secundarias)."""
+    exc = _esc((n.bajada or "")[:150])
+    exc_html = f'<p class="exc">{exc}{"…" if n.bajada and len(n.bajada) > 150 else ""}</p>' if exc else ""
     return f"""<article class="card">
   <a href="/noticias/nota/{_esc(n.slug)}">{_img(n.imagen_portada)}</a>
-  <div class="k">{_esc(n.categoria or "Noticias")}</div>
   <h3><a href="/noticias/nota/{_esc(n.slug)}">{_esc(n.titulo)}</a></h3>
-  <div class="d">{fecha_es(n.fecha_pub)}</div>
+  {exc_html}
+  <div class="dm">{fecha_es(n.fecha_pub)}</div>
 </article>"""
 
 
+def _card_min(n) -> str:
+    """Tarjeta compacta (grilla del resto de las noticias)."""
+    return f"""<article class="card">
+  <a href="/noticias/nota/{_esc(n.slug)}">{_img(n.imagen_portada)}</a>
+  <h3><a href="/noticias/nota/{_esc(n.slug)}">{_esc(n.titulo)}</a></h3>
+  <div class="dm">{fecha_es(n.fecha_pub)}</div>
+</article>"""
+
+
+def _promo_banner(titulo_html: str, subtitulo: str, href: str) -> str:
+    return (f'<a class="promo" href="{href}">'
+            f'<div class="promo-title">{titulo_html}</div>'
+            f'<div class="promo-sub">{_esc(subtitulo)}</div></a>')
+
+
 def render_home(noticias: list) -> tuple[str, str]:
-    """Devuelve (title, body_html) para la home."""
+    """Devuelve (title, body_html) para la home, con la estructura de masbcr:
+    hero + 3 secundarias + banner Tablero + banner Kit + resto de noticias."""
     if not noticias:
         body = '<div class="empty">Todavía no hay noticias publicadas.</div>'
         return "Más BCR — Fuente de Noticias", body
 
     hero = noticias[0]
-    resto = noticias[1:13]
+    secundarias = noticias[1:4]
+    resto = noticias[4:16]
+
     hero_html = f"""
 <div class="hero">
   <a class="img" href="/noticias/nota/{_esc(hero.slug)}">{_img(hero.imagen_portada)}</a>
   <div class="panel">
     <div class="k">{_esc(hero.categoria or "Noticias")}</div>
     <h1><a href="/noticias/nota/{_esc(hero.slug)}">{_esc(hero.titulo)}</a></h1>
-    <p>{_esc((hero.bajada or "")[:220])}</p>
+    <p>{_esc((hero.bajada or "")[:230])}</p>
     <span class="date">{fecha_es(hero.fecha_pub)}</span>
   </div>
 </div>"""
-    cards = "".join(_card(n) for n in resto)
-    grid = f'<section class="grid"><div class="wrap"><div class="cards">{cards}</div></div></section>' if resto else ""
-    body = hero_html + grid
+
+    sec_html = ""
+    if secundarias:
+        cards = "".join(_card_full(n) for n in secundarias)
+        sec_html = f'<section class="grid"><div class="wrap"><div class="cards3">{cards}</div></div></section>'
+
+    tablero = _promo_banner(
+        "TABLERO DE <b>CULTIVOS</b>",
+        "Datos estadísticos sobre las campañas de soja, trigo y maíz de los últimos 10 años",
+        "/noticias/tablero",
+    )
+    kit = _promo_banner(
+        "KIT <b>MULTIMEDIA</b>",
+        "Descargá contenido para Televisión, Medios Gráficos, Medios Digitales y también para usos académicos",
+        "/noticias/kit",
+    )
+
+    resto_html = ""
+    if resto:
+        cards = "".join(_card_min(n) for n in resto)
+        resto_html = (f'<section class="grid"><div class="wrap">'
+                      f'<h2 class="sec-title">Últimas noticias</h2>'
+                      f'<div class="cards4">{cards}</div></div></section>')
+
+    body = hero_html + sec_html + tablero + kit + resto_html
     return "Más BCR — Fuente de Noticias", body
 
 
@@ -281,6 +340,19 @@ def render_kit_gallery(nombre: str, assets: list) -> str:
     return (f'<section class="grid"><div class="wrap">'
             f'<a class="backlink" href="/noticias/kit">&#8592; Kit Multimedia</a>'
             f'<h2 class="sec-title">{_esc(nombre)}</h2>{inner}</div></section>')
+
+
+def render_tablero(embed_url: str | None) -> str:
+    if embed_url:
+        inner = (f'<div class="tablero-embed"><iframe src="{_esc(embed_url)}" '
+                 f'allowfullscreen title="Tablero de Cultivos"></iframe></div>')
+    else:
+        inner = ('<div class="empty">El tablero todavía no está configurado. '
+                 '(Falta cargar la URL del Power BI.)</div>')
+    return (f'<section class="grid"><div class="wrap">'
+            f'<h2 class="sec-title">Tablero de Cultivos</h2>'
+            f'<p class="kit-intro">Datos estadísticos sobre las campañas de soja, trigo y maíz '
+            f'de los últimos 10 años.</p>{inner}</div></section>')
 
 
 def render_article(n, relacionadas: list, canonical: str) -> str:

@@ -100,6 +100,11 @@ BOT_ASUNTOS_PUBLICOS_DOC_ID = os.environ.get(
 # si el modelo del bot no la soporta.
 BOT_COYUNTURA_AUTO_MODEL = os.environ.get("BOT_COYUNTURA_AUTO_MODEL", BOT_OPENAI_MODEL)
 
+# Más BCR — URL del embed del Tablero de Cultivos (Power BI publicado a la web).
+# Es pública (no secreta); se puede setear por env o hardcodear el default cuando
+# tengamos el link "Publicar en la web" del informe de Power BI.
+MASBCR_TABLERO_URL = os.environ.get("MASBCR_TABLERO_URL", "")
+
 
 # ---------------------------------------------------------------------------
 # Cloudinary (CDN para imágenes del newsletter Conectados).
