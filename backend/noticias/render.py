@@ -73,13 +73,13 @@ a{color:var(--link);text-decoration:none}
 .ph{background:linear-gradient(135deg,#cdd6df,#9aa7b6);position:relative;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .logo{display:flex;align-items:center;gap:12px}
-.logo-img{height:58px;width:auto;display:block}
-.foot .logo-img{height:60px}
+.logo-img{height:70px;width:auto;display:block}
+.foot .logo-img{height:64px}
 .logo .txt{display:flex;flex-direction:column;line-height:1}
 .logo .n{font-weight:800;font-size:22px;color:#fff;letter-spacing:.5px}
 .logo .s{font-size:8.5px;letter-spacing:3px;color:var(--cyan);margin-top:4px;font-weight:600}
 header.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:50}
-.topbar{display:flex;align-items:center;gap:30px;height:96px}
+.topbar{display:flex;align-items:center;gap:30px;height:104px}
 nav.main{display:flex;gap:24px;align-items:center;font-weight:600;font-size:14px;position:relative}
 nav.main a{color:#fff}
 .drop{position:relative}
@@ -90,8 +90,8 @@ nav.main a{color:#fff}
 .drop .menu a{display:block;color:var(--navy);padding:9px 16px;font-size:13.5px}
 .drop .menu a:hover{background:#f1f5f9}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:12px}
-.socials{display:flex;gap:11px}
-.ico{width:15px;height:15px;fill:#fff;opacity:.9}
+.socials{display:flex;gap:16px}
+.ico{width:20px;height:20px;fill:#fff;opacity:.9}
 .hero{display:grid;grid-template-columns:1.35fr 1fr;background:var(--navy)}
 .hero .img{aspect-ratio:16/10}
 .hero .panel{padding:38px 40px;color:#fff;display:flex;flex-direction:column;justify-content:center}
@@ -125,7 +125,8 @@ section.grid{padding:36px 0 50px}
 .art .body a{color:var(--link);text-decoration:underline}
 aside h4{font-weight:800;color:#9aa2b1;font-size:13px;letter-spacing:1.5px;border-bottom:2px solid var(--line);padding-bottom:8px;margin-bottom:14px}
 .rel{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
-.rel .t{width:58px;height:44px;flex:none;border-radius:3px}
+.rel .t{width:66px;height:50px;flex:none;border-radius:4px;overflow:hidden;background:#e5e7eb;display:block}
+.rel .t img{width:100%;height:100%;object-fit:cover}
 .rel a{color:var(--navy);font-weight:600;font-size:13px;line-height:1.3}
 footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
 .foot{display:flex;gap:48px;align-items:flex-start;flex-wrap:wrap}
@@ -180,7 +181,6 @@ def _header() -> str:
     return f"""
 <header class="top"><div class="wrap topbar">
   <a class="logo" href="/noticias/">{_LOGO}</a>
-  <nav class="main"><a href="/noticias/kit">Kit Multimedia</a></nav>
   <div class="top-right"><div class="socials">{_social_links()}</div></div>
 </div></header>"""
 
@@ -274,7 +274,7 @@ def render_videos(videos: list) -> str:
     if not videos:
         return ""
     feat = videos[0]
-    resto = videos[1:4]
+    resto = videos[1:6]
     feat_html = (f'<div class="vid-feat"><iframe src="https://www.youtube.com/embed/{_esc(feat.youtube_id)}" '
                  f'title="{_esc(feat.titulo or "Video")}" allowfullscreen loading="lazy"></iframe></div>')
     items = ""
@@ -298,7 +298,7 @@ def render_home(noticias: list, videos: list | None = None) -> tuple[str, str]:
 
     hero = noticias[0]
     secundarias = noticias[1:4]
-    resto = noticias[4:16]
+    resto = noticias[4:12]  # 8 en la grilla "Últimas noticias"
 
     hero_html = f"""
 <div class="hero">
@@ -412,7 +412,9 @@ def render_article(n, relacionadas: list, canonical: str) -> str:
 
     rels = ""
     for r in relacionadas:
-        rels += f"""<div class="rel"><a class="t" href="/noticias/nota/{_esc(r.slug)}">{_img(r.imagen_portada)}</a><a href="/noticias/nota/{_esc(r.slug)}">{_esc(r.titulo)}</a></div>"""
+        thumb = f'<img src="{_esc(r.imagen_portada)}" alt="">' if r.imagen_portada else ""
+        rels += (f'<div class="rel"><a class="t" href="/noticias/nota/{_esc(r.slug)}">{thumb}</a>'
+                 f'<a href="/noticias/nota/{_esc(r.slug)}">{_esc(r.titulo)}</a></div>')
     aside = f'<aside><h4>NOTAS RELACIONADAS</h4>{rels}</aside>' if rels else "<aside></aside>"
 
     cover = (

@@ -250,6 +250,13 @@ def kit_borrar(aid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     return {"ok": True}
 
 
+@kit_api.post("/importar-masbcr")
+def kit_importar_masbcr(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Scrapea las 6 galerías del kit de masbcr y crea los MediaAsset."""
+    from noticias.importer import scrape_kit_masbcr
+    return scrape_kit_masbcr(db)
+
+
 # ===========================================================================
 # API de Videos (con auth)
 # ===========================================================================
@@ -307,7 +314,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         db.query(Noticia).filter(Noticia.estado == "publicado")
         .order_by(Noticia.fecha_pub.desc()).limit(13).all()
     )
-    videos = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).limit(4).all()
+    videos = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).limit(6).all()
     title, body = render.render_home(rows, videos)
     html = render.base_page(
         title=title,

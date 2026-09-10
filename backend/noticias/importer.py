@@ -113,6 +113,63 @@ def parse_wxr(paths: list[str]) -> list[dict[str, Any]]:
     return posts
 
 
+# ---------------------------------------------------------------------------
+# Kit Multimedia: las galerías no están en el XML (son widgets Elementor).
+# Se scrapean las 6 páginas del sitio original y se traen las imágenes full-size.
+# ---------------------------------------------------------------------------
+_KIT_PAGES = {
+    "institucional": "https://masbcr.com.ar/kit-institucional/",
+    "rosario": "https://masbcr.com.ar/kit-rosario/",
+    "cultivos": "https://masbcr.com.ar/kit-cultivos/",
+    "ganaderia": "https://masbcr.com.ar/kit-ganaderia/",
+    "logistica": "https://masbcr.com.ar/kit-logistica/",
+    "otras": "https://masbcr.com.ar/kit-otras/",
+}
+_UPLOAD_IMG_RE = re.compile(r"https?://[^\s\"')]+wp-content/uploads/[^\s\"')]+\.(?:jpg|jpeg|png)", re.I)
+
+
+def scrape_kit_masbcr(db) -> dict[str, Any]:
+    """Scrapea las 6 galerías del kit de masbcr y crea MediaAsset (URLs del host
+    WP; se re-hostean después). Idempotente: dedup por URL."""
+    import requests
+    from bs4 import BeautifulSoup
+
+    from noticias.models import MediaAsset
+
+    headers = {"User-Agent": "Mozilla/5.0 (BCR importer)"}
+    existentes = {u for (u,) in db.query(MediaAsset.url).all()}
+    resumen: dict[str, Any] = {}
+    for slug, url in _KIT_PAGES.items():
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            r.raise_for_status()
+        except Exception as exc:  # noqa: BLE001
+            resumen[slug] = {"error": str(exc)}
+            continue
+        soup = BeautifulSoup(r.text, "html.parser")
+        found: list[str] = []
+        # Los lightbox linkean a la imagen original con <a href="....jpg">.
+        for a in soup.find_all("a", href=True):
+            h = a["href"]
+            if _UPLOAD_IMG_RE.match(h) and not re.search(r"logo|logobolsa", h, re.I):
+                found.append(h)
+        # dedup preservando orden
+        seen, ordered = set(), []
+        for h in found:
+            if h not in seen:
+                seen.add(h); ordered.append(h)
+        nuevas = 0
+        for h in ordered:
+            if h in existentes:
+                continue
+            db.add(MediaAsset(kit_cat=slug, url=h))
+            existentes.add(h)
+            nuevas += 1
+        resumen[slug] = {"en_pagina": len(ordered), "nuevas": nuevas}
+    db.commit()
+    return resumen
+
+
 def importar_posts(db, posts: list[dict[str, Any]]) -> dict[str, Any]:
     """Crea las noticias que no existan (por slug). No pisa las existentes."""
     from noticias.models import Noticia
