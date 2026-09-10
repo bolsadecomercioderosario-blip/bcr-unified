@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import tempfile
 import unicodedata
 import uuid
 from datetime import datetime
@@ -178,6 +179,34 @@ async def subir_imagen(file: UploadFile = File(...)) -> dict[str, Any]:
     with open(os.path.join(UPLOADS_DIR, filename), "wb") as buf:
         shutil.copyfileobj(file.file, buf)
     return {"url": f"/static/uploads/{filename}"}
+
+
+@router.post("/importar-wp")
+async def importar_wp(
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Importa noticias desde uno o más XML (WXR) exportados de WordPress.
+    Idempotente: crea sólo las notas cuyo slug no exista todavía. Las imágenes
+    quedan apuntando al host de WP hasta que se corra el re-hosting."""
+    from noticias.importer import parse_wxr, importar_posts
+
+    tmpdir = tempfile.mkdtemp()
+    paths = []
+    try:
+        for i, f in enumerate(files):
+            p = os.path.join(tmpdir, f.filename or f"wxr_{i}.xml")
+            with open(p, "wb") as buf:
+                buf.write(await f.read())
+            paths.append(p)
+        posts = parse_wxr(paths)
+        return importar_posts(db, posts)
+    finally:
+        for p in paths:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
 
 # ===========================================================================
