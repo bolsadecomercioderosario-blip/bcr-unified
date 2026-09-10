@@ -47,7 +47,7 @@ from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
 from corte.router import router as corte_api
 from canciones.router import router as canciones_api
-from noticias.router import router as noticias_api, site as noticias_site
+from noticias.router import router as noticias_api, site as noticias_site, kit_api as noticias_kit_api
 from abuela.router import router as abuela_api
 
 
@@ -107,8 +107,9 @@ app.include_router(aapresid_api)
 app.include_router(murga_api)
 app.include_router(corte_api)
 app.include_router(canciones_api)
-app.include_router(noticias_api)   # API del admin (/api/noticias)
-app.include_router(noticias_site)  # sitio público server-rendered (/noticias/...)
+app.include_router(noticias_api)      # API del admin (/api/noticias)
+app.include_router(noticias_kit_api)  # API del Kit Multimedia (/api/kit)
+app.include_router(noticias_site)     # sitio público server-rendered (/noticias/...)
 app.include_router(abuela_api)
 
 
@@ -189,6 +190,15 @@ async def _bot_coyuntura():
 @app.get("/noticias/admin")
 async def _noticias_admin():
     with open(os.path.join(STATIC_DIR, "noticias", "admin.html"), encoding="utf-8") as f:
+        html = f.read().replace("__VERSION__", APP_VERSION)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+# Kit Multimedia — admin de galerías. En /noticias/kit-admin (NO /noticias/kit/admin
+# para no chocar con la ruta pública /noticias/kit/{cat}).
+@app.get("/noticias/kit-admin")
+async def _noticias_kit_admin():
+    with open(os.path.join(STATIC_DIR, "noticias", "kit-admin.html"), encoding="utf-8") as f:
         html = f.read().replace("__VERSION__", APP_VERSION)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
 

@@ -27,7 +27,10 @@ from auth import require_auth
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
 from noticias import render
-from noticias.models import CATEGORIAS, Noticia, NoticiaIn
+from noticias.models import (
+    CATEGORIAS, KIT_CATEGORIAS, _KIT_NOMBRE, _KIT_SLUGS,
+    MediaAsset, MediaAssetIn, Noticia, NoticiaIn,
+)
 
 
 # ===========================================================================
@@ -168,6 +171,47 @@ async def subir_imagen(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 # ===========================================================================
+# API del Kit Multimedia (con auth) — prefijo propio para no chocar con /{nid}
+# ===========================================================================
+kit_api = APIRouter(prefix="/api/kit", dependencies=[Depends(require_auth)])
+
+
+@kit_api.get("")
+def kit_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
+    rows = db.query(MediaAsset).order_by(MediaAsset.orden.asc(), MediaAsset.created_at.desc()).all()
+    return {
+        "categorias": KIT_CATEGORIAS,
+        "assets": [
+            {"id": a.id, "kit_cat": a.kit_cat, "url": a.url, "titulo": a.titulo}
+            for a in rows
+        ],
+    }
+
+
+@kit_api.post("")
+def kit_crear(payload: MediaAssetIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    if payload.kit_cat not in _KIT_SLUGS:
+        raise HTTPException(400, "Categoría de kit inválida")
+    if not payload.url:
+        raise HTTPException(400, "Falta la URL de la imagen")
+    a = MediaAsset(kit_cat=payload.kit_cat, url=payload.url, titulo=payload.titulo)
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "kit_cat": a.kit_cat, "url": a.url, "titulo": a.titulo}
+
+
+@kit_api.delete("/{aid}")
+def kit_borrar(aid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    a = db.query(MediaAsset).filter(MediaAsset.id == aid).first()
+    if a is None:
+        raise HTTPException(404, "Recurso no encontrado")
+    db.delete(a)
+    db.commit()
+    return {"ok": True}
+
+
+# ===========================================================================
 # Sitio público (server-rendered, sin auth)
 # ===========================================================================
 site = APIRouter()
@@ -235,5 +279,45 @@ async def categoria(categoria: str, request: Request, db: Session = Depends(get_
         description=f"Noticias de {categoria} — Bolsa de Comercio de Rosario.",
         body=body,
         canonical=_canonical(request, f"/noticias/categoria/{categoria}"),
+    )
+    return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
+
+
+@site.get("/noticias/kit", response_class=HTMLResponse)
+async def kit_index(request: Request, db: Session = Depends(get_db)):
+    rows = db.query(MediaAsset).order_by(MediaAsset.orden.asc(), MediaAsset.created_at.desc()).all()
+    cats = []
+    for c in KIT_CATEGORIAS:
+        assets = [a for a in rows if a.kit_cat == c["slug"]]
+        cats.append({
+            "slug": c["slug"], "nombre": c["nombre"], "desc": c["desc"],
+            "count": len(assets),
+            "thumb": assets[0].url if assets else None,
+        })
+    body = render.render_kit_index(cats)
+    html = render.base_page(
+        title="Kit Multimedia — Más BCR",
+        description="Biblioteca de imágenes y videos de libre uso para medios de comunicación.",
+        body=body,
+        canonical=_canonical(request, "/noticias/kit"),
+    )
+    return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
+
+
+@site.get("/noticias/kit/{cat}", response_class=HTMLResponse)
+async def kit_gallery(cat: str, request: Request, db: Session = Depends(get_db)):
+    if cat not in _KIT_SLUGS:
+        raise HTTPException(404, "Galería no encontrada")
+    assets = (
+        db.query(MediaAsset).filter(MediaAsset.kit_cat == cat)
+        .order_by(MediaAsset.orden.asc(), MediaAsset.created_at.desc()).all()
+    )
+    nombre = _KIT_NOMBRE.get(cat, cat)
+    body = render.render_kit_gallery(nombre, assets)
+    html = render.base_page(
+        title=f"Kit Multimedia · {nombre} — Más BCR",
+        description=f"Imágenes de {nombre} — Kit Multimedia de la BCR.",
+        body=body,
+        canonical=_canonical(request, f"/noticias/kit/{cat}"),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})

@@ -120,7 +120,22 @@ footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
 .foot .col{font-size:13px;line-height:1.95}
 .foot .col b{color:#fff}
 .empty{text-align:center;color:var(--muted);padding:80px 20px}
-@media(max-width:820px){.hero,.cards,.art{grid-template-columns:1fr}.share{flex-direction:row}nav.main{display:none}}
+.kit-intro{color:var(--muted);font-size:14px;max-width:780px;margin:-6px 0 24px}
+.kitgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.kitcard{display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;transition:box-shadow .15s}
+.kitcard:hover{box-shadow:0 10px 24px rgba(0,0,0,.08)}
+.kitcard .kitimg{aspect-ratio:16/10;border-top:3px solid var(--cyan)}
+.kitbody{padding:14px 16px}
+.kitbody h3{color:var(--navy);font-weight:800;font-size:18px}
+.kitbody p{color:var(--muted);font-size:13px;margin-top:6px}
+.kitcount{display:inline-block;margin-top:10px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.5px}
+.galgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.gal{position:relative;display:block;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#e5e7eb}
+.gal img{width:100%;height:100%;object-fit:cover}
+.gal span{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,49,75,.85));color:#fff;font-size:12px;font-weight:600;padding:18px 10px 8px;opacity:0;transition:.15s}
+.gal:hover span{opacity:1}
+.backlink{color:var(--link);font-weight:600;font-size:14px;display:inline-block;margin-bottom:6px}
+@media(max-width:820px){.hero,.cards,.art,.kitgrid{grid-template-columns:1fr}.share{flex-direction:row}nav.main{display:none}}
 """
 
 
@@ -139,7 +154,7 @@ def _header() -> str:
   <nav class="main">
     <a href="#">Sobre Nosotros</a>
     {_cat_menu()}
-    <a href="#">Kit Multimedia</a>
+    <a href="/noticias/kit">Kit Multimedia</a>
     <a href="#">Contacto</a>
   </nav>
   <div class="top-right"><div class="socials">{socials}</div></div>
@@ -229,6 +244,43 @@ def render_lista(titulo: str, noticias: list) -> str:
         cards = "".join(_card(n) for n in noticias)
         inner = f'<div class="cards">{cards}</div>'
     return f'<section class="grid"><div class="wrap"><h2 class="sec-title">{_esc(titulo)}</h2>{inner}</div></section>'
+
+
+_KIT_INTRO = (
+    "Las imágenes y videos de esta biblioteca están a disposición de los medios de "
+    "comunicación y son de libre uso. Se permite la descarga, publicación y libre "
+    "edición del material de acuerdo a las buenas prácticas del periodismo."
+)
+
+
+def render_kit_index(cats: list[dict]) -> str:
+    """cats: list de {slug, nombre, desc, thumb, count}."""
+    cards = ""
+    for c in cats:
+        thumb = f'<img src="{_esc(c.get("thumb"))}" alt="">' if c.get("thumb") else ""
+        cards += f"""<a class="kitcard" href="/noticias/kit/{_esc(c['slug'])}">
+  <div class="ph kitimg">{thumb}</div>
+  <div class="kitbody"><h3>{_esc(c['nombre'])}</h3><p>{_esc(c['desc'])}</p>
+  <span class="kitcount">{c.get('count', 0)} archivos</span></div></a>"""
+    return (f'<section class="grid"><div class="wrap">'
+            f'<h2 class="sec-title">Kit Multimedia</h2>'
+            f'<p class="kit-intro">{_KIT_INTRO}</p>'
+            f'<div class="kitgrid">{cards}</div></div></section>')
+
+
+def render_kit_gallery(nombre: str, assets: list) -> str:
+    if not assets:
+        inner = '<div class="empty">Esta galería todavía no tiene imágenes.</div>'
+    else:
+        items = ""
+        for a in assets:
+            items += (f'<a class="gal" href="{_esc(a.url)}" target="_blank" rel="noopener" download>'
+                      f'<img src="{_esc(a.url)}" alt="{_esc(a.titulo or "")}">'
+                      f'<span>&#10515; Descargar</span></a>')
+        inner = f'<div class="galgrid">{items}</div>'
+    return (f'<section class="grid"><div class="wrap">'
+            f'<a class="backlink" href="/noticias/kit">&#8592; Kit Multimedia</a>'
+            f'<h2 class="sec-title">{_esc(nombre)}</h2>{inner}</div></section>')
 
 
 def render_article(n, relacionadas: list, canonical: str) -> str:
