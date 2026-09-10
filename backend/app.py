@@ -30,6 +30,7 @@ import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapres
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
 import canciones.models  # noqa: F401  — registra tabla canciones_respuestas (encuesta versión B, solo canciones)
+import noticias.models  # noqa: F401  — registra tabla noticias (sitio Más BCR)
 import abuela.models  # noqa: F401  — registra tablas ab_* (panel interno de la murga: caja, ensayos, toques)
 
 # Routers de cada módulo
@@ -46,6 +47,7 @@ from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
 from corte.router import router as corte_api
 from canciones.router import router as canciones_api
+from noticias.router import router as noticias_api, site as noticias_site
 from abuela.router import router as abuela_api
 
 
@@ -105,6 +107,8 @@ app.include_router(aapresid_api)
 app.include_router(murga_api)
 app.include_router(corte_api)
 app.include_router(canciones_api)
+app.include_router(noticias_api)   # API del admin (/api/noticias)
+app.include_router(noticias_site)  # sitio público server-rendered (/noticias/...)
 app.include_router(abuela_api)
 
 
@@ -176,6 +180,15 @@ async def _canciones_resultados():
 @app.get("/bot/coyuntura")
 async def _bot_coyuntura():
     with open(os.path.join(STATIC_DIR, "bot", "coyuntura.html"), encoding="utf-8") as f:
+        html = f.read().replace("__VERSION__", APP_VERSION)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+# Noticias (Más BCR) — editor de carga (admin), protegido por auth.js. El sitio
+# público (/noticias/, /noticias/nota/{slug}, ...) lo sirve el router server-rendered.
+@app.get("/noticias/admin")
+async def _noticias_admin():
+    with open(os.path.join(STATIC_DIR, "noticias", "admin.html"), encoding="utf-8") as f:
         html = f.read().replace("__VERSION__", APP_VERSION)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
 

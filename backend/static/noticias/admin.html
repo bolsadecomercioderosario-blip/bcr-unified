@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Más BCR · Cargar noticias | __VERSION__</title>
+<script src="/static/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#00314b;--cyan:#009ee3;--line:#e5e7eb;--muted:#6b7280;--f:"Outfit",system-ui,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--f);background:#f3f4f6;color:#1f2937}
+  header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px}
+  header .brand{font-weight:800;font-size:18px}
+  header .brand span{color:var(--cyan)}
+  header .sub{font-size:12px;color:#9fb3c2;margin-left:2px}
+  .wrap{max-width:1000px;margin:22px auto;padding:0 18px}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-weight:600;font-size:14px;padding:9px 16px}
+  .btn-primary{background:var(--cyan);color:#04303f}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:#374151}
+  .btn-danger{background:#fff;border:1px solid #fecaca;color:#dc2626}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .between{justify-content:space-between}
+  /* Lista */
+  .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:center}
+  .item .thumb{width:70px;height:52px;border-radius:6px;background:#e5e7eb center/cover no-repeat;flex:none}
+  .item .grow{flex:1;min-width:0}
+  .item h3{font-size:15px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .chip{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 8px;border-radius:999px}
+  .chip.pub{background:#dcfce7;color:#15803d}
+  .chip.bor{background:#fef3c7;color:#b45309}
+  /* Editor */
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  label{display:block;font-size:12.5px;font-weight:700;color:#374151;margin:14px 0 5px}
+  input[type=text],textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px}
+  textarea{resize:vertical}
+  .portada{display:flex;gap:12px;align-items:center}
+  .portada .pv{width:150px;height:90px;border-radius:8px;background:#e5e7eb center/cover no-repeat;border:1px solid var(--line);flex:none}
+  /* Toolbar + editor */
+  .tb{display:flex;gap:4px;flex-wrap:wrap;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;background:#f9fafb;padding:6px}
+  .tb button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700;color:#374151}
+  #editor{border:1px solid var(--line);border-radius:0 0 8px 8px;min-height:280px;padding:14px 16px;font-size:15px;line-height:1.6;outline:none}
+  #editor:focus{border-color:var(--cyan)}
+  #editor h2{color:var(--navy);font-size:22px;margin:14px 0 8px}
+  #editor p{margin:0 0 12px}
+  #editor img{max-width:100%;border-radius:6px;margin:8px 0}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;display:none}
+  .empty{text-align:center;color:var(--muted);padding:50px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">+<span>BCR</span></span><span class="sub">Cargar noticias</span>
+  <div style="margin-left:auto" class="row">
+    <a href="/noticias/" target="_blank"><button class="btn-ghost">Ver sitio ↗</button></a>
+  </div>
+</header>
+
+<!-- ===== LISTA ===== -->
+<div class="wrap" id="view-list">
+  <div class="row between" style="margin-bottom:16px">
+    <h2 style="color:var(--navy);font-weight:800">Noticias</h2>
+    <button class="btn-primary" id="btn-new">+ Nueva noticia</button>
+  </div>
+  <div id="list"><div class="empty">Cargando…</div></div>
+</div>
+
+<!-- ===== EDITOR ===== -->
+<div class="wrap" id="view-edit" hidden>
+  <div class="row between" style="margin-bottom:14px">
+    <h2 style="color:var(--navy);font-weight:800" id="edit-title">Nueva noticia</h2>
+    <button class="btn-ghost" id="btn-back">← Volver</button>
+  </div>
+  <div class="card">
+    <label>Título</label>
+    <input type="text" id="f-titulo" placeholder="Título de la noticia">
+
+    <label>Bajada (copete)</label>
+    <textarea id="f-bajada" rows="2" placeholder="Resumen breve que aparece bajo el título"></textarea>
+
+    <div class="row" style="gap:24px">
+      <div style="flex:1;min-width:220px">
+        <label>Categoría</label>
+        <select id="f-categoria"></select>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <label>Estado</label>
+        <select id="f-estado"><option value="borrador">Borrador</option><option value="publicado">Publicado</option></select>
+      </div>
+    </div>
+
+    <label>Imagen de portada</label>
+    <div class="portada">
+      <div class="pv" id="portada-pv"></div>
+      <div class="row">
+        <button class="btn-ghost" id="btn-portada">Subir portada</button>
+        <button class="btn-ghost" id="btn-portada-rm" hidden>Quitar</button>
+      </div>
+    </div>
+
+    <label>Cuerpo</label>
+    <div class="tb">
+      <button data-cmd="bold" title="Negrita">B</button>
+      <button data-cmd="italic" title="Cursiva" style="font-style:italic">I</button>
+      <button data-cmd="h2" title="Subtítulo">H2</button>
+      <button data-cmd="p" title="Párrafo">¶</button>
+      <button data-cmd="ul" title="Lista">• Lista</button>
+      <button data-cmd="link" title="Enlace">🔗</button>
+      <button data-cmd="img" title="Insertar imagen">🖼️ Imagen</button>
+    </div>
+    <div id="editor" contenteditable="true"></div>
+
+    <div class="row between" style="margin-top:20px">
+      <button class="btn-danger" id="btn-del" hidden>Eliminar</button>
+      <div class="row" style="margin-left:auto">
+        <a id="link-ver" href="#" target="_blank" hidden><button class="btn-ghost">Ver en el sitio ↗</button></a>
+        <button class="btn-navy" id="btn-save">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" hidden>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='/api/noticias';
+let categorias=[], editingId=null, portadaUrl='', fileTarget=null;
+const $=s=>document.querySelector(s);
+const toast=(m)=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600);};
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function fmtDate(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+
+// ---- Lista ----
+async function loadList(){
+  const r=await fetch(API); if(!r.ok){$('#list').innerHTML='<div class="empty">No se pudo cargar.</div>';return;}
+  const d=await r.json(); categorias=d.categorias||[];
+  const items=d.noticias||[];
+  if(!items.length){$('#list').innerHTML='<div class="empty">Todavía no hay noticias. Creá la primera.</div>';return;}
+  $('#list').innerHTML=items.map(n=>`
+    <div class="item">
+      <div class="thumb" style="${n.imagen_portada?`background-image:url('${esc(n.imagen_portada)}')`:''}"></div>
+      <div class="grow">
+        <h3>${esc(n.titulo)}</h3>
+        <div class="meta">
+          <span class="chip ${n.estado==='publicado'?'pub':'bor'}">${n.estado}</span>
+          &nbsp;${esc(n.categoria||'sin categoría')} · ${fmtDate(n.fecha_pub||n.created_at)}
+        </div>
+      </div>
+      <div class="row">
+        ${n.estado==='publicado'?`<a href="/noticias/nota/${esc(n.slug)}" target="_blank"><button class="btn-ghost">Ver</button></a>`:''}
+        <button class="btn-ghost" onclick="editNota(${n.id})">Editar</button>
+      </div>
+    </div>`).join('');
+}
+
+// ---- Vistas ----
+function showList(){$('#view-edit').hidden=true;$('#view-list').hidden=false;loadList();}
+function showEdit(){$('#view-list').hidden=true;$('#view-edit').hidden=false;}
+
+function fillCategorias(sel){
+  $('#f-categoria').innerHTML='<option value="">— sin categoría —</option>'+
+    categorias.map(c=>`<option value="${esc(c)}" ${c===sel?'selected':''}>${esc(c)}</option>`).join('');
+}
+function setPortada(url){
+  portadaUrl=url||'';
+  $('#portada-pv').style.backgroundImage=url?`url('${url}')`:'';
+  $('#btn-portada-rm').hidden=!url;
+}
+
+async function newNota(){
+  if(!categorias.length){const r=await fetch(API);categorias=(await r.json()).categorias||[];}
+  editingId=null;
+  $('#edit-title').textContent='Nueva noticia';
+  $('#f-titulo').value='';$('#f-bajada').value='';$('#f-estado').value='borrador';
+  $('#editor').innerHTML='';setPortada('');fillCategorias('');
+  $('#btn-del').hidden=true;$('#link-ver').hidden=true;
+  showEdit();
+}
+async function editNota(id){
+  const r=await fetch(`${API}/${id}`); if(!r.ok){toast('No se pudo abrir');return;}
+  const n=await r.json();
+  if(!categorias.length){const rr=await fetch(API);categorias=(await rr.json()).categorias||[];}
+  editingId=id;
+  $('#edit-title').textContent='Editar noticia';
+  $('#f-titulo').value=n.titulo||'';$('#f-bajada').value=n.bajada||'';$('#f-estado').value=n.estado||'borrador';
+  $('#editor').innerHTML=n.cuerpo||'';setPortada(n.imagen_portada||'');fillCategorias(n.categoria||'');
+  $('#btn-del').hidden=false;
+  const lv=$('#link-ver'); if(n.estado==='publicado'){lv.hidden=false;lv.href=`/noticias/nota/${n.slug}`;}else{lv.hidden=true;}
+  showEdit();
+}
+
+async function save(){
+  const titulo=$('#f-titulo').value.trim();
+  if(!titulo){toast('Poné un título');return;}
+  const payload={titulo,bajada:$('#f-bajada').value,cuerpo:$('#editor').innerHTML,
+    imagen_portada:portadaUrl,categoria:$('#f-categoria').value,estado:$('#f-estado').value};
+  const btn=$('#btn-save');btn.disabled=true;btn.textContent='Guardando…';
+  const url=editingId?`${API}/${editingId}`:API;
+  const method=editingId?'PUT':'POST';
+  const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  btn.disabled=false;btn.textContent='Guardar';
+  if(r.ok){toast('Guardado ✓');showList();}else{toast('Error al guardar');}
+}
+
+async function delNota(){
+  if(!editingId)return;
+  if(!confirm('¿Eliminar esta noticia? No se puede deshacer.'))return;
+  const r=await fetch(`${API}/${editingId}`,{method:'DELETE'});
+  if(r.ok){toast('Eliminada');showList();}else{toast('Error al eliminar');}
+}
+
+// ---- Subida de imágenes ----
+async function uploadImage(file){
+  const fd=new FormData();fd.append('file',file);
+  const r=await fetch(`${API}/upload`,{method:'POST',body:fd});
+  if(!r.ok){toast('Error al subir imagen');return null;}
+  return (await r.json()).url;
+}
+$('#file-input').onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  toast('Subiendo imagen…');
+  const url=await uploadImage(f); e.target.value='';
+  if(!url)return;
+  if(fileTarget==='portada'){setPortada(url);toast('Portada lista');}
+  else{ $('#editor').focus(); document.execCommand('insertHTML',false,`<img src="${url}" alt="">`); }
+};
+
+// ---- Toolbar ----
+$('.tb').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  const cmd=b.dataset.cmd; $('#editor').focus();
+  if(cmd==='bold')document.execCommand('bold');
+  else if(cmd==='italic')document.execCommand('italic');
+  else if(cmd==='h2')document.execCommand('formatBlock',false,'H2');
+  else if(cmd==='p')document.execCommand('formatBlock',false,'P');
+  else if(cmd==='ul')document.execCommand('insertUnorderedList');
+  else if(cmd==='link'){const u=prompt('URL del enlace:');if(u)document.execCommand('createLink',false,u);}
+  else if(cmd==='img'){fileTarget='body';$('#file-input').click();}
+});
+
+// ---- Wire ----
+$('#btn-new').onclick=newNota;
+$('#btn-back').onclick=showList;
+$('#btn-save').onclick=save;
+$('#btn-del').onclick=delNota;
+$('#btn-portada').onclick=()=>{fileTarget='portada';$('#file-input').click();};
+$('#btn-portada-rm').onclick=()=>setPortada('');
+loadList();
+</script>
+</body>
+</html>
