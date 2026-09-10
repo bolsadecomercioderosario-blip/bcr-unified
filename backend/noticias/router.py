@@ -29,8 +29,18 @@ from database import get_db
 from noticias import render
 from noticias.models import (
     CATEGORIAS, KIT_CATEGORIAS, _KIT_NOMBRE, _KIT_SLUGS,
-    MediaAsset, MediaAssetIn, Noticia, NoticiaIn,
+    MediaAsset, MediaAssetIn, Noticia, NoticiaIn, Video, VideoIn,
 )
+
+_YT_RE = re.compile(r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})")
+
+
+def _yt_id(url: str) -> Optional[str]:
+    m = _YT_RE.search(url or "")
+    if m:
+        return m.group(1)
+    s = (url or "").strip()
+    return s if re.fullmatch(r"[A-Za-z0-9_-]{11}", s) else None
 
 
 # ===========================================================================
@@ -212,6 +222,40 @@ def kit_borrar(aid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 # ===========================================================================
+# API de Videos (con auth)
+# ===========================================================================
+videos_api = APIRouter(prefix="/api/videos", dependencies=[Depends(require_auth)])
+
+
+@videos_api.get("")
+def videos_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
+    rows = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).all()
+    return {"videos": [{"id": v.id, "youtube_id": v.youtube_id, "titulo": v.titulo} for v in rows]}
+
+
+@videos_api.post("")
+def videos_crear(payload: VideoIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    yid = _yt_id(payload.url)
+    if not yid:
+        raise HTTPException(400, "No pude reconocer el video de YouTube. Pegá la URL completa.")
+    v = Video(youtube_id=yid, titulo=payload.titulo)
+    db.add(v)
+    db.commit()
+    db.refresh(v)
+    return {"id": v.id, "youtube_id": v.youtube_id, "titulo": v.titulo}
+
+
+@videos_api.delete("/{vid}")
+def videos_borrar(vid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    v = db.query(Video).filter(Video.id == vid).first()
+    if v is None:
+        raise HTTPException(404, "Video no encontrado")
+    db.delete(v)
+    db.commit()
+    return {"ok": True}
+
+
+# ===========================================================================
 # Sitio público (server-rendered, sin auth)
 # ===========================================================================
 site = APIRouter()
@@ -232,7 +276,8 @@ async def home(request: Request, db: Session = Depends(get_db)):
         db.query(Noticia).filter(Noticia.estado == "publicado")
         .order_by(Noticia.fecha_pub.desc()).limit(13).all()
     )
-    title, body = render.render_home(rows)
+    videos = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).limit(4).all()
+    title, body = render.render_home(rows, videos)
     html = render.base_page(
         title=title,
         description="Agencia de noticias de la Bolsa de Comercio de Rosario.",

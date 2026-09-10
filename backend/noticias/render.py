@@ -32,15 +32,10 @@ def fecha_es(dt: datetime | None) -> str:
     return f"{dt.day} de {_MESES[dt.month]} de {dt.year}"
 
 
-_LOGO = (
-    '<svg viewBox="0 0 100 100" aria-hidden="true">'
-    '<g fill="#009ee3">'
-    '<rect x="14" y="40" width="34" height="15"/>'
-    '<rect x="33" y="14" width="15" height="41"/>'
-    '<rect x="52" y="45" width="34" height="15"/>'
-    '<rect x="52" y="45" width="15" height="41"/>'
-    "</g></svg>"
-)
+# Logo oficial (versión negativa, para fondo navy). Incluye marca + "BCR" +
+# "FUENTE DE NOTICIAS", así que no hace falta texto aparte.
+_LOGO = ('<img class="logo-img" src="/static/noticias/img/logo-neg.png" '
+         'alt="+BCR — Fuente de Noticias">')
 
 _ICON = {
     "x": '<svg class="ico" viewBox="0 0 24 24"><path d="M18.9 2H22l-7 8 8.2 11h-6.4l-5-6.6L6 21H2.9l7.5-8.6L2.3 2h6.6l4.5 6zM17.8 19h1.7L7.3 3.8H5.5z"/></svg>',
@@ -62,6 +57,8 @@ a{color:var(--link);text-decoration:none}
 .ph{background:linear-gradient(135deg,#cdd6df,#9aa7b6);position:relative;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .logo{display:flex;align-items:center;gap:12px}
+.logo-img{height:44px;width:auto;display:block}
+.foot .logo-img{height:52px}
 .logo svg{width:38px;height:38px;flex:none}
 .logo .txt{display:flex;flex-direction:column;line-height:1}
 .logo .n{font-weight:800;font-size:22px;color:#fff;letter-spacing:.5px}
@@ -145,6 +142,14 @@ footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
 .promo-sub{margin-top:16px;font-size:17px;max-width:780px}
 .tablero-embed{position:relative;width:100%;height:75vh;min-height:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .tablero-embed iframe{width:100%;height:100%;border:0}
+.vids{display:grid;grid-template-columns:1.5fr 1fr;gap:24px}
+.vid-feat{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000}
+.vid-feat iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vid-list{display:flex;flex-direction:column;gap:14px}
+.vid-item{display:flex;gap:11px;align-items:center}
+.vid-item img{width:120px;height:68px;object-fit:cover;border-radius:5px;flex:none}
+.vid-item span{color:var(--navy);font-weight:600;font-size:13.5px;line-height:1.3}
+@media(max-width:820px){.vids{grid-template-columns:1fr}}
 @media(max-width:820px){.hero,.cards,.cards3,.cards4,.art,.kitgrid{grid-template-columns:1fr}.share{flex-direction:row}nav.main{display:none}}
 """
 
@@ -160,7 +165,7 @@ def _header() -> str:
     socials = "".join(_ICON[k] for k in ("x", "ig", "fb", "yt", "in"))
     return f"""
 <header class="top"><div class="wrap topbar">
-  <a class="logo" href="/noticias/">{_LOGO}<span class="txt"><span class="n">+BCR</span><span class="s">FUENTE DE NOTICIAS</span></span></a>
+  <a class="logo" href="/noticias/">{_LOGO}</a>
   <nav class="main">
     <a href="#">Sobre Nosotros</a>
     {_cat_menu()}
@@ -175,7 +180,7 @@ def _footer() -> str:
     socials = "".join(_ICON[k] for k in ("x", "ig", "fb", "yt", "in"))
     return f"""
 <footer><div class="wrap foot">
-  <a class="logo">{_LOGO}<span class="txt"><span class="n">+BCR</span><span class="s">FUENTE DE NOTICIAS</span></span></a>
+  <a class="logo">{_LOGO}</a>
   <div class="col">
     <div>54-341-5258300</div>
     <div>masbcr.com.ar</div>
@@ -247,9 +252,28 @@ def _promo_banner(titulo_html: str, subtitulo: str, href: str) -> str:
             f'<div class="promo-sub">{_esc(subtitulo)}</div></a>')
 
 
-def render_home(noticias: list) -> tuple[str, str]:
+def render_videos(videos: list) -> str:
+    if not videos:
+        return ""
+    feat = videos[0]
+    resto = videos[1:4]
+    feat_html = (f'<div class="vid-feat"><iframe src="https://www.youtube.com/embed/{_esc(feat.youtube_id)}" '
+                 f'title="{_esc(feat.titulo or "Video")}" allowfullscreen loading="lazy"></iframe></div>')
+    items = ""
+    for v in resto:
+        items += (f'<a class="vid-item" href="https://www.youtube.com/watch?v={_esc(v.youtube_id)}" '
+                  f'target="_blank" rel="noopener">'
+                  f'<img src="https://img.youtube.com/vi/{_esc(v.youtube_id)}/mqdefault.jpg" alt="">'
+                  f'<span>{_esc(v.titulo or "")}</span></a>')
+    lista = f'<div class="vid-list">{items}</div>' if items else ""
+    return (f'<section class="grid"><div class="wrap">'
+            f'<h2 class="sec-title">Videos</h2>'
+            f'<div class="vids"><div>{feat_html}</div>{lista}</div></div></section>')
+
+
+def render_home(noticias: list, videos: list | None = None) -> tuple[str, str]:
     """Devuelve (title, body_html) para la home, con la estructura de masbcr:
-    hero + 3 secundarias + banner Tablero + banner Kit + resto de noticias."""
+    hero + 3 secundarias + banner Tablero + Videos + banner Kit + resto."""
     if not noticias:
         body = '<div class="empty">Todavía no hay noticias publicadas.</div>'
         return "Más BCR — Fuente de Noticias", body
@@ -292,7 +316,8 @@ def render_home(noticias: list) -> tuple[str, str]:
                       f'<h2 class="sec-title">Últimas noticias</h2>'
                       f'<div class="cards4">{cards}</div></div></section>')
 
-    body = hero_html + sec_html + tablero + kit + resto_html
+    videos_html = render_videos(videos or [])
+    body = hero_html + sec_html + tablero + videos_html + kit + resto_html
     return "Más BCR — Fuente de Noticias", body
 
 

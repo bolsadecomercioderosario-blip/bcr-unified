@@ -90,3 +90,19 @@ class MediaAssetIn(BaseModel):
     kit_cat: str
     url: str
     titulo: Optional[str] = None
+
+
+class Video(Base):
+    """Video de YouTube para la sección Videos de la home."""
+    __tablename__ = "videos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    youtube_id = Column(String, nullable=False)   # los 11 caracteres del ID
+    titulo = Column(String, nullable=True)
+    orden = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class VideoIn(BaseModel):
+    url: str                      # URL de YouTube (o el ID pelado)
+    titulo: Optional[str] = None

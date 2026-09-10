@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Más BCR · Videos | __VERSION__</title>
+<script src="/static/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#00314b;--cyan:#009ee3;--line:#e5e7eb;--muted:#6b7280;--f:"Outfit",system-ui,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--f);background:#f3f4f6;color:#1f2937}
+  header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px}
+  header .brand{font-weight:800;font-size:18px}header .brand span{color:var(--cyan)}
+  header .sub{font-size:12px;color:#9fb3c2}
+  header a{color:#cfe6f4;font-size:13px;font-weight:600;text-decoration:none}
+  .wrap{max-width:900px;margin:22px auto;padding:0 18px}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-weight:600;font-size:14px;padding:10px 16px}
+  .btn-primary{background:var(--cyan);color:#04303f}
+  input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+  label{display:block;font-size:12.5px;font-weight:700;color:#374151;margin:0 0 5px}
+  .row{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+  .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;gap:12px;align-items:center}
+  .item img{width:120px;height:68px;object-fit:cover;border-radius:6px;flex:none}
+  .item .t{flex:1;font-weight:600;color:var(--navy)}
+  .item button{background:#fff;border:1px solid #fecaca;color:#dc2626;padding:6px 12px}
+  .empty{text-align:center;color:var(--muted);padding:40px}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">+<span>BCR</span></span><span class="sub">Videos</span>
+  <div style="margin-left:auto;display:flex;gap:16px">
+    <a href="/noticias/admin">← Noticias</a>
+    <a href="/noticias/kit-admin">Kit</a>
+    <a href="/noticias/" target="_blank">Ver sitio ↗</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <div style="flex:2;min-width:260px">
+        <label>URL del video de YouTube</label>
+        <input type="text" id="f-url" placeholder="https://www.youtube.com/watch?v=...">
+      </div>
+      <div style="flex:2;min-width:220px">
+        <label>Título</label>
+        <input type="text" id="f-titulo" placeholder="Título del video">
+      </div>
+      <button class="btn-primary" id="btn-add">Agregar</button>
+    </div>
+    <div class="hint">El primer video de la lista es el destacado en la home; los siguientes aparecen al costado.</div>
+  </div>
+  <div id="list"><div class="empty">Cargando…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='/api/videos';
+const $=s=>document.querySelector(s);
+const toast=(m)=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600);};
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+async function load(){
+  const r=await fetch(API); if(!r.ok){$('#list').innerHTML='<div class="empty">No se pudo cargar.</div>';return;}
+  const d=await r.json(); const vs=d.videos||[];
+  if(!vs.length){$('#list').innerHTML='<div class="empty">Todavía no hay videos.</div>';return;}
+  $('#list').innerHTML=vs.map((v,i)=>`
+    <div class="item">
+      <img src="https://img.youtube.com/vi/${esc(v.youtube_id)}/mqdefault.jpg" alt="">
+      <div class="t">${i===0?'⭐ ':''}${esc(v.titulo||'(sin título)')}</div>
+      <button onclick="del(${v.id})">Eliminar</button>
+    </div>`).join('');
+}
+async function add(){
+  const url=$('#f-url').value.trim(); if(!url){toast('Pegá la URL');return;}
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,titulo:$('#f-titulo').value})});
+  const d=await r.json().catch(()=>({}));
+  if(r.ok){$('#f-url').value='';$('#f-titulo').value='';toast('Agregado');load();}
+  else toast(d.detail||'Error');
+}
+async function del(id){
+  if(!confirm('¿Eliminar este video?'))return;
+  const r=await fetch(`${API}/${id}`,{method:'DELETE'});
+  if(r.ok){toast('Eliminado');load();}else toast('Error');
+}
+$('#btn-add').onclick=add;
+load();
+</script>
+</body>
+</html>

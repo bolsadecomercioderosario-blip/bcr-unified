@@ -103,7 +103,10 @@ BOT_COYUNTURA_AUTO_MODEL = os.environ.get("BOT_COYUNTURA_AUTO_MODEL", BOT_OPENAI
 # Más BCR — URL del embed del Tablero de Cultivos (Power BI publicado a la web).
 # Es pública (no secreta); se puede setear por env o hardcodear el default cuando
 # tengamos el link "Publicar en la web" del informe de Power BI.
-MASBCR_TABLERO_URL = os.environ.get("MASBCR_TABLERO_URL", "")
+MASBCR_TABLERO_URL = os.environ.get(
+    "MASBCR_TABLERO_URL",
+    "https://app.powerbi.com/view?r=eyJrIjoiMWYzNGM1ODctMDNiNC00NGU2LTlmZGUtZGVhMDU2Y2YxODJkIiwidCI6IjAzNDJjMmMyLTgzNDAtNGM4NC04MTVjLWViMGE2ODE1N2MwNCIsImMiOjR9",
+)
 
 
 # ---------------------------------------------------------------------------
