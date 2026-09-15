@@ -16,6 +16,7 @@ import secrets
 from typing import List
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
@@ -46,9 +47,14 @@ def list_compromisos(token: str):
     _check_token(token)
     db = SessionLocal()
     try:
+        # La Agenda de la Mesa = actividades de Secretaría + las de áreas que
+        # Secretaría aprobó (me_estado='aprobada').
         return db.query(agenda_models.Activity).filter(
             agenda_models.Activity.is_custom == False,  # noqa: E712 — SQLAlchemy
-            agenda_models.Activity.origen == "secretaria",
+            or_(
+                agenda_models.Activity.origen == "secretaria",
+                agenda_models.Activity.me_estado == "aprobada",
+            ),
             agenda_models.Activity.archived == False,  # noqa: E712 — no mostrar archivadas
         ).all()
     finally:

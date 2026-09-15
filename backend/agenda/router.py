@@ -19,7 +19,10 @@ from google_auth_oauthlib.flow import Flow
 from sqlalchemy.orm import Session
 
 import agenda_models
-from auth import require_auth
+from auth import (
+    require_auth, get_role, area_of_role, is_area_role,
+    ROLE_COMUNICACION, ROLE_SECRETARIA,
+)
 from common import require_external_integrations, require_google_drive
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
 from database import get_db
@@ -262,25 +265,68 @@ def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):
 # ---------------------------------------------------------
 # CRUD de Actividades
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# Visibilidad por rol (Fase 3 multi-área):
+#   comunicacion → todo lo que NO es de área (sus actividades + las de Secretaría)
+#   secretaria   → Mesa (secretaria) + todas las áreas (para ver y aprobar)
+#   area:<slug>  → Mesa + todas las áreas (Mi agenda filtra a lo propio en el front)
+# ---------------------------------------------------------
+def _visibility_filter(query, role: str):
+    A = agenda_models.Activity
+    if role == ROLE_COMUNICACION:
+        return query.filter(A.origen != "area")
+    # secretaria y área ven Mesa + áreas (no lo interno de Comunicación).
+    return query.filter(A.origen.in_(["secretaria", "area"]))
+
+
 @router.get("/actividades", response_model=List[agenda_models.ActivityOut])
-def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
+def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db),
+                    role: str = Depends(get_role)):
     # Excluye archivadas: viven sólo en la vista "Archivados".
-    return db.query(agenda_models.Activity).filter(
+    q = db.query(agenda_models.Activity).filter(
         agenda_models.Activity.archived == False,  # noqa: E712 — SQLAlchemy
-    ).offset(skip).limit(limit).all()
+    )
+    return _visibility_filter(q, role).offset(skip).limit(limit).all()
 
 
 @router.get("/actividades/archivadas", response_model=List[agenda_models.ActivityOut])
-def read_archived_activities(db: Session = Depends(get_db)):
+def read_archived_activities(db: Session = Depends(get_db), role: str = Depends(get_role)):
     """Listado de actividades archivadas (soft-deleted), para la vista Archivados."""
-    return db.query(agenda_models.Activity).filter(
+    q = db.query(agenda_models.Activity).filter(
         agenda_models.Activity.archived == True,  # noqa: E712 — SQLAlchemy
-    ).all()
+    )
+    return _visibility_filter(q, role).all()
+
+
+def _owns(db_activity, role: str) -> bool:
+    """¿El rol es dueño de esta actividad (puede editarla/borrarla)?"""
+    origen = db_activity.origen or "comunicacion"
+    if role == ROLE_COMUNICACION:
+        return origen == "comunicacion"
+    if role == ROLE_SECRETARIA:
+        return origen == "secretaria"
+    if is_area_role(role):
+        return origen == "area" and (db_activity.area or "") == area_of_role(role)
+    return False
 
 
 @router.post("/actividades", response_model=agenda_models.ActivityOut)
-def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    db_activity = agenda_models.Activity(**activity.model_dump())
+def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks,
+                    db: Session = Depends(get_db), role: str = Depends(get_role)):
+    data = activity.model_dump()
+    # El origen/dueño lo fija el rol (no se confía en lo que manda el cliente).
+    if role == ROLE_COMUNICACION:
+        data["origen"] = "comunicacion"; data["area"] = ""; data["me_estado"] = ""
+    elif role == ROLE_SECRETARIA:
+        data["origen"] = "secretaria"; data["area"] = ""; data["me_estado"] = ""
+    elif is_area_role(role):
+        data["origen"] = "area"; data["area"] = area_of_role(role)
+        # Un área sólo puede dejar la sugerencia en pendiente (no auto-aprobarse).
+        data["me_estado"] = "pendiente" if (data.get("me_estado") or "") else ""
+    else:
+        raise HTTPException(status_code=403, detail="Rol sin permiso de carga")
+
+    db_activity = agenda_models.Activity(**data)
     db.add(db_activity)
     db.commit()
     db.refresh(db_activity)
@@ -288,12 +334,46 @@ def create_activity(activity: agenda_models.ActivityCreate, background_tasks: Ba
 
 
 @router.put("/actividades/{activity_id}", response_model=agenda_models.ActivityOut)
-def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, background_tasks: BackgroundTasks,
+                    db: Session = Depends(get_db), role: str = Depends(get_role)):
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
 
+    origen = db_activity.origen or "comunicacion"
     update_data = activity.model_dump(exclude_unset=True)
+
+    if role == ROLE_SECRETARIA and origen == "area":
+        # Secretaría sobre una actividad de área: SÓLO puede aprobar/rechazar
+        # (setear me_estado). No toca el contenido — lo maneja el área. Si el
+        # request no trae me_estado, es un no-op (no error).
+        if "me_estado" in update_data:
+            estado = update_data.get("me_estado") or ""
+            if estado not in ("pendiente", "aprobada", "rechazada", ""):
+                raise HTTPException(status_code=400, detail="Estado de Mesa inválido")
+            db_activity.me_estado = estado
+            db.commit()
+            db.refresh(db_activity)
+        return db_activity
+
+    if not _owns(db_activity, role):
+        raise HTTPException(status_code=403, detail="No podés editar esta actividad")
+
+    # Nadie cambia el dueño por esta vía.
+    update_data.pop("origen", None)
+    update_data.pop("area", None)
+    if is_area_role(role):
+        # El área no puede auto-aprobarse: si ya está aprobada, se mantiene;
+        # si no, sólo puede dejarla en pendiente o sin sugerir.
+        if "me_estado" in update_data:
+            if db_activity.me_estado == "aprobada":
+                update_data["me_estado"] = "aprobada"
+            else:
+                update_data["me_estado"] = "pendiente" if (update_data["me_estado"] or "") else ""
+    else:
+        # Comunicación/Secretaría no manejan me_estado de sus propias actividades.
+        update_data.pop("me_estado", None)
+
     for key, value in update_data.items():
         setattr(db_activity, key, value)
 
@@ -351,7 +431,8 @@ def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/actividades/{activity_id}")
-def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends(get_db)):
+def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends(get_db),
+                     role: str = Depends(get_role)):
     """Archiva la actividad (soft-delete): NO borra el registro, lo marca como
     archivado y sale de todas las vistas activas. La carpeta de Drive va a la
     PAPELERA (recuperable). Todo se puede restaurar desde la vista Archivados.
@@ -363,6 +444,11 @@ def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+
+    # Sólo el dueño archiva lo suyo (cada área lo suyo; Secretaría lo de Mesa;
+    # Comunicación lo suyo, incluidos los bloques de newsletter is_custom).
+    if not _owns(db_activity, role):
+        raise HTTPException(status_code=403, detail="No podés eliminar esta actividad")
 
     if hard and db_activity.is_custom:
         db.delete(db_activity)
@@ -381,12 +467,14 @@ def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends
 
 
 @router.post("/actividades/{activity_id}/restore", response_model=agenda_models.ActivityOut)
-def restore_activity(activity_id: str, db: Session = Depends(get_db)):
+def restore_activity(activity_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
     """Restaura una actividad archivada: vuelve a las vistas activas y saca su
     carpeta de Drive de la papelera."""
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+    if not _owns(db_activity, role):
+        raise HTTPException(status_code=403, detail="No podés restaurar esta actividad")
 
     if db_activity.drive_bcr:
         untrash_drive_folder(db_activity.drive_bcr)

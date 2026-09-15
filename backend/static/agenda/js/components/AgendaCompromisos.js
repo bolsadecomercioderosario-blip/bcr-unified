@@ -9,8 +9,8 @@
  *
  * Muestra sólo las actividades con origen='secretaria'.
  */
-import { state } from '../state.js';
-import { SEC_RESPONSABLES } from '../constants.js';
+import { state, updateActivity } from '../state.js';
+import { SEC_RESPONSABLES, ownerLabel } from '../constants.js';
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -119,13 +119,21 @@ function occurrencesOf(act) {
     }
     return [{ act, occDate: act.date, dayIndex: 1, dayCount: 1 }];
 }
+// La Agenda de la Mesa = actividades de Secretaría + las de áreas aprobadas.
 function secretariaOccurrences() {
     const occ = [];
     for (const a of state.activities) {
-        if (a.is_custom || a.origen !== 'secretaria') continue;
+        if (a.is_custom) continue;
+        if (a.origen !== 'secretaria' && a.me_estado !== 'aprobada') continue;
         for (const o of occurrencesOf(a)) occ.push(o);
     }
     return occ;
+}
+
+// Sugerencias de áreas pendientes de aprobación.
+function pendingSuggestions() {
+    return state.activities.filter(a => !a.is_custom && !a.archived
+        && a.origen === 'area' && a.me_estado === 'pendiente');
 }
 
 function cardHTML(occ) {
@@ -136,6 +144,7 @@ function cardHTML(occ) {
 
     const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
     const meta = [];
+    if (act.origen === 'area') meta.push(`<span><strong>Área:</strong> ${esc(ownerLabel(act))}</span>`);
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     if (act.participants) meta.push(`<span><strong>Participa:</strong> ${esc(act.participants)}</span>`);
     const metaHtml = meta.length ? `<div class="cmp-meta">${meta.join('')}</div>` : '';
@@ -271,6 +280,10 @@ export function renderAgendaCompromisos(container) {
             <button id="cmp-past-toggle" class="cmp-icon-btn" type="button" title="${showPast ? 'Ocultar pasadas' : 'Ver pasadas'}">
                 <i data-lucide="history"></i>
             </button>
+            <button id="cmp-inbox-btn" class="cmp-icon-btn" type="button" title="Sugerencias de las áreas" style="position:relative;">
+                <i data-lucide="inbox"></i>
+                <span id="cmp-inbox-badge" style="display:none;position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;"></span>
+            </button>
             <button id="cmp-archived-btn" class="cmp-icon-btn" type="button" title="Archivados">
                 <i data-lucide="archive"></i>
             </button>
@@ -288,9 +301,16 @@ export function renderAgendaCompromisos(container) {
 
     const pastBtn = wrapper.querySelector('#cmp-past-toggle');
 
+    const inboxBadge = wrapper.querySelector('#cmp-inbox-badge');
     const paint = () => {
         filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === currentFilter));
         if (pastBtn) pastBtn.classList.toggle('active', showPast);
+        // Badge con la cantidad de sugerencias pendientes.
+        const n = pendingSuggestions().length;
+        if (inboxBadge) {
+            inboxBadge.textContent = n;
+            inboxBadge.style.display = n ? 'block' : 'none';
+        }
         content.innerHTML = contentHTML(currentFilter);
         if (window.lucide) window.lucide.createIcons();
     };
@@ -320,9 +340,75 @@ export function renderAgendaCompromisos(container) {
     wrapper.querySelector('#cmp-new-btn').onclick = () => window.openNewActivity();
     wrapper.querySelector('#cmp-print-btn').onclick = () => openPrintModal();
     wrapper.querySelector('#cmp-archived-btn').onclick = () => window.openArchivedSheet();
+    wrapper.querySelector('#cmp-inbox-btn').onclick = () => openSugerenciasModal();
 
     container.appendChild(wrapper);
     paint();
+}
+
+// =================================================================
+// Bandeja de sugerencias: actividades de áreas pendientes de aprobación.
+// Secretaría aprueba (van a la Agenda de la Mesa) o rechaza.
+// =================================================================
+function openSugerenciasModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'login-overlay';
+    overlay.style.zIndex = '1000';
+    overlay.innerHTML = `
+        <div class="login-card" style="max-width: 560px; width: 92%; text-align: left; max-height: 82vh; display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                <h3 style="margin:0;">Sugerencias de las áreas</h3>
+                <button id="sug-close" style="background:none;border:none;font-size:1.3rem;line-height:1;cursor:pointer;color:var(--text-muted);">&times;</button>
+            </div>
+            <p style="margin:0 0 1rem; color: var(--text-muted); font-size: 0.85rem;">Actividades que las áreas proponen sumar a la Agenda de la Mesa. Al aprobar, aparecen en la Mesa (y en la vista pública). El área las sigue editando.</p>
+            <div id="sug-list" style="overflow-y:auto;"></div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#sug-close').onclick = close;
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+
+    const listEl = overlay.querySelector('#sug-list');
+
+    const render = () => {
+        const pend = pendingSuggestions().sort((a, b) =>
+            (a.date || '').localeCompare(b.date || '') || (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99'));
+        if (!pend.length) {
+            listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:2rem 0;">No hay sugerencias pendientes.</div>';
+            return;
+        }
+        listEl.innerHTML = pend.map(a => `
+            <div class="sug-item" data-id="${esc(a.id)}" style="border:1px solid var(--border); border-radius:0.6rem; padding:0.85rem 1rem; margin-bottom:0.7rem;">
+                <div style="display:flex; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+                    <div style="min-width:0;">
+                        <div style="font-weight:700; color:var(--primary);">${esc(a.title) || '(Sin título)'}</div>
+                        <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.15rem;">
+                            ${esc(ownerLabel(a))} · ${esc(shortDate(a.date))} · ${esc(timeLabel(a))}
+                        </div>
+                        ${a.location ? `<div style="font-size:0.82rem; margin-top:0.2rem;"><strong>Lugar:</strong> ${esc(a.location)}</div>` : ''}
+                        ${a.description ? `<div style="font-size:0.82rem; color:#475569; margin-top:0.2rem;">${esc(a.description)}</div>` : ''}
+                    </div>
+                    <div style="display:flex; gap:0.4rem; align-items:flex-start;">
+                        <button class="sug-ok" data-id="${esc(a.id)}" style="background:#16a34a; color:#fff; border:none; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Aprobar</button>
+                        <button class="sug-no" data-id="${esc(a.id)}" style="background:#fff; color:#ef4444; border:1px solid #fca5a5; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Rechazar</button>
+                    </div>
+                </div>
+            </div>`).join('');
+
+        listEl.querySelectorAll('.sug-ok').forEach(b => b.onclick = async () => {
+            b.disabled = true;
+            await updateActivity(b.dataset.id, { me_estado: 'aprobada' });
+            render();
+        });
+        listEl.querySelectorAll('.sug-no').forEach(b => b.onclick = async () => {
+            b.disabled = true;
+            await updateActivity(b.dataset.id, { me_estado: 'rechazada' });
+            render();
+        });
+    };
+
+    render();
 }
 
 // =================================================================

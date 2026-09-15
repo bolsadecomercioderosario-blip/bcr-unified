@@ -45,10 +45,13 @@ export function renderActivityForm(container, preData = null) {
     const areaSlug = getAreaSlug();
     // Origen de la actividad. Para nuevas, lo define el rol que la crea.
     const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : isArea ? 'area' : 'comunicacion') : 'comunicacion');
-    // Datos Generales: los edita el dueño (Secretaría siempre; Área en las
-    // suyas; Comunicación sólo en sus propias). En las de Secretaría,
-    // Comunicación los ve en solo-lectura.
-    const generalsEditable = isSec || isArea || actOrigen === 'comunicacion';
+    // Secretaría viendo una actividad de un ÁREA: solo lectura (el contenido lo
+    // maneja el área; Secretaría sólo aprueba/rechaza desde la bandeja).
+    const areaForeignForSec = isSec && actOrigen === 'area';
+    // Datos Generales: los edita el dueño (Secretaría en las de Mesa; Área en
+    // las suyas; Comunicación sólo en sus propias). En las de Secretaría,
+    // Comunicación los ve en solo-lectura; en las de área, Secretaría también.
+    const generalsEditable = (isSec && !areaForeignForSec) || isArea || actOrigen === 'comunicacion';
     const generalsReadOnly = !generalsEditable;
     // Operativo (responsable, canales, links, copies) + notas internas: sólo
     // Comunicación. Secretaría y Área no ven nada de esto.
@@ -76,14 +79,14 @@ export function renderActivityForm(container, preData = null) {
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
     // actividades de Secretaría que ya tengan adjunto).
     let attachmentHTML = '';
-    if (isSec || isArea) {
+    if ((isSec && !areaForeignForSec) || isArea) {
         attachmentHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Archivo adjunto <span style="font-weight: 400; color: var(--text-muted); font-size: 0.78rem;">(DOC, DOCX, PDF, JPG o PNG)</span></label>
                 <input type="file" id="attach-input" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png" style="display: none;">
                 <div id="attach-area"></div>
             </div>`;
-    } else if (actOrigen === 'secretaria' && act.attachment_url) {
+    } else if (act.attachment_url && (actOrigen === 'secretaria' || areaForeignForSec)) {
         attachmentHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Archivo adjunto</label>
@@ -97,7 +100,7 @@ export function renderActivityForm(container, preData = null) {
     const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
     const secRespIsOther = act.sec_responsible === 'Otro';
     let estadoHTML = '';
-    if (isSec) {
+    if (isSec && !areaForeignForSec) {
         estadoHTML = `
             <section>
                 <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Estado</h3>
@@ -159,7 +162,7 @@ export function renderActivityForm(container, preData = null) {
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         Datos Generales
-                        ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> Los carga Secretaría · solo lectura</span>` : ''}
+                        ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> ${areaForeignForSec ? 'La carga el área · solo lectura' : 'Los carga Secretaría · solo lectura'}</span>` : ''}
                     </h3>
                     <fieldset ${generalsReadOnly ? 'disabled' : ''} style="border: none; padding: 0; margin: 0; min-inline-size: auto;">
                     <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0.85rem; user-select: none;">
@@ -343,8 +346,8 @@ export function renderActivityForm(container, preData = null) {
         </div>
 
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
-            <button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>
-            <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
+            ${areaForeignForSec ? '' : '<button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>'}
+            <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">${areaForeignForSec ? 'Cerrar' : 'Cancelar'}</button>
             ${showDelete ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
     `;
@@ -466,7 +469,7 @@ export function renderActivityForm(container, preData = null) {
     // getAttachment devuelve el adjunto vigente al guardar. Default: el que ya
     // tenía la actividad (para no perderlo cuando el form no lo edita).
     let getAttachment = () => ({ attachment_url: act.attachment_url || '', attachment_name: act.attachment_name || '' });
-    if (isSec || isArea) {
+    if ((isSec && !areaForeignForSec) || isArea) {
         const attachInput = container.querySelector('#attach-input');
         const attachArea = container.querySelector('#attach-area');
         let attachUrl = act.attachment_url || '';
@@ -601,8 +604,9 @@ export function renderActivityForm(container, preData = null) {
         };
     }
 
-    // Save logic
-    container.querySelector('#btn-save-activity').onclick = async () => {
+    // Save logic (no existe en modo solo-lectura de Secretaría sobre área)
+    const saveBtnEl = container.querySelector('#btn-save-activity');
+    if (saveBtnEl) saveBtnEl.onclick = async () => {
         const formData = new FormData(form);
 
         // Datos Generales (sólo se incluyen si el rol puede editarlos).
