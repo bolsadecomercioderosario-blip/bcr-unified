@@ -88,18 +88,36 @@ def _fmt_ars(v) -> str:
         return "-"
 
 
+def _arrow(trend: str | None):
+    return {"up": ("▲", "#2E9E41"), "down": ("▼", "#B23A2E")}.get(trend or "", ("▬", "#9aa6b5"))
+
+
+def _fmt_fecha_corta(iso: str | None) -> str:
+    if not iso:
+        return ""
+    try:
+        y, m, d = iso.split("-")
+        return f"{d}/{m}/{y}"
+    except Exception:
+        return iso
+
+
 def _hpcell(p: dict) -> str:
     nombre, color = _crop(p["producto"])
-    return (f'<div class="hpcell"><div class="hpbar" style="background:{color}"></div>'
-            f'<div class="hpname">{_esc(nombre)}</div>'
-            f'<div class="hpval">{_fmt_ars(p["precio"])}</div></div>')
+    arr, acol = _arrow(p.get("trend"))
+    return (f'<div class="hpcell">'
+            f'<div class="hpname" style="color:{color}">{_esc(nombre)}</div>'
+            f'<div class="hpval">{_fmt_ars(p["precio"])}</div>'
+            f'<div class="hparr" style="color:{acol}">{arr}</div></div>')
 
 
 def _pcell(p: dict) -> str:
     nombre, color = _crop(p["producto"])
-    return (f'<div class="pcell"><div class="pbar" style="background:{color}"></div>'
-            f'<div class="pname">{_esc(nombre)}</div>'
-            f'<div class="pprice">{_fmt_ars(p["precio"])}</div></div>')
+    arr, acol = _arrow(p.get("trend"))
+    return (f'<div class="pcell">'
+            f'<div class="pname" style="color:{color}">{_esc(nombre)}</div>'
+            f'<div class="pprice">{_fmt_ars(p["precio"])}</div>'
+            f'<div class="parr" style="color:{acol}">{arr}</div></div>')
 
 _CSS = """
 :root{--navy:#193363;--navy-deep:#102249;--azure:#2E6FB0;--cyan:#009ee3;--link:#2E6FB0;
@@ -123,15 +141,16 @@ header.top{background:#fff;color:var(--ink);position:sticky;top:0;z-index:50;bor
 .socials{display:flex;gap:16px}
 .ico{width:20px;height:20px;fill:var(--navy);opacity:.85}
 .top .socials a:hover .ico{opacity:1}
-/* Precios pizarra — cabecera fija (desktop) */
+/* Precios pizarra — cabecera fija (desktop): LOGO | MARQUESINA | REDES */
 .hdrpiz-wrap{display:none}
-.hdrpiz{display:flex;align-items:stretch}
-.hpcell{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15;padding:0 15px;border-right:1px solid var(--line)}
+.hdrpiz{display:flex;align-items:stretch;justify-content:center}
+.hpcell{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.12;padding:0 13px;border-right:1px solid var(--line)}
 .hpcell:last-child{border-right:0}
-.hpbar{width:30px;height:3px;border-radius:2px;margin-bottom:5px}
-.hpname{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
-.hpval{font-family:var(--mono);font-size:15px;color:var(--navy);font-weight:600;margin-top:3px;white-space:nowrap}
-@media(min-width:992px){.hdrpiz-wrap{display:flex;flex:1;justify-content:center;margin:0 16px}}
+.hpname{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.hpval{font-family:var(--mono);font-size:15px;color:var(--navy);font-weight:600;margin-top:2px;white-space:nowrap}
+.hparr{font-size:10px;line-height:1;margin-top:1px}
+.pnote{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.3;margin-top:7px}
+@media(min-width:992px){.hdrpiz-wrap{display:flex;flex-direction:column;flex:1;justify-content:center;margin:0 14px}}
 /* Precios pizarra — marquesina (mobile) */
 .pizarra{background:#fff;border-bottom:1px solid var(--line)}
 .marquee{overflow:hidden;width:100%}
@@ -139,10 +158,10 @@ header.top{background:#fff;color:var(--ink);position:sticky;top:0;z-index:50;bor
 .mtrack:hover{animation-play-state:paused}
 @keyframes mscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.mtrack{animation:none}}
-.pcell{flex:0 0 auto;min-width:135px;display:flex;flex-direction:column;align-items:center;text-align:center;border-right:1px solid var(--line);padding:8px 0 9px}
-.pbar{height:4px;width:100%}
-.pname{margin-top:7px;font-weight:800;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
-.pprice{font-family:var(--mono);font-size:17px;color:var(--navy);font-weight:600;margin-top:4px}
+.pcell{flex:0 0 auto;min-width:120px;display:flex;flex-direction:column;align-items:center;text-align:center;border-right:1px solid var(--line);padding:8px 14px 9px}
+.pname{font-weight:800;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase}
+.pprice{font-family:var(--mono);font-size:16px;color:var(--navy);font-weight:600;margin-top:2px}
+.parr{font-size:10px;line-height:1;margin-top:1px}
 @media(min-width:992px){.pizarra{display:none}}
 /* Hero (más bajo que antes) */
 .hero{display:grid;grid-template-columns:1.5fr 1fr;background:var(--navy)}
@@ -234,7 +253,15 @@ def _cat_menu() -> str:
 def _header(precios: list | None = None) -> str:
     precios = precios or []
     hdr = "".join(_hpcell(p) for p in precios)
-    hdrpiz = f'<div class="hdrpiz-wrap"><div class="hdrpiz">{hdr}</div></div>' if hdr else ""
+    if hdr:
+        fecha = _fmt_fecha_corta(precios[0].get("fecha"))
+        nota = (f"Precios Pizarra Rosario del {fecha}, fijados por la Cámara Arbitral de Cereales. "
+                f"Valores en $/Tn.") if fecha else \
+               "Precios Pizarra Rosario, fijados por la Cámara Arbitral de Cereales. Valores en $/Tn."
+        hdrpiz = (f'<div class="hdrpiz-wrap"><div class="hdrpiz">{hdr}</div>'
+                  f'<div class="pnote">{_esc(nota)}</div></div>')
+    else:
+        hdrpiz = ""
     cells = "".join(_pcell(p) for p in precios)  # duplicadas para loop sin cortes
     marquee = (f'<div class="pizarra" title="Precios pizarra Mercado Físico de Rosario">'
                f'<div class="marquee"><div class="mtrack">{cells}{cells}</div></div></div>'

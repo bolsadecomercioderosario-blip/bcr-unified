@@ -303,21 +303,38 @@ def _canonical(request: Request, path: str) -> str:
     return str(request.base_url).rstrip("/") + path
 
 
-# Orden fijo de cultivos para la marquesina de precios.
-_PRECIO_ORDEN = {"soja": 0, "trigo": 1, "maiz": 2, "maíz": 2, "girasol": 3, "sorgo": 4, "cebada": 5}
+# Orden fijo de cultivos para la marquesina (como la home institucional).
+_PRECIO_ORDEN = {"trigo": 0, "maiz": 1, "maíz": 1, "girasol": 2, "soja": 3, "sorgo": 4, "cebada": 5}
 
 
 def _latest_precios(db: Session) -> list[dict[str, Any]]:
-    """Precios pizarra de la última fecha disponible (tabla del bot). Para la
-    marquesina del header. Degradación silenciosa si no hay datos."""
+    """Precios pizarra de la última fecha disponible (tabla del bot), con la
+    tendencia (up/down/eq) respecto de la fecha anterior. Para la marquesina.
+    Degradación silenciosa si no hay datos."""
     try:
         from bot.db_models import PrecioPizarra
-        last = db.query(PrecioPizarra.fecha).order_by(PrecioPizarra.fecha.desc()).first()
-        if not last:
+        fechas = [
+            f for (f,) in db.query(PrecioPizarra.fecha).distinct()
+            .order_by(PrecioPizarra.fecha.desc()).limit(2).all()
+        ]
+        if not fechas:
             return []
-        rows = db.query(PrecioPizarra).filter(PrecioPizarra.fecha == last[0]).all()
+        rows = db.query(PrecioPizarra).filter(PrecioPizarra.fecha == fechas[0]).all()
+        prev = {}
+        if len(fechas) > 1:
+            prev = {
+                (r.producto or "").lower(): r.precio_ars_tn
+                for r in db.query(PrecioPizarra).filter(PrecioPizarra.fecha == fechas[1]).all()
+            }
         rows.sort(key=lambda r: _PRECIO_ORDEN.get((r.producto or "").lower(), 9))
-        return [{"producto": r.producto, "precio": r.precio_ars_tn, "fecha": last[0]} for r in rows]
+        out = []
+        for r in rows:
+            pv = prev.get((r.producto or "").lower())
+            trend = "eq"
+            if pv is not None:
+                trend = "up" if r.precio_ars_tn > pv else ("down" if r.precio_ars_tn < pv else "eq")
+            out.append({"producto": r.producto, "precio": r.precio_ars_tn, "fecha": fechas[0], "trend": trend})
+        return out
     except Exception:
         return []
 
