@@ -401,18 +401,65 @@ def render_videos(videos: list) -> str:
             f'<div class="vids"><div>{feat_html}</div>{lista}</div></div></section>')
 
 
+def _home_layout(noticias: list):
+    """Ubica las notas en la Home según su anclaje (posicion), replicando WP:
+      - 'principal' → nota destacada (hero); 'sec1/2/3' → las 3 secundarias.
+      - Los huecos de esos 4 slots se llenan con las 'normal' (Sin anclaje),
+        más recientes primero.
+      - 'no_principal' nunca va arriba: sólo entra en la tira "Últimas noticias".
+      - 'no_home' no aparece en la Home.
+    `noticias` viene ya filtrada (publicadas y vigentes), más recientes primero.
+    Devuelve (hero, [secundarias], [resto]).
+    """
+    def pos(n):
+        return (getattr(n, "posicion", "normal") or "normal")
+
+    visibles = [n for n in noticias if pos(n) != "no_home"]
+    used: set = set()
+
+    def anchor(p):
+        for n in visibles:
+            if pos(n) == p and n.id not in used:
+                used.add(n.id)
+                return n
+        return None
+
+    normales = [n for n in visibles if pos(n) == "normal"]
+    idx = {"i": 0}
+
+    def filler():
+        while idx["i"] < len(normales):
+            n = normales[idx["i"]]
+            idx["i"] += 1
+            if n.id not in used:
+                used.add(n.id)
+                return n
+        return None
+
+    hero = anchor("principal") or filler()
+    secundarias = []
+    for p in ("sec1", "sec2", "sec3"):
+        s = anchor(p) or filler()
+        if s:
+            secundarias.append(s)
+
+    # Tira "Últimas noticias": todo lo que sobró (incluye 'no_principal' y las
+    # 'normal' que no entraron arriba), más recientes primero.
+    resto = [n for n in visibles if n.id not in used][:8]
+    return hero, secundarias, resto
+
+
 def render_home(noticias: list, videos: list | None = None) -> tuple[str, str]:
     """Devuelve (title, body_html) para la home, con la estructura de masbcr:
     hero + 3 secundarias + banner Tablero + Videos + banner Kit + resto."""
-    if not noticias:
+    hero, secundarias, resto = _home_layout(noticias)
+    if hero is None and not resto:
         body = '<div class="empty">Todavía no hay noticias publicadas.</div>'
         return "Más BCR — Fuente de Noticias", body
 
-    hero = noticias[0]
-    secundarias = noticias[1:4]
-    resto = noticias[4:12]  # 8 en la grilla "Últimas noticias"
-
-    hero_html = f"""
+    hero_html = ""
+    if hero is not None:
+        hero_html = f"""
 <div class="hero">
   <a class="img" href="/noticias/nota/{_esc(hero.slug)}">{_img(hero.imagen_portada)}</a>
   <div class="panel">

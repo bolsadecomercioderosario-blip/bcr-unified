@@ -34,7 +34,9 @@
   /* Editor */
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px}
   label{display:block;font-size:12.5px;font-weight:700;color:#374151;margin:14px 0 5px}
-  input[type=text],textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px}
+  input[type=text],input[type=datetime-local],textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px}
+  .chip.prog{background:#dbeafe;color:#1d4ed8}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
   textarea{resize:vertical}
   .portada{display:flex;gap:12px;align-items:center}
   .portada .pv{width:150px;height:90px;border-radius:8px;background:#e5e7eb center/cover no-repeat;border:1px solid var(--line);flex:none}
@@ -94,6 +96,19 @@
       </div>
     </div>
 
+    <div class="row" style="gap:24px">
+      <div style="flex:1;min-width:220px">
+        <label>Posición en la Home</label>
+        <select id="f-posicion"></select>
+        <div class="hint">Principal = nota destacada arriba; Secundaria 1–3 = las tres de al lado. "No en principales" la manda a la tira de abajo; "No en Home" la saca de la portada.</div>
+      </div>
+      <div style="flex:1;min-width:220px" id="wrap-fecha" hidden>
+        <label>Fecha y hora de publicación</label>
+        <input type="datetime-local" id="f-fecha">
+        <div class="hint">Vacía = publicar ahora. Una fecha/hora futura <b>programa</b> la nota (hora de Argentina).</div>
+      </div>
+    </div>
+
     <label>Imagen de portada</label>
     <div class="portada">
       <div class="pv" id="portada-pv"></div>
@@ -130,33 +145,42 @@
 
 <script>
 const API='/api/noticias';
-let categorias=[], editingId=null, portadaUrl='', fileTarget=null;
+let categorias=[], posiciones=[], editingId=null, portadaUrl='', fileTarget=null;
 const $=s=>document.querySelector(s);
 const toast=(m)=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600);};
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 function fmtDate(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+// El backend guarda en UTC (isoformat sin zona); lo tratamos como UTC y lo mostramos en ART.
+function fmtDateTime(iso){if(!iso)return '';const d=new Date(iso.endsWith('Z')?iso:iso+'Z');return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 
 // ---- Lista ----
 async function loadList(){
   const r=await fetch(API); if(!r.ok){$('#list').innerHTML='<div class="empty">No se pudo cargar.</div>';return;}
-  const d=await r.json(); categorias=d.categorias||[];
+  const d=await r.json(); categorias=d.categorias||[]; posiciones=d.posiciones||posiciones;
   const items=d.noticias||[];
   if(!items.length){$('#list').innerHTML='<div class="empty">Todavía no hay noticias. Creá la primera.</div>';return;}
-  $('#list').innerHTML=items.map(n=>`
+  const posLabel=v=>{const p=posiciones.find(x=>x[0]===v);return p?p[1]:'';};
+  $('#list').innerHTML=items.map(n=>{
+    const estadoChip=n.programada
+      ? `<span class="chip prog">programada ${fmtDateTime(n.fecha_pub)}</span>`
+      : `<span class="chip ${n.estado==='publicado'?'pub':'bor'}">${n.estado}</span>`;
+    const ancla=(n.posicion&&n.posicion!=='normal')?` · ${esc(posLabel(n.posicion))}`:'';
+    return `
     <div class="item">
       <div class="thumb" style="${n.imagen_portada?`background-image:url('${esc(n.imagen_portada)}')`:''}"></div>
       <div class="grow">
         <h3>${esc(n.titulo)}</h3>
         <div class="meta">
-          <span class="chip ${n.estado==='publicado'?'pub':'bor'}">${n.estado}</span>
-          &nbsp;${esc(n.categoria||'sin categoría')} · ${fmtDate(n.fecha_pub||n.created_at)}
+          ${estadoChip}
+          &nbsp;${esc(n.categoria||'sin categoría')} · ${fmtDate(n.fecha_pub||n.created_at)}${ancla}
         </div>
       </div>
       <div class="row">
-        ${n.estado==='publicado'?`<a href="/noticias/nota/${esc(n.slug)}" target="_blank"><button class="btn-ghost">Ver</button></a>`:''}
+        ${(n.estado==='publicado'&&!n.programada)?`<a href="/noticias/nota/${esc(n.slug)}" target="_blank"><button class="btn-ghost">Ver</button></a>`:''}
         <button class="btn-ghost" onclick="editNota(${n.id})">Editar</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ---- Vistas ----
@@ -167,6 +191,16 @@ function fillCategorias(sel){
   $('#f-categoria').innerHTML='<option value="">— sin categoría —</option>'+
     categorias.map(c=>`<option value="${esc(c)}" ${c===sel?'selected':''}>${esc(c)}</option>`).join('');
 }
+function fillPosiciones(sel){
+  const opts=posiciones.length?posiciones:[['normal','Sin anclaje']];
+  $('#f-posicion').innerHTML=opts.map(p=>`<option value="${esc(p[0])}" ${p[0]===(sel||'normal')?'selected':''}>${esc(p[1])}</option>`).join('');
+}
+// La fecha de publicación sólo tiene sentido si la nota está publicada.
+function toggleFecha(){$('#wrap-fecha').hidden=$('#f-estado').value!=='publicado';}
+async function ensureMeta(){
+  if(categorias.length&&posiciones.length)return;
+  const r=await fetch(API); if(r.ok){const d=await r.json();categorias=d.categorias||categorias;posiciones=d.posiciones||posiciones;}
+}
 function setPortada(url){
   portadaUrl=url||'';
   $('#portada-pv').style.backgroundImage=url?`url('${url}')`:'';
@@ -174,24 +208,27 @@ function setPortada(url){
 }
 
 async function newNota(){
-  if(!categorias.length){const r=await fetch(API);categorias=(await r.json()).categorias||[];}
+  await ensureMeta();
   editingId=null;
   $('#edit-title').textContent='Nueva noticia';
   $('#f-titulo').value='';$('#f-bajada').value='';$('#f-estado').value='borrador';
-  $('#editor').innerHTML='';setPortada('');fillCategorias('');
+  $('#f-fecha').value='';
+  $('#editor').innerHTML='';setPortada('');fillCategorias('');fillPosiciones('normal');toggleFecha();
   $('#btn-del').hidden=true;$('#link-ver').hidden=true;
   showEdit();
 }
 async function editNota(id){
   const r=await fetch(`${API}/${id}`); if(!r.ok){toast('No se pudo abrir');return;}
   const n=await r.json();
-  if(!categorias.length){const rr=await fetch(API);categorias=(await rr.json()).categorias||[];}
+  await ensureMeta();
   editingId=id;
   $('#edit-title').textContent='Editar noticia';
   $('#f-titulo').value=n.titulo||'';$('#f-bajada').value=n.bajada||'';$('#f-estado').value=n.estado||'borrador';
+  $('#f-fecha').value=n.fecha_pub_art||'';
   $('#editor').innerHTML=n.cuerpo||'';setPortada(n.imagen_portada||'');fillCategorias(n.categoria||'');
+  fillPosiciones(n.posicion||'normal');toggleFecha();
   $('#btn-del').hidden=false;
-  const lv=$('#link-ver'); if(n.estado==='publicado'){lv.hidden=false;lv.href=`/noticias/nota/${n.slug}`;}else{lv.hidden=true;}
+  const lv=$('#link-ver'); if(n.estado==='publicado'&&!n.programada){lv.hidden=false;lv.href=`/noticias/nota/${n.slug}`;}else{lv.hidden=true;}
   showEdit();
 }
 
@@ -199,7 +236,8 @@ async function save(){
   const titulo=$('#f-titulo').value.trim();
   if(!titulo){toast('Poné un título');return;}
   const payload={titulo,bajada:$('#f-bajada').value,cuerpo:$('#editor').innerHTML,
-    imagen_portada:portadaUrl,categoria:$('#f-categoria').value,estado:$('#f-estado').value};
+    imagen_portada:portadaUrl,categoria:$('#f-categoria').value,estado:$('#f-estado').value,
+    posicion:$('#f-posicion').value,fecha_pub:$('#f-fecha').value||null};
   const btn=$('#btn-save');btn.disabled=true;btn.textContent='Guardando…';
   const url=editingId?`${API}/${editingId}`:API;
   const method=editingId?'PUT':'POST';
@@ -251,6 +289,7 @@ $('#btn-save').onclick=save;
 $('#btn-del').onclick=delNota;
 $('#btn-portada').onclick=()=>{fileTarget='portada';$('#file-input').click();};
 $('#btn-portada-rm').onclick=()=>setPortada('');
+$('#f-estado').onchange=toggleFecha;
 loadList();
 </script>
 </body>

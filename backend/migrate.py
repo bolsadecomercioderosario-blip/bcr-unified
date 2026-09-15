@@ -130,6 +130,10 @@ def migrate():
     _try_exec("ALTER media_assets add subcat",
               "ALTER TABLE media_assets ADD COLUMN subcat VARCHAR DEFAULT NULL")
 
+    # Anclaje/posición de las noticias en la Home.
+    _try_exec("ALTER noticias add posicion",
+              "ALTER TABLE noticias ADD COLUMN posicion VARCHAR DEFAULT 'normal'")
+
     # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
     # toques) la primera vez que las tablas ab_ están vacías.
     from abuela.seed import seed_abuela_if_empty

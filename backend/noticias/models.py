@@ -28,6 +28,19 @@ CATEGORIAS = [
     "Entrevistas",
 ]
 
+# Posición/anclaje de una nota en la Home (réplica del selector de WordPress).
+# El orden es el que se muestra en el desplegable del admin.
+POSICIONES = [
+    ("normal", "Sin anclaje"),
+    ("principal", "Anclar en Principal"),
+    ("sec1", "Anclar en Secundaria 1"),
+    ("sec2", "Anclar en Secundaria 2"),
+    ("sec3", "Anclar en Secundaria 3"),
+    ("no_principal", "No en principales"),
+    ("no_home", "No en Home"),
+]
+_POSICIONES_SET = {k for k, _ in POSICIONES}
+
 # Kit Multimedia: 6 galerías fijas (réplica de masbcr). slug estable + nombre +
 # descripción que se muestran en el índice del kit.
 KIT_CATEGORIAS = [
@@ -67,7 +80,8 @@ class Noticia(Base):
     imagen_portada = Column(String, nullable=True)  # URL (Cloudinary o /static/uploads)
     categoria = Column(String, nullable=True, index=True)
     estado = Column(String, nullable=False, default="borrador")  # borrador | publicado
-    fecha_pub = Column(DateTime, nullable=True)  # se setea al publicar
+    posicion = Column(String, nullable=False, default="normal", index=True)  # ver POSICIONES
+    fecha_pub = Column(DateTime, nullable=True)  # fecha/hora de publicación (UTC); a futuro = programada
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -80,6 +94,8 @@ class NoticiaIn(BaseModel):
     imagen_portada: Optional[str] = None
     categoria: Optional[str] = None
     estado: Optional[str] = "borrador"  # 'borrador' | 'publicado'
+    posicion: Optional[str] = "normal"  # ver POSICIONES
+    fecha_pub: Optional[str] = None     # ISO local (ART) del datetime-local; vacío = ahora
 
 
 class MediaAsset(Base):

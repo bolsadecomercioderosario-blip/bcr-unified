@@ -15,13 +15,14 @@ import shutil
 import tempfile
 import unicodedata
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import cloudinary
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from auth import require_auth
@@ -29,7 +30,8 @@ from config import CLOUDINARY_ENABLED, MASBCR_TABLERO_URL, UPLOADS_DIR
 from database import get_db
 from noticias import render
 from noticias.models import (
-    CATEGORIAS, KIT_CATEGORIAS, KIT_SUBCATS, _KIT_NOMBRE, _KIT_SLUGS,
+    CATEGORIAS, KIT_CATEGORIAS, KIT_SUBCATS, POSICIONES, _KIT_NOMBRE, _KIT_SLUGS,
+    _POSICIONES_SET,
     MediaAsset, MediaAssetIn, MediaAssetUpdate, Noticia, NoticiaIn, Video, VideoIn,
 )
 
@@ -66,12 +68,46 @@ def _unique_slug(db: Session, base: str, exclude_id: Optional[int] = None) -> st
         i += 1
 
 
+# Argentina no tiene DST: ART = UTC-3 fijo. Guardamos fecha_pub en UTC (naive),
+# consistente con el resto del sistema; el admin trabaja en hora local (ART).
+_ART = timedelta(hours=3)
+
+
+def _art_to_utc(s: str | None) -> datetime | None:
+    """'2026-09-16T08:00' (hora ART del datetime-local) → datetime naive en UTC."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s) + _ART
+    except (ValueError, TypeError):
+        return None
+
+
+def _utc_to_art_str(dt: datetime | None) -> str:
+    """UTC naive → 'YYYY-MM-DDTHH:MM' en ART, para precargar el datetime-local."""
+    return (dt - _ART).strftime("%Y-%m-%dT%H:%M") if dt else ""
+
+
+def _live_conds():
+    """Condiciones para que una nota sea pública AHORA: publicada y con fecha de
+    publicación ya cumplida (o sin fecha). Las programadas a futuro quedan ocultas."""
+    now = datetime.utcnow()
+    return [Noticia.estado == "publicado",
+            or_(Noticia.fecha_pub.is_(None), Noticia.fecha_pub <= now)]
+
+
 def _to_dict(n: Noticia) -> dict[str, Any]:
+    programada = bool(
+        n.estado == "publicado" and n.fecha_pub and n.fecha_pub > datetime.utcnow()
+    )
     return {
         "id": n.id, "slug": n.slug, "titulo": n.titulo, "bajada": n.bajada,
         "cuerpo": n.cuerpo, "imagen_portada": n.imagen_portada, "categoria": n.categoria,
         "estado": n.estado,
+        "posicion": n.posicion or "normal",
+        "programada": programada,
         "fecha_pub": n.fecha_pub.isoformat() if n.fecha_pub else None,
+        "fecha_pub_art": _utc_to_art_str(n.fecha_pub),
         "created_at": n.created_at.isoformat() if n.created_at else None,
         "updated_at": n.updated_at.isoformat() if n.updated_at else None,
     }
@@ -87,7 +123,8 @@ router = APIRouter(prefix="/api/noticias", dependencies=[Depends(require_auth)])
 def listar_admin(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Todas las notas (incluye borradores), más recientes primero."""
     rows = db.query(Noticia).order_by(Noticia.created_at.desc()).all()
-    return {"categorias": CATEGORIAS, "noticias": [_to_dict(n) for n in rows]}
+    return {"categorias": CATEGORIAS, "posiciones": POSICIONES,
+            "noticias": [_to_dict(n) for n in rows]}
 
 
 @router.get("/{nid}")
@@ -96,6 +133,10 @@ def obtener(nid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     if n is None:
         raise HTTPException(404, "Noticia no encontrada")
     return _to_dict(n)
+
+
+def _posicion_valida(p: str | None) -> str:
+    return p if p in _POSICIONES_SET else "normal"
 
 
 @router.post("")
@@ -110,9 +151,11 @@ def crear(payload: NoticiaIn, db: Session = Depends(get_db)) -> dict[str, Any]:
         imagen_portada=payload.imagen_portada,
         categoria=payload.categoria,
         estado=payload.estado or "borrador",
+        posicion=_posicion_valida(payload.posicion),
     )
     if n.estado == "publicado":
-        n.fecha_pub = datetime.utcnow()
+        # Con fecha elegida (puede ser a futuro = programada) o ahora.
+        n.fecha_pub = _art_to_utc(payload.fecha_pub) or datetime.utcnow()
     db.add(n)
     db.commit()
     db.refresh(n)
@@ -129,10 +172,15 @@ def actualizar(nid: int, payload: NoticiaIn, db: Session = Depends(get_db)) -> d
     n.cuerpo = payload.cuerpo
     n.imagen_portada = payload.imagen_portada
     n.categoria = payload.categoria
+    n.posicion = _posicion_valida(payload.posicion)
     # El slug se mantiene estable (SEO). Sólo cambia el estado/fecha.
     nuevo_estado = payload.estado or n.estado
-    if nuevo_estado == "publicado" and n.fecha_pub is None:
-        n.fecha_pub = datetime.utcnow()  # primera publicación
+    if nuevo_estado == "publicado":
+        nueva_fecha = _art_to_utc(payload.fecha_pub)
+        if nueva_fecha is not None:
+            n.fecha_pub = nueva_fecha            # fecha/hora elegida (ahora o programada)
+        elif n.fecha_pub is None:
+            n.fecha_pub = datetime.utcnow()      # publicar ahora (primera vez, sin fecha)
     n.estado = nuevo_estado
     db.commit()
     db.refresh(n)
@@ -400,8 +448,8 @@ async def home_redirect():
 @site.get("/noticias/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
     rows = (
-        db.query(Noticia).filter(Noticia.estado == "publicado")
-        .order_by(Noticia.fecha_pub.desc()).limit(13).all()
+        db.query(Noticia).filter(*_live_conds())
+        .order_by(Noticia.fecha_pub.desc()).limit(60).all()
     )
     videos = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).limit(6).all()
     title, body = render.render_home(rows, videos)
@@ -418,12 +466,12 @@ async def home(request: Request, db: Session = Depends(get_db)):
 
 @site.get("/noticias/nota/{slug}", response_class=HTMLResponse)
 async def nota(slug: str, request: Request, db: Session = Depends(get_db)):
-    n = db.query(Noticia).filter(Noticia.slug == slug, Noticia.estado == "publicado").first()
+    n = db.query(Noticia).filter(Noticia.slug == slug, *_live_conds()).first()
     if n is None:
         raise HTTPException(404, "Nota no encontrada")
     relacionadas = (
         db.query(Noticia)
-        .filter(Noticia.estado == "publicado", Noticia.id != n.id)
+        .filter(*_live_conds(), Noticia.id != n.id)
         .order_by(Noticia.fecha_pub.desc()).limit(5).all()
     )
     canonical = _canonical(request, f"/noticias/nota/{n.slug}")
@@ -444,7 +492,7 @@ async def nota(slug: str, request: Request, db: Session = Depends(get_db)):
 async def categoria(categoria: str, request: Request, db: Session = Depends(get_db)):
     rows = (
         db.query(Noticia)
-        .filter(Noticia.estado == "publicado", Noticia.categoria == categoria)
+        .filter(*_live_conds(), Noticia.categoria == categoria)
         .order_by(Noticia.fecha_pub.desc()).limit(60).all()
     )
     body = render.render_lista(categoria, rows)
