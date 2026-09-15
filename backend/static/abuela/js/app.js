@@ -137,20 +137,14 @@
       var byId = {}; items.forEach(function (x) { byId[x.id] = x; });
       body.innerHTML = head + '<div class="list">' + items.map(function (x) {
         var ing = x.tipo.toLowerCase() === "ingreso";
-        return '<div class="row" data-id="' + x.id + '">' +
-          '<div class="rc-main rc-edit"><div class="rc-concepto">' + esc(x.concepto || "(sin concepto)") + '</div>' +
+        return '<div class="row row-tap" data-id="' + x.id + '" role="button" tabindex="0">' +
+          '<div class="rc-main"><div class="rc-concepto">' + esc(x.concepto || "(sin concepto)") + '</div>' +
           '<div class="rc-meta">' + (x.fecha ? fechaCorta(x.fecha) + " · " : "") + esc(x.cuenta || "—") + '</div></div>' +
           '<div class="rc-monto ' + (ing ? "ing" : "egr") + '">' + (ing ? "+" : "−") + fmt(x.monto) + '</div>' +
-          '<button class="rc-del" title="Borrar">🗑</button></div>';
+          '<span class="earr" title="Editar">›</span></div>';
       }).join("") + '</div>';
       body.querySelectorAll(".row").forEach(function (row) {
-        var id = row.getAttribute("data-id");
-        row.querySelector(".rc-edit").addEventListener("click", function () { formMovimiento(proy, byId[id]); });
-        row.querySelector(".rc-del").addEventListener("click", function () {
-          if (!confirm("¿Borrar este movimiento?")) return;
-          api("/caja/movimientos/" + id, { method: "DELETE" })
-            .then(function () { toast("Borrado."); cargarResumen(); renderMovimientos(proy); }).catch(function () { toast("No se pudo."); });
-        });
+        row.addEventListener("click", function () { formMovimiento(proy, byId[row.getAttribute("data-id")]); });
       });
     }).catch(function () { body.innerHTML = '<div class="empty">Error al cargar.</div>'; });
   }

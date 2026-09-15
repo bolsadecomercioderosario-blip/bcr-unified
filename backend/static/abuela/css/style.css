@@ -85,8 +85,9 @@ input, select, textarea { font-family: inherit; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
 .row .rc-main { flex: 1; min-width: 0; }
-.row .rc-edit { cursor: pointer; }
-.row .rc-edit:active { opacity: .6; }
+.row-tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.row-tap:active { background: #fffdf5; }
+.row-tap .earr { color: var(--oro-deep); font-weight: 800; flex: 0 0 auto; }
 .row .rc-concepto { font-weight: 600; font-size: .98rem; line-height: 1.25; word-break: break-word; }
 .row .rc-meta { font-size: .8rem; color: var(--soft); margin-top: 2px; }
 .row .rc-monto { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
