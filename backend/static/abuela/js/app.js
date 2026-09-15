@@ -159,11 +159,16 @@
   function formMovimiento(proy, mov) {
     var esProy = mov ? mov.proyectado : proy;
     var tipo = mov ? (mov.tipo || "Egreso") : "Egreso";
+    // Cuenta: lista de las dos cuentas (más la del movimiento si fuera otra, al editar).
+    var cuentaSel = mov ? (mov.cuenta || "ClaroPay") : "ClaroPay";
+    var cuentas = ["ClaroPay", "Brubank"];
+    if (cuentaSel && cuentas.indexOf(cuentaSel) === -1) cuentas.push(cuentaSel);
+    var cuentaOpts = cuentas.map(function (cc) { return '<option' + (cc === cuentaSel ? " selected" : "") + '>' + esc(cc) + '</option>'; }).join("");
     abrirModal(mov ? "Editar" : (esProy ? "Nueva proyección" : "Nuevo movimiento"),
       '<div class="field"><label>Tipo</label><div class="seg" id="f-seg">' +
         '<button type="button" data-t="Egreso" class="' + (tipo === "Egreso" ? "on-egr" : "") + '">Egreso</button>' +
         '<button type="button" data-t="Ingreso" class="' + (tipo === "Ingreso" ? "on-ing" : "") + '">Ingreso</button></div></div>' +
-      (esProy ? "" : '<div class="field"><label>Cuenta</label><input id="f-cuenta" list="f-cuentas" value="' + esc(mov ? (mov.cuenta || "") : "ClaroPay") + '"><datalist id="f-cuentas"><option value="ClaroPay"></option><option value="Brubank"></option></datalist></div>') +
+      (esProy ? "" : '<div class="field"><label>Cuenta</label><select id="f-cuenta">' + cuentaOpts + '</select></div>') +
       '<div class="field"><label>Monto</label><input id="f-monto" type="number" inputmode="numeric" placeholder="0" value="' + (mov ? mov.monto : "") + '"></div>' +
       '<div class="field"><label>Concepto</label><input id="f-concepto" type="text" placeholder="¿De qué se trata?" value="' + esc(mov ? (mov.concepto || "") : "") + '"></div>' +
       (esProy ? "" : '<div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="' + (mov ? (mov.fecha || hoy()) : hoy()) + '"></div>') +
