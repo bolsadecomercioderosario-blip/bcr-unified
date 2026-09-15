@@ -123,10 +123,9 @@ function cardHTML(occ) {
     const act = occ.act;
     const mine = isMine(act);
     const timeHtml = fmtTime(act.time) ? esc(timeLabel(act)) : `<span class="cmp-tbd">${esc(timeLabel(act))}</span>`;
-    // Borde: en "Mi agenda" por estado de sugerencia; en "completa" por dueño.
-    const color = currentTab === 'mias'
-        ? (ME_COLOR[act.me_estado || ''] || '#cbd5e1')
-        : (act.origen === 'secretaria' ? '#193363' : '#0ea5e9');
+    // Área → celeste fijo (mismo color en todo el proceso); Mesa → azul institucional.
+    // El estado de la sugerencia se comunica por el chip, no por el color.
+    const color = act.origen === 'area' ? '#0ea5e9' : '#193363';
     const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
     const meta = [];
     if (currentTab === 'completa') meta.push(`<span><strong>${esc(ownerLabel(act))}</strong></span>`);

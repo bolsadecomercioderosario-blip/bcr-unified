@@ -167,7 +167,7 @@ function renderActivity(occ) {
         : '';
 
     return `
-        <article class="activity">
+        <article class="activity${act.origen === 'area' ? ' area' : ''}">
             ${timeHtml}
             <div class="activity-body">
                 <h3 class="activity-title">${esc(act.title) || '(Sin título)'}</h3>

@@ -16,6 +16,7 @@ import cloudinary.uploader
 import openai
 import requests
 from google_auth_oauthlib.flow import Flow
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import agenda_models
@@ -266,15 +267,17 @@ def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):
 # CRUD de Actividades
 # ---------------------------------------------------------
 # ---------------------------------------------------------
-# Visibilidad por rol (Fase 3 multi-área):
-#   comunicacion → todo lo que NO es de área (sus actividades + las de Secretaría)
+# Visibilidad por rol (multi-área):
+#   comunicacion → sus actividades + las de Secretaría + las de área APROBADAS
+#                  (las que pasaron a la Mesa; les agrega sus campos operativos).
 #   secretaria   → Mesa (secretaria) + todas las áreas (para ver y aprobar)
 #   area:<slug>  → Mesa + todas las áreas (Mi agenda filtra a lo propio en el front)
 # ---------------------------------------------------------
 def _visibility_filter(query, role: str):
     A = agenda_models.Activity
     if role == ROLE_COMUNICACION:
-        return query.filter(A.origen != "area")
+        # No-área (comunicación + secretaría) + área aprobada.
+        return query.filter(or_(A.origen != "area", A.me_estado == "aprobada"))
     # secretaria y área ven Mesa + áreas (no lo interno de Comunicación).
     return query.filter(A.origen.in_(["secretaria", "area"]))
 
@@ -299,7 +302,7 @@ def read_archived_activities(db: Session = Depends(get_db), role: str = Depends(
 
 
 def _owns(db_activity, role: str) -> bool:
-    """¿El rol es dueño de esta actividad (puede editarla/borrarla)?"""
+    """¿El rol es dueño de esta actividad (puede borrarla/restaurarla)?"""
     origen = db_activity.origen or "comunicacion"
     if role == ROLE_COMUNICACION:
         return origen == "comunicacion"
@@ -308,6 +311,43 @@ def _owns(db_activity, role: str) -> bool:
     if is_area_role(role):
         return origen == "area" and (db_activity.area or "") == area_of_role(role)
     return False
+
+
+# Grupos de campos, para permisos de edición a nivel de campo.
+_GENERALS = {"date", "time", "end_date", "end_time", "title", "description",
+             "location", "observations", "participants"}
+_ATTACHMENT = {"attachment_url", "attachment_name"}
+# Campos "propios de Comunicación" (operativo + notas internas): los agrega
+# Comunicación a cualquier actividad que vea (propia, de Secretaría o de área ya
+# en la Mesa), sin tocar los Datos Generales.
+_OPERATIVE = {"responsible", "external_name", "channels", "done", "drive_bcr",
+              "drive_santiago", "copy_instagram", "copy_linkedin", "story_type",
+              "comunicacion_notes"}
+# Campos "propios de Secretaría" (seguimiento): los edita Secretaría tanto en sus
+# actividades como en las de área que aceptó.
+_SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other"}
+
+
+def _allowed_update_fields(db_activity, role: str) -> set:
+    """Qué campos puede modificar `role` en esta actividad. origen/area nunca."""
+    origen = db_activity.origen or "comunicacion"
+    if role == ROLE_COMUNICACION:
+        if origen == "comunicacion":
+            return _GENERALS | _ATTACHMENT | _OPERATIVE
+        if origen == "secretaria" or (origen == "area" and db_activity.me_estado == "aprobada"):
+            return set(_OPERATIVE)          # ajena: sólo sus campos operativos
+        return set()
+    if role == ROLE_SECRETARIA:
+        if origen == "secretaria":
+            return _GENERALS | _ATTACHMENT | _SEC_WORKFLOW
+        if origen == "area":
+            return _SEC_WORKFLOW | {"me_estado"}   # su seguimiento + aprobar/rechazar
+        return set()
+    if is_area_role(role):
+        if origen == "area" and (db_activity.area or "") == area_of_role(role):
+            return _GENERALS | _ATTACHMENT | {"me_estado"}
+        return set()
+    return set()
 
 
 @router.post("/actividades", response_model=agenda_models.ActivityOut)
@@ -340,39 +380,23 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
 
-    origen = db_activity.origen or "comunicacion"
-    update_data = activity.model_dump(exclude_unset=True)
-
-    if role == ROLE_SECRETARIA and origen == "area":
-        # Secretaría sobre una actividad de área: SÓLO puede aprobar/rechazar
-        # (setear me_estado). No toca el contenido — lo maneja el área. Si el
-        # request no trae me_estado, es un no-op (no error).
-        if "me_estado" in update_data:
-            estado = update_data.get("me_estado") or ""
-            if estado not in ("pendiente", "aprobada", "rechazada", ""):
-                raise HTTPException(status_code=400, detail="Estado de Mesa inválido")
-            db_activity.me_estado = estado
-            db.commit()
-            db.refresh(db_activity)
-        return db_activity
-
-    if not _owns(db_activity, role):
+    allowed = _allowed_update_fields(db_activity, role)
+    if not allowed:
         raise HTTPException(status_code=403, detail="No podés editar esta actividad")
 
-    # Nadie cambia el dueño por esta vía.
-    update_data.pop("origen", None)
-    update_data.pop("area", None)
-    if is_area_role(role):
-        # El área no puede auto-aprobarse: si ya está aprobada, se mantiene;
-        # si no, sólo puede dejarla en pendiente o sin sugerir.
-        if "me_estado" in update_data:
-            if db_activity.me_estado == "aprobada":
-                update_data["me_estado"] = "aprobada"
-            else:
-                update_data["me_estado"] = "pendiente" if (update_data["me_estado"] or "") else ""
-    else:
-        # Comunicación/Secretaría no manejan me_estado de sus propias actividades.
-        update_data.pop("me_estado", None)
+    # Sólo se aplican los campos permitidos para este rol (origen/area nunca).
+    update_data = {k: v for k, v in activity.model_dump(exclude_unset=True).items() if k in allowed}
+
+    if "me_estado" in update_data:
+        if is_area_role(role):
+            # El área no puede auto-aprobarse: si ya está aprobada, se mantiene;
+            # si no, sólo puede dejarla en pendiente o sin sugerir.
+            update_data["me_estado"] = ("aprobada" if db_activity.me_estado == "aprobada"
+                                        else ("pendiente" if (update_data["me_estado"] or "") else ""))
+        else:  # secretaria aprueba/rechaza/revierte
+            if update_data["me_estado"] not in ("pendiente", "aprobada", "rechazada", ""):
+                raise HTTPException(status_code=400, detail="Estado de Mesa inválido")
+            update_data["me_estado"] = update_data["me_estado"] or ""
 
     for key, value in update_data.items():
         setattr(db_activity, key, value)

@@ -206,6 +206,9 @@ html, body {
     grid-template-columns: 80px 1fr;
     gap: 1rem;
 }
+/* Las actividades nacidas en las áreas llevan un acento celeste (mismo color
+   en todo el proceso). El resto (Mesa) queda uniforme. */
+.activity.area { border-left: 4px solid #0ea5e9; }
 .activity-time {
     font-size: 1.15rem;
     font-weight: 700;

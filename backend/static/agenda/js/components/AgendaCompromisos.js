@@ -15,13 +15,16 @@ import { SEC_RESPONSABLES, ownerLabel } from '../constants.js';
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
-// Colores del semáforo por estado de avance.
+// Colores del semáforo por estado de avance (sólo para actividades de la Mesa).
 const ESTADO_COLOR = {
     'Pendiente': '#ef4444',   // rojo
     'En Proceso': '#f59e0b',  // naranja
     'Avanzado': '#2563eb',    // azul
     'Finalizado': '#16a34a',  // verde
 };
+// Las actividades nacidas en las áreas llevan SIEMPRE el mismo color (celeste),
+// en todas las vistas y en todo el proceso (no siguen el semáforo de estado).
+const AREA_COLOR = '#0ea5e9';
 
 const FILTERS = [
     { key: 'proximas', label: 'Próximas' },
@@ -146,7 +149,8 @@ function cardHTML(occ) {
     const act = occ.act;
     const isClock = !!fmtTime(act.time);
     const timeHtml = isClock ? esc(timeLabel(act)) : `<span class="cmp-tbd">${esc(timeLabel(act))}</span>`;
-    const color = ESTADO_COLOR[act.estado] || '#cbd5e1';
+    // Área → celeste fijo; Mesa → semáforo por estado.
+    const color = act.origen === 'area' ? AREA_COLOR : (ESTADO_COLOR[act.estado] || '#cbd5e1');
 
     const descHtml = act.description ? `<div class="cmp-desc">${esc(act.description)}</div>` : '';
     const meta = [];

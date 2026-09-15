@@ -71,9 +71,9 @@ export function renderActivityForm(container, preData = null) {
     // ocultamos los campos de Datos Generales que estén vacíos.
     const hasContent = (v) => v != null && String(v).trim() !== '';
     const showGen = (v) => !generalsReadOnly || hasContent(v);
-    // Notas internas: sólo en actividades que vienen de Secretaría (no en las
-    // nativas de Comunicación).
-    const showNotes = showOperative && actOrigen === 'secretaria';
+    // Notas internas de Comunicación: en las actividades ajenas que Comunicación
+    // gestiona (de Secretaría o de área ya en la Mesa), no en las nativas suyas.
+    const showNotes = showOperative && (actOrigen === 'secretaria' || actOrigen === 'area');
 
     // --- Bloque de adjunto (al final de Datos Generales) ---
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
@@ -86,7 +86,7 @@ export function renderActivityForm(container, preData = null) {
                 <input type="file" id="attach-input" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png" style="display: none;">
                 <div id="attach-area"></div>
             </div>`;
-    } else if (act.attachment_url && (actOrigen === 'secretaria' || areaForeignForSec)) {
+    } else if (act.attachment_url) {
         attachmentHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Archivo adjunto</label>
@@ -100,7 +100,7 @@ export function renderActivityForm(container, preData = null) {
     const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
     const secRespIsOther = act.sec_responsible === 'Otro';
     let estadoHTML = '';
-    if (isSec && !areaForeignForSec) {
+    if (isSec) {
         estadoHTML = `
             <section>
                 <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Estado</h3>
@@ -162,7 +162,7 @@ export function renderActivityForm(container, preData = null) {
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         Datos Generales
-                        ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> ${areaForeignForSec ? 'La carga el área · solo lectura' : 'Los carga Secretaría · solo lectura'}</span>` : ''}
+                        ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> ${actOrigen === 'area' ? 'La carga el área · solo lectura' : 'Los carga Secretaría · solo lectura'}</span>` : ''}
                     </h3>
                     <fieldset ${generalsReadOnly ? 'disabled' : ''} style="border: none; padding: 0; margin: 0; min-inline-size: auto;">
                     <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0.85rem; user-select: none;">
@@ -346,9 +346,9 @@ export function renderActivityForm(container, preData = null) {
         </div>
 
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
-            ${areaForeignForSec ? '' : '<button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>'}
+            <button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>
             ${(areaForeignForSec && act.me_estado === 'aprobada') ? '<button id="btn-revert-me" class="btn-primary" style="background:#b45309;">Quitar de la Mesa</button>' : ''}
-            <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">${areaForeignForSec ? 'Cerrar' : 'Cancelar'}</button>
+            <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
             ${showDelete ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
     `;
@@ -637,7 +637,16 @@ export function renderActivityForm(container, preData = null) {
         }
 
         let data;
-        if (isSec) {
+        if (areaForeignForSec) {
+            // Secretaría sobre una actividad de área: sólo sus campos de
+            // seguimiento (Estado). El contenido lo maneja el área; el backend
+            // ignora cualquier otro campo.
+            data = {
+                estado: formData.get('estado') || 'Pendiente',
+                sec_responsible: formData.get('sec_responsible') || '',
+                sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
+            };
+        } else if (isSec) {
             // Secretaría: Datos Generales + sección Estado + adjunto. La
             // actividad es suya.
             const att = getAttachment();
