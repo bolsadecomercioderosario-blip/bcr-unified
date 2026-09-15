@@ -95,6 +95,14 @@ html, body {
 .print-btn:hover { background: rgba(255, 255, 255, 0.28); }
 
 .topbar-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+/* Botón "Agenda Completa" + link "Acceso áreas": en desktop el link va debajo
+   del botón; en mobile, a su derecha. */
+.scope-group { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+.area-access { color: #fff; font-size: 0.8rem; font-weight: 600; text-decoration: underline; opacity: 0.92; white-space: nowrap; }
+.area-access:hover { opacity: 1; }
+@media (max-width: 600px) {
+    .scope-group { flex-direction: row; align-items: center; gap: 0.6rem; }
+}
 .scope-btn {
     background: #fff;
     color: #0742ab;
