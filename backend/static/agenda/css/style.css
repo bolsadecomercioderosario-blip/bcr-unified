@@ -1158,6 +1158,15 @@ body[data-role="secretaria"] .top-bar { display: none; }
 body[data-role="secretaria"] .view-container { padding: 0; background: #f7f8fb; }
 body[data-role="secretaria"] .mobile-bottom-tabs { display: none; }
 
+/* Área (Funcionarios): misma lógica que Secretaría — la vista es la pantalla. */
+body[data-role="area"] .top-bar { display: none; }
+body[data-role="area"] .view-container { padding: 0; background: #f7f8fb; }
+body[data-role="area"] .mobile-bottom-tabs { display: none; }
+
+/* En la vista de área, sólo las tarjetas propias son clickeables (editar). */
+.cmp-card.cmp-clickable, .cmp-past-item.cmp-clickable { cursor: pointer; }
+.cmp-card:not(.cmp-clickable) { cursor: default; }
+
 .cmp-view {
     width: 100%;
     min-height: 100%;

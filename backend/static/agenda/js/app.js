@@ -4,22 +4,26 @@ import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
 import { renderActivityForm } from './components/ActivityForm.js';
 import { renderAgendaCompromisos } from './components/AgendaCompromisos.js';
+import { renderAreaAgenda } from './components/AreaAgenda.js';
 import { renderEfemeridesModal } from './components/EfemeridesModal.js';
 import { renderArchivedModal } from './components/ArchivedModal.js';
 import { getRole, isSecretaria } from './role.js';
 
-// Rol del usuario (secretaria | comunicacion). Lo exponemos en el <body> para
-// que el CSS muestre/oculte la nav que corresponde a cada rol.
+// Rol del usuario (secretaria | comunicacion | area). Lo exponemos en el <body>
+// para que el CSS muestre/oculte la nav que corresponde a cada rol.
 const ROLE = getRole();
 document.body.dataset.role = ROLE;
 
-// Vistas permitidas por rol. Secretaría sólo ve la Agenda de Compromisos.
-const ALLOWED_VIEWS = ROLE === 'secretaria'
-    ? ['compromisos']
+// Vistas permitidas por rol. Secretaría → Agenda de Compromisos; Área → su
+// vista propia (Mi agenda + Agenda completa); Comunicación → la app completa.
+const ALLOWED_VIEWS = ROLE === 'secretaria' ? ['compromisos']
+    : ROLE === 'area' ? ['area']
     : ['list', 'conectados', 'santi'];
 
 // La vista inicial depende del rol.
-state.view = ROLE === 'secretaria' ? 'compromisos' : 'list';
+state.view = ROLE === 'secretaria' ? 'compromisos'
+    : ROLE === 'area' ? 'area'
+    : 'list';
 
 const viewContainer = document.getElementById('view-container');
 const btnNewActivity = document.getElementById('btn-new-activity');
@@ -94,6 +98,9 @@ function updateUI() {
             break;
         case 'compromisos':
             renderAgendaCompromisos(viewContainer);
+            break;
+        case 'area':
+            renderAreaAgenda(viewContainer);
             break;
     }
 

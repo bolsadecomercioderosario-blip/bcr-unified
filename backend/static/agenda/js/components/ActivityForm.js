@@ -1,5 +1,5 @@
 import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
-import { getRole } from '../role.js';
+import { getRole, getAreaSlug } from '../role.js';
 import { SEC_RESPONSABLES } from '../constants.js';
 // Nota: los botones de "Generar con IA" en este modal se sacaron por seguridad
 // (no exponer la API key de OpenAI desde un endpoint público). La generación
@@ -32,7 +32,8 @@ export function renderActivityForm(container, preData = null) {
         sec_responsible: sourceAct.sec_responsible || '',
         sec_responsible_other: sourceAct.sec_responsible_other || '',
         attachment_url: sourceAct.attachment_url || '',
-        attachment_name: sourceAct.attachment_name || ''
+        attachment_name: sourceAct.attachment_name || '',
+        me_estado: sourceAct.me_estado || ''
     };
 
     const isNew = !state.currentActivity;
@@ -40,16 +41,18 @@ export function renderActivityForm(container, preData = null) {
     // --- Rol / origen: deciden qué secciones se muestran y qué se guarda ---
     const role = getRole();
     const isSec = role === 'secretaria';
+    const isArea = role === 'area';
+    const areaSlug = getAreaSlug();
     // Origen de la actividad. Para nuevas, lo define el rol que la crea.
-    const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : 'comunicacion') : 'comunicacion');
-    // Datos Generales: los edita el dueño (Secretaría siempre; Comunicación sólo
-    // en sus propias actividades). En las de Secretaría, Comunicación los ve en
-    // solo-lectura.
-    const generalsEditable = isSec || actOrigen === 'comunicacion';
+    const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : isArea ? 'area' : 'comunicacion') : 'comunicacion');
+    // Datos Generales: los edita el dueño (Secretaría siempre; Área en las
+    // suyas; Comunicación sólo en sus propias). En las de Secretaría,
+    // Comunicación los ve en solo-lectura.
+    const generalsEditable = isSec || isArea || actOrigen === 'comunicacion';
     const generalsReadOnly = !generalsEditable;
     // Operativo (responsable, canales, links, copies) + notas internas: sólo
-    // Comunicación. Secretaría no ve nada de esto.
-    const showOperative = !isSec;
+    // Comunicación. Secretaría y Área no ven nada de esto.
+    const showOperative = !isSec && !isArea;
     // Borrar la actividad entera es acción del dueño de los Datos Generales.
     const showDelete = !isNew && generalsEditable;
 
@@ -73,7 +76,7 @@ export function renderActivityForm(container, preData = null) {
     // Secretaría puede subir/cambiar/quitar; Comunicación sólo ve/descarga (en
     // actividades de Secretaría que ya tengan adjunto).
     let attachmentHTML = '';
-    if (isSec) {
+    if (isSec || isArea) {
         attachmentHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Archivo adjunto <span style="font-weight: 400; color: var(--text-muted); font-size: 0.78rem;">(DOC, DOCX, PDF, JPG o PNG)</span></label>
@@ -118,6 +121,27 @@ export function renderActivityForm(container, preData = null) {
                     <label>Nombre del responsable</label>
                     <input type="text" name="sec_responsible_other" value="${(act.sec_responsible_other || '').replace(/"/g, '&quot;')}" placeholder="Nombre y apellido">
                 </div>
+            </section>`;
+    }
+
+    // --- Sección "Agenda de la Mesa" (sólo Área): sugerir a Compromisos ---
+    let sugerirHTML = '';
+    if (isArea) {
+        const st = act.me_estado || '';
+        const checked = (st === 'pendiente' || st === 'aprobada') ? 'checked' : '';
+        const disabled = st === 'aprobada' ? 'disabled' : '';
+        let hint = 'Se envía como sugerencia; Secretaría la aprueba para que aparezca en la Agenda de la Mesa.';
+        if (st === 'pendiente') hint = 'Sugerida — pendiente de aprobación de Secretaría.';
+        else if (st === 'aprobada') hint = 'Aprobada — ya aparece en la Agenda de la Mesa. La seguís editando normalmente.';
+        else if (st === 'rechazada') hint = 'Secretaría no la sumó a la Mesa. Podés volver a sugerirla marcando la casilla.';
+        sugerirHTML = `
+            <section>
+                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Agenda de la Mesa</h3>
+                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: ${disabled ? 'default' : 'pointer'}; font-weight: 600;">
+                    <input type="checkbox" id="area-sugerir" ${checked} ${disabled} style="width: 18px; height: 18px;">
+                    Sugerir esta actividad para la Agenda de Compromisos (Mesa)
+                </label>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">${hint}</p>
             </section>`;
     }
 
@@ -208,6 +232,8 @@ export function renderActivityForm(container, preData = null) {
                 </section>
 
                 ${estadoHTML}
+
+                ${sugerirHTML}
 
                 ${showOperative ? `
                 ${showNotes ? `
@@ -440,7 +466,7 @@ export function renderActivityForm(container, preData = null) {
     // getAttachment devuelve el adjunto vigente al guardar. Default: el que ya
     // tenía la actividad (para no perderlo cuando el form no lo edita).
     let getAttachment = () => ({ attachment_url: act.attachment_url || '', attachment_name: act.attachment_name || '' });
-    if (isSec) {
+    if (isSec || isArea) {
         const attachInput = container.querySelector('#attach-input');
         const attachArea = container.querySelector('#attach-area');
         let attachUrl = act.attachment_url || '';
@@ -618,6 +644,23 @@ export function renderActivityForm(container, preData = null) {
                 sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
                 attachment_url: att.attachment_url,
                 attachment_name: att.attachment_name,
+            };
+        } else if (isArea) {
+            // Área: Datos Generales + adjunto + estado de sugerencia a la Mesa.
+            const att = getAttachment();
+            const sug = container.querySelector('#area-sugerir');
+            // No se puede "des-aprobar" desde el área: si ya está aprobada, queda.
+            let me_estado = act.me_estado || '';
+            if (me_estado !== 'aprobada') {
+                me_estado = (sug && sug.checked) ? 'pendiente' : '';
+            }
+            data = {
+                ...generalsData,
+                origen: 'area',
+                area: areaSlug,
+                attachment_url: att.attachment_url,
+                attachment_name: att.attachment_name,
+                me_estado,
             };
         } else {
             // Comunicación: siempre lo operativo + notas internas.
