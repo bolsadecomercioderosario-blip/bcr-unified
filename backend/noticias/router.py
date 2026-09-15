@@ -29,8 +29,8 @@ from config import CLOUDINARY_ENABLED, MASBCR_TABLERO_URL, UPLOADS_DIR
 from database import get_db
 from noticias import render
 from noticias.models import (
-    CATEGORIAS, KIT_CATEGORIAS, _KIT_NOMBRE, _KIT_SLUGS,
-    MediaAsset, MediaAssetIn, Noticia, NoticiaIn, Video, VideoIn,
+    CATEGORIAS, KIT_CATEGORIAS, KIT_SUBCATS, _KIT_NOMBRE, _KIT_SLUGS,
+    MediaAsset, MediaAssetIn, MediaAssetUpdate, Noticia, NoticiaIn, Video, VideoIn,
 )
 
 _YT_RE = re.compile(r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})")
@@ -220,11 +220,18 @@ def kit_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
     rows = db.query(MediaAsset).order_by(MediaAsset.orden.asc(), MediaAsset.created_at.desc()).all()
     return {
         "categorias": KIT_CATEGORIAS,
+        "subcats": KIT_SUBCATS,
         "assets": [
-            {"id": a.id, "kit_cat": a.kit_cat, "url": a.url, "titulo": a.titulo}
+            {"id": a.id, "kit_cat": a.kit_cat, "subcat": a.subcat, "url": a.url, "titulo": a.titulo}
             for a in rows
         ],
     }
+
+
+def _subcat_valida(kit_cat: str, subcat: str | None) -> bool:
+    if not subcat:
+        return True
+    return subcat in KIT_SUBCATS.get(kit_cat, [])
 
 
 @kit_api.post("")
@@ -233,11 +240,26 @@ def kit_crear(payload: MediaAssetIn, db: Session = Depends(get_db)) -> dict[str,
         raise HTTPException(400, "Categoría de kit inválida")
     if not payload.url:
         raise HTTPException(400, "Falta la URL de la imagen")
-    a = MediaAsset(kit_cat=payload.kit_cat, url=payload.url, titulo=payload.titulo)
+    if not _subcat_valida(payload.kit_cat, payload.subcat):
+        raise HTTPException(400, "Subcategoría inválida para esta galería")
+    a = MediaAsset(kit_cat=payload.kit_cat, url=payload.url, titulo=payload.titulo,
+                   subcat=payload.subcat or None)
     db.add(a)
     db.commit()
     db.refresh(a)
-    return {"id": a.id, "kit_cat": a.kit_cat, "url": a.url, "titulo": a.titulo}
+    return {"id": a.id, "kit_cat": a.kit_cat, "subcat": a.subcat, "url": a.url, "titulo": a.titulo}
+
+
+@kit_api.patch("/{aid}")
+def kit_actualizar(aid: int, payload: MediaAssetUpdate, db: Session = Depends(get_db)) -> dict[str, Any]:
+    a = db.query(MediaAsset).filter(MediaAsset.id == aid).first()
+    if a is None:
+        raise HTTPException(404, "Recurso no encontrado")
+    if not _subcat_valida(a.kit_cat, payload.subcat):
+        raise HTTPException(400, "Subcategoría inválida para esta galería")
+    a.subcat = payload.subcat or None
+    db.commit()
+    return {"id": a.id, "kit_cat": a.kit_cat, "subcat": a.subcat, "url": a.url, "titulo": a.titulo}
 
 
 @kit_api.delete("/{aid}")
@@ -480,7 +502,7 @@ async def kit_gallery(cat: str, request: Request, db: Session = Depends(get_db))
         .order_by(MediaAsset.orden.asc(), MediaAsset.created_at.desc()).all()
     )
     nombre = _KIT_NOMBRE.get(cat, cat)
-    body = render.render_kit_gallery(nombre, assets)
+    body = render.render_kit_gallery(nombre, assets, KIT_SUBCATS.get(cat))
     html = render.base_page(
         title=f"Kit Multimedia · {nombre} — Más BCR",
         description=f"Imágenes de {nombre} — Kit Multimedia de la BCR.",

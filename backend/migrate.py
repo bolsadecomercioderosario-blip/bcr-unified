@@ -126,6 +126,10 @@ def migrate():
     from aapresid.seed import seed_aapresid_if_empty
     seed_aapresid_if_empty()
 
+    # Subcategorías (subtítulos) del Kit Multimedia.
+    _try_exec("ALTER media_assets add subcat",
+              "ALTER TABLE media_assets ADD COLUMN subcat VARCHAR DEFAULT NULL")
+
     # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
     # toques) la primera vez que las tablas ab_ están vacías.
     from abuela.seed import seed_abuela_if_empty

@@ -149,10 +149,10 @@ a{color:var(--link);text-decoration:none}
 .ph{background:linear-gradient(135deg,#cdd6df,#9aa7b6);position:relative;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .logo{display:flex;align-items:center;gap:12px}
-.logo-img{height:66px;width:auto;display:block}
+.logo-img{height:92px;width:auto;display:block}
 .foot .logo-img{height:64px}
 header.top{background:#fff;color:var(--ink);position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line)}
-.topbar{display:flex;align-items:center;gap:16px;height:94px}
+.topbar{display:flex;align-items:center;gap:16px;height:112px}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:14px}
 .socials{display:flex;gap:16px}
 .ico{width:20px;height:20px;fill:var(--navy);opacity:.85}
@@ -235,6 +235,8 @@ footer .ico{fill:#fff;opacity:.9}
 .kitbody p{color:var(--muted);font-size:13px;margin-top:6px}
 .kitcount{display:inline-block;margin-top:10px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.5px}
 .galgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.galsub{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:19px;letter-spacing:.01em;text-transform:uppercase;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--line)}
+.galsub:first-of-type{margin-top:10px}
 .gal{position:relative;display:block;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#e5e7eb}
 .gal img{width:100%;height:100%;object-fit:cover}
 .gal span{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,49,75,.85));color:#fff;font-size:12px;font-weight:600;padding:18px 10px 8px;opacity:0;transition:.15s}
@@ -480,16 +482,37 @@ def render_kit_index(cats: list[dict]) -> str:
             f'<div class="kitgrid">{cards}</div></div></section>')
 
 
-def render_kit_gallery(nombre: str, assets: list) -> str:
+def _gal_item(a) -> str:
+    return (f'<a class="gal" href="{_esc(a.url)}" target="_blank" rel="noopener" download>'
+            f'<img src="{_esc(a.url)}" alt="{_esc(a.titulo or "")}">'
+            f'<span>&#10515; Descargar</span></a>')
+
+
+def _gal_grupo(titulo: str | None, assets: list) -> str:
+    grid = f'<div class="galgrid">{"".join(_gal_item(a) for a in assets)}</div>'
+    if titulo:
+        return f'<h3 class="galsub">{_esc(titulo)}</h3>{grid}'
+    return grid
+
+
+def render_kit_gallery(nombre: str, assets: list, subcats: list | None = None) -> str:
     if not assets:
         inner = '<div class="empty">Esta galería todavía no tiene imágenes.</div>'
-    else:
-        items = ""
+    elif subcats:
+        # Agrupadas por subcategoría, en el orden definido; las sin clasificar
+        # van al final bajo su propio subtítulo para que se noten y se asignen.
+        por_sub: dict[str, list] = {}
         for a in assets:
-            items += (f'<a class="gal" href="{_esc(a.url)}" target="_blank" rel="noopener" download>'
-                      f'<img src="{_esc(a.url)}" alt="{_esc(a.titulo or "")}">'
-                      f'<span>&#10515; Descargar</span></a>')
-        inner = f'<div class="galgrid">{items}</div>'
+            por_sub.setdefault(getattr(a, "subcat", None) or "", []).append(a)
+        bloques = []
+        for sc in subcats:
+            if por_sub.get(sc):
+                bloques.append(_gal_grupo(sc, por_sub[sc]))
+        if por_sub.get(""):
+            bloques.append(_gal_grupo("Sin clasificar", por_sub[""]))
+        inner = "".join(bloques)
+    else:
+        inner = _gal_grupo(None, assets)
     return (f'<section class="grid"><div class="wrap">'
             f'<a class="backlink" href="/noticias/kit">&#8592; Kit Multimedia</a>'
             f'<h2 class="sec-title">{_esc(nombre)}</h2>{inner}</div></section>')
