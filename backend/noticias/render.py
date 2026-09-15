@@ -32,10 +32,11 @@ def fecha_es(dt: datetime | None) -> str:
     return f"{dt.day} de {_MESES[dt.month]} de {dt.year}"
 
 
-# Logo oficial (versión negativa, para fondo navy). Incluye marca + "BCR" +
-# "FUENTE DE NOTICIAS", así que no hace falta texto aparte.
-_LOGO = ('<img class="logo-img" src="/static/noticias/img/logo-neg.png" '
-         'alt="+BCR — Fuente de Noticias">')
+# Logo oficial: color para fondos claros (header blanco), negativo para navy (footer).
+_LOGO_COLOR = ('<img class="logo-img" src="/static/noticias/img/logo-color.png" '
+               'alt="+BCR — Fuente de Noticias">')
+_LOGO_NEG = ('<img class="logo-img" src="/static/noticias/img/logo-neg.png" '
+             'alt="+BCR — Fuente de Noticias">')
 
 _ICON = {
     "x": '<svg class="ico" viewBox="0 0 24 24"><path d="M18.9 2H22l-7 8 8.2 11h-6.4l-5-6.6L6 21H2.9l7.5-8.6L2.3 2h6.6l4.5 6zM17.8 19h1.7L7.3 3.8H5.5z"/></svg>',
@@ -63,64 +64,116 @@ def _social_links() -> str:
         for k in ("x", "ig", "fb", "yt", "in")
     )
 
+
+# Colores de cultivo (paleta del portal institucional) para la marquesina de precios.
+_CROP = {
+    "soja": ("Soja", "#2E9E41"),
+    "trigo": ("Trigo", "#9A7B39"),
+    "maiz": ("Maíz", "#E08A1E"),
+    "maíz": ("Maíz", "#E08A1E"),
+    "girasol": ("Girasol", "#E0AE00"),
+    "sorgo": ("Sorgo", "#B23A2E"),
+    "cebada": ("Cebada", "#C69A3A"),
+}
+
+
+def _crop(prod: str):
+    return _CROP.get((prod or "").strip().lower(), ((prod or "-").title(), "#193363"))
+
+
+def _fmt_ars(v) -> str:
+    try:
+        return "$ " + f"{int(round(float(v))):,}".replace(",", ".")
+    except Exception:
+        return "-"
+
+
+def _hpcell(p: dict) -> str:
+    nombre, color = _crop(p["producto"])
+    return (f'<div class="hpcell"><div class="hpbar" style="background:{color}"></div>'
+            f'<div class="hpname">{_esc(nombre)}</div>'
+            f'<div class="hpval">{_fmt_ars(p["precio"])}</div></div>')
+
+
+def _pcell(p: dict) -> str:
+    nombre, color = _crop(p["producto"])
+    return (f'<div class="pcell"><div class="pbar" style="background:{color}"></div>'
+            f'<div class="pname">{_esc(nombre)}</div>'
+            f'<div class="pprice">{_fmt_ars(p["precio"])}</div></div>')
+
 _CSS = """
-:root{--navy:#00314b;--cyan:#009ee3;--link:#0079ad;--text:#333;--muted:#6b7280;--line:#e5e7eb;--f:"Outfit",system-ui,sans-serif}
+:root{--navy:#193363;--navy-deep:#102249;--azure:#2E6FB0;--cyan:#009ee3;--link:#2E6FB0;
+--text:#1e2a44;--ink:#1e2a44;--muted:#6b7b92;--line:#e1e8f2;--soft:#f4f7fb;
+--f:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+--serif:"Spectral",Georgia,"Times New Roman",serif;
+--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--f);color:var(--text);background:#fff;line-height:1.55}
+body{font-family:var(--f);color:var(--ink);background:#fff;line-height:1.55}
 img{max-width:100%;display:block}
 a{color:var(--link);text-decoration:none}
 .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
 .ph{background:linear-gradient(135deg,#cdd6df,#9aa7b6);position:relative;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .logo{display:flex;align-items:center;gap:12px}
-.logo-img{height:70px;width:auto;display:block}
+.logo-img{height:66px;width:auto;display:block}
 .foot .logo-img{height:64px}
-.logo .txt{display:flex;flex-direction:column;line-height:1}
-.logo .n{font-weight:800;font-size:22px;color:#fff;letter-spacing:.5px}
-.logo .s{font-size:8.5px;letter-spacing:3px;color:var(--cyan);margin-top:4px;font-weight:600}
-header.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:50}
-.topbar{display:flex;align-items:center;gap:30px;height:104px}
-nav.main{display:flex;gap:24px;align-items:center;font-weight:600;font-size:14px;position:relative}
-nav.main a{color:#fff}
-.drop{position:relative}
-.drop>span{cursor:pointer}
-.drop>span::after{content:" \\25BE";color:var(--cyan);font-size:11px}
-.drop .menu{display:none;position:absolute;top:100%;left:0;background:#fff;min-width:210px;box-shadow:0 12px 30px rgba(0,0,0,.15);border-radius:6px;padding:6px 0;z-index:60}
-.drop:hover .menu{display:block}
-.drop .menu a{display:block;color:var(--navy);padding:9px 16px;font-size:13.5px}
-.drop .menu a:hover{background:#f1f5f9}
-.top-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+header.top{background:#fff;color:var(--ink);position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line)}
+.topbar{display:flex;align-items:center;gap:16px;height:94px}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:14px}
 .socials{display:flex;gap:16px}
-.ico{width:20px;height:20px;fill:#fff;opacity:.9}
-.hero{display:grid;grid-template-columns:1.35fr 1fr;background:var(--navy)}
-.hero .img{aspect-ratio:16/10}
-.hero .panel{padding:38px 40px;color:#fff;display:flex;flex-direction:column;justify-content:center}
-.hero .k{color:var(--cyan);font-weight:700;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px}
-.hero h1{font-weight:800;font-size:32px;line-height:1.18;margin-bottom:16px}
+.ico{width:20px;height:20px;fill:var(--navy);opacity:.85}
+.top .socials a:hover .ico{opacity:1}
+/* Precios pizarra — cabecera fija (desktop) */
+.hdrpiz-wrap{display:none}
+.hdrpiz{display:flex;align-items:stretch}
+.hpcell{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15;padding:0 15px;border-right:1px solid var(--line)}
+.hpcell:last-child{border-right:0}
+.hpbar{width:30px;height:3px;border-radius:2px;margin-bottom:5px}
+.hpname{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+.hpval{font-family:var(--mono);font-size:15px;color:var(--navy);font-weight:600;margin-top:3px;white-space:nowrap}
+@media(min-width:992px){.hdrpiz-wrap{display:flex;flex:1;justify-content:center;margin:0 16px}}
+/* Precios pizarra — marquesina (mobile) */
+.pizarra{background:#fff;border-bottom:1px solid var(--line)}
+.marquee{overflow:hidden;width:100%}
+.mtrack{display:flex;width:max-content;animation:mscroll 32s linear infinite}
+.mtrack:hover{animation-play-state:paused}
+@keyframes mscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.mtrack{animation:none}}
+.pcell{flex:0 0 auto;min-width:135px;display:flex;flex-direction:column;align-items:center;text-align:center;border-right:1px solid var(--line);padding:8px 0 9px}
+.pbar{height:4px;width:100%}
+.pname{margin-top:7px;font-weight:800;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+.pprice{font-family:var(--mono);font-size:17px;color:var(--navy);font-weight:600;margin-top:4px}
+@media(min-width:992px){.pizarra{display:none}}
+/* Hero (más bajo que antes) */
+.hero{display:grid;grid-template-columns:1.5fr 1fr;background:var(--navy)}
+.hero .img{aspect-ratio:16/7}
+.hero .panel{padding:24px 34px;color:#fff;display:flex;flex-direction:column;justify-content:center}
+.hero .k{color:var(--cyan);font-weight:700;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
+.hero h1{font-family:var(--serif);font-weight:700;font-size:26px;line-height:1.2;margin-bottom:11px}
 .hero h1 a{color:#fff}
-.hero p{font-size:14.5px;color:#cdd8e0;margin-bottom:18px;font-weight:300}
+.hero p{font-size:14px;color:#cdd8e0;margin-bottom:14px;font-weight:400}
 .date{color:var(--cyan);font-size:13px;font-weight:600}
 section.grid{padding:36px 0 50px}
-.sec-title{font-weight:800;color:var(--navy);font-size:20px;margin:0 0 20px;border-left:4px solid var(--cyan);padding-left:12px}
+.sec-title{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:22px;margin:0 0 20px;border-left:4px solid var(--cyan);padding-left:12px}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
 .card .img{aspect-ratio:16/10;border-top:3px solid var(--cyan)}
 .card .k{color:var(--cyan);font-weight:700;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;margin:13px 0 6px}
-.card h3{font-weight:700;color:var(--navy);font-size:18px;line-height:1.28}
+.card h3{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:18px;line-height:1.3}
 .card h3 a{color:var(--navy)}
 .card .d{color:var(--muted);font-size:12px;margin-top:9px}
 .article-wrap{padding:36px 0 10px}
 .art{display:grid;grid-template-columns:78px 1fr 300px;gap:26px}
 .share{display:flex;flex-direction:column;gap:12px;padding-top:6px}
 .share a{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--navy)}
-.share .ico{width:16px;height:16px;opacity:1}
+.share .ico{width:16px;height:16px;fill:#fff;opacity:1}
 .art .k{color:var(--cyan);font-weight:700;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
-.art h1{font-weight:800;color:var(--navy);font-size:36px;line-height:1.15;margin-bottom:14px}
+.art h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:34px;line-height:1.18;margin-bottom:14px}
 .art .meta{color:var(--muted);font-size:13px;margin-bottom:18px}
 .art .bajada{font-size:18px;color:#4b5563;margin-bottom:22px}
 .art .cover{aspect-ratio:16/9;margin-bottom:22px;border-radius:4px}
 .art .body{font-size:16px;color:#333}
 .art .body p{margin-bottom:16px}
-.art .body h2{color:var(--navy);font-size:24px;margin:24px 0 12px}
+.art .body h2{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:24px;margin:24px 0 12px}
 .art .body img{border-radius:4px;margin:16px 0}
 .art .body a{color:var(--link);text-decoration:underline}
 aside h4{font-weight:800;color:#9aa2b1;font-size:13px;letter-spacing:1.5px;border-bottom:2px solid var(--line);padding-bottom:8px;margin-bottom:14px}
@@ -128,7 +181,8 @@ aside h4{font-weight:800;color:#9aa2b1;font-size:13px;letter-spacing:1.5px;borde
 .rel .t{width:66px;height:50px;flex:none;border-radius:4px;overflow:hidden;background:#e5e7eb;display:block}
 .rel .t img{width:100%;height:100%;object-fit:cover}
 .rel a{color:var(--navy);font-weight:600;font-size:13px;line-height:1.3}
-footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
+footer{background:var(--navy-deep);color:#b9c6d0;padding:36px 0;margin-top:30px}
+footer .ico{fill:#fff;opacity:.9}
 .foot{display:flex;gap:48px;align-items:flex-start;flex-wrap:wrap}
 .foot .col{font-size:13px;line-height:1.95}
 .foot .col b{color:#fff}
@@ -139,7 +193,7 @@ footer{background:var(--navy);color:#b9c6d0;padding:36px 0;margin-top:30px}
 .kitcard:hover{box-shadow:0 10px 24px rgba(0,0,0,.08)}
 .kitcard .kitimg{aspect-ratio:16/10;border-top:3px solid var(--cyan)}
 .kitbody{padding:14px 16px}
-.kitbody h3{color:var(--navy);font-weight:800;font-size:18px}
+.kitbody h3{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:18px}
 .kitbody p{color:var(--muted);font-size:13px;margin-top:6px}
 .kitcount{display:inline-block;margin-top:10px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.5px}
 .galgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
@@ -177,18 +231,26 @@ def _cat_menu() -> str:
     return f'<div class="drop"><span>Categorías</span><div class="menu">{items}</div></div>'
 
 
-def _header() -> str:
+def _header(precios: list | None = None) -> str:
+    precios = precios or []
+    hdr = "".join(_hpcell(p) for p in precios)
+    hdrpiz = f'<div class="hdrpiz-wrap"><div class="hdrpiz">{hdr}</div></div>' if hdr else ""
+    cells = "".join(_pcell(p) for p in precios)  # duplicadas para loop sin cortes
+    marquee = (f'<div class="pizarra" title="Precios pizarra Mercado Físico de Rosario">'
+               f'<div class="marquee"><div class="mtrack">{cells}{cells}</div></div></div>'
+               if cells else "")
     return f"""
 <header class="top"><div class="wrap topbar">
-  <a class="logo" href="/noticias/">{_LOGO}</a>
+  <a class="logo" href="/noticias/">{_LOGO_COLOR}</a>
+  {hdrpiz}
   <div class="top-right"><div class="socials">{_social_links()}</div></div>
-</div></header>"""
+</div></header>{marquee}"""
 
 
 def _footer() -> str:
     return f"""
 <footer><div class="wrap foot">
-  <a class="logo">{_LOGO}</a>
+  <a class="logo">{_LOGO_NEG}</a>
   <div class="col">
     <b>Contacto</b>
     <div><a href="https://wa.me/5493416800028" target="_blank" rel="noopener" style="color:#cfe6f4">WhatsApp: +54 9 3416 80-0028</a></div>
@@ -200,7 +262,8 @@ def _footer() -> str:
 
 
 def base_page(*, title: str, description: str, body: str, canonical: str,
-              og_image: str | None = None, og_type: str = "website") -> str:
+              og_image: str | None = None, og_type: str = "website",
+              precios: list | None = None) -> str:
     og_img = f'<meta property="og:image" content="{_esc(og_image)}">' if og_image else ""
     return f"""<!DOCTYPE html>
 <html lang="es"><head>
@@ -218,10 +281,10 @@ def base_page(*, title: str, description: str, body: str, canonical: str,
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
 <style>{_CSS}</style>
 </head><body>
-{_header()}
+{_header(precios)}
 {body}
 {_footer()}
 </body></html>"""

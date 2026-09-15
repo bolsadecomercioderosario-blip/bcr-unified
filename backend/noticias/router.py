@@ -303,6 +303,25 @@ def _canonical(request: Request, path: str) -> str:
     return str(request.base_url).rstrip("/") + path
 
 
+# Orden fijo de cultivos para la marquesina de precios.
+_PRECIO_ORDEN = {"soja": 0, "trigo": 1, "maiz": 2, "maíz": 2, "girasol": 3, "sorgo": 4, "cebada": 5}
+
+
+def _latest_precios(db: Session) -> list[dict[str, Any]]:
+    """Precios pizarra de la última fecha disponible (tabla del bot). Para la
+    marquesina del header. Degradación silenciosa si no hay datos."""
+    try:
+        from bot.db_models import PrecioPizarra
+        last = db.query(PrecioPizarra.fecha).order_by(PrecioPizarra.fecha.desc()).first()
+        if not last:
+            return []
+        rows = db.query(PrecioPizarra).filter(PrecioPizarra.fecha == last[0]).all()
+        rows.sort(key=lambda r: _PRECIO_ORDEN.get((r.producto or "").lower(), 9))
+        return [{"producto": r.producto, "precio": r.precio_ars_tn, "fecha": last[0]} for r in rows]
+    except Exception:
+        return []
+
+
 @site.get("/noticias", include_in_schema=False)
 async def home_redirect():
     return RedirectResponse(url="/noticias/", status_code=307)
@@ -322,6 +341,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         body=body,
         canonical=_canonical(request, "/noticias/"),
         og_image=rows[0].imagen_portada if rows else None,
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
 
@@ -345,6 +365,7 @@ async def nota(slug: str, request: Request, db: Session = Depends(get_db)):
         canonical=canonical,
         og_image=n.imagen_portada,
         og_type="article",
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
 
@@ -362,6 +383,7 @@ async def categoria(categoria: str, request: Request, db: Session = Depends(get_
         description=f"Noticias de {categoria} — Bolsa de Comercio de Rosario.",
         body=body,
         canonical=_canonical(request, f"/noticias/categoria/{categoria}"),
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
 
@@ -383,18 +405,20 @@ async def kit_index(request: Request, db: Session = Depends(get_db)):
         description="Biblioteca de imágenes y videos de libre uso para medios de comunicación.",
         body=body,
         canonical=_canonical(request, "/noticias/kit"),
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
 
 
 @site.get("/noticias/tablero", response_class=HTMLResponse)
-async def tablero(request: Request):
+async def tablero(request: Request, db: Session = Depends(get_db)):
     body = render.render_tablero(MASBCR_TABLERO_URL)
     html = render.base_page(
         title="Tablero de Cultivos — Más BCR",
         description="Datos estadísticos de las campañas de soja, trigo y maíz de los últimos 10 años.",
         body=body,
         canonical=_canonical(request, "/noticias/tablero"),
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=300"})
 
@@ -414,5 +438,6 @@ async def kit_gallery(cat: str, request: Request, db: Session = Depends(get_db))
         description=f"Imágenes de {nombre} — Kit Multimedia de la BCR.",
         body=body,
         canonical=_canonical(request, f"/noticias/kit/{cat}"),
+        precios=_latest_precios(db),
     )
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=120"})
