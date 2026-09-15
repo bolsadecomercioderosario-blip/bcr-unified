@@ -136,6 +136,12 @@ function pendingSuggestions() {
         && a.origen === 'area' && a.me_estado === 'pendiente');
 }
 
+// Actividades de áreas ya aprobadas (están en la Mesa) — para poder revertirlas.
+function approvedSuggestions() {
+    return state.activities.filter(a => !a.is_custom && !a.archived
+        && a.origen === 'area' && a.me_estado === 'aprobada');
+}
+
 function cardHTML(occ) {
     const act = occ.act;
     const isClock = !!fmtTime(act.time);
@@ -371,40 +377,54 @@ function openSugerenciasModal() {
 
     const listEl = overlay.querySelector('#sug-list');
 
-    const render = () => {
-        const pend = pendingSuggestions().sort((a, b) =>
-            (a.date || '').localeCompare(b.date || '') || (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99'));
-        if (!pend.length) {
-            listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:2rem 0;">No hay sugerencias pendientes.</div>';
-            return;
-        }
-        listEl.innerHTML = pend.map(a => `
-            <div class="sug-item" data-id="${esc(a.id)}" style="border:1px solid var(--border); border-radius:0.6rem; padding:0.85rem 1rem; margin-bottom:0.7rem;">
-                <div style="display:flex; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
-                    <div style="min-width:0;">
-                        <div style="font-weight:700; color:var(--primary);">${esc(a.title) || '(Sin título)'}</div>
-                        <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.15rem;">
-                            ${esc(ownerLabel(a))} · ${esc(shortDate(a.date))} · ${esc(timeLabel(a))}
-                        </div>
-                        ${a.location ? `<div style="font-size:0.82rem; margin-top:0.2rem;"><strong>Lugar:</strong> ${esc(a.location)}</div>` : ''}
-                        ${a.description ? `<div style="font-size:0.82rem; color:#475569; margin-top:0.2rem;">${esc(a.description)}</div>` : ''}
+    const sortByDate = arr => arr.sort((a, b) =>
+        (a.date || '').localeCompare(b.date || '') || (fmtTime(a.time) || '99:99').localeCompare(fmtTime(b.time) || '99:99'));
+
+    const itemHTML = (a, actions) => `
+        <div class="sug-item" data-id="${esc(a.id)}" style="border:1px solid var(--border); border-radius:0.6rem; padding:0.85rem 1rem; margin-bottom:0.7rem;">
+            <div style="display:flex; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+                <div style="min-width:0;">
+                    <div style="font-weight:700; color:var(--primary);">${esc(a.title) || '(Sin título)'}</div>
+                    <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.15rem;">
+                        ${esc(ownerLabel(a))} · ${esc(shortDate(a.date))} · ${esc(timeLabel(a))}
                     </div>
-                    <div style="display:flex; gap:0.4rem; align-items:flex-start;">
-                        <button class="sug-ok" data-id="${esc(a.id)}" style="background:#16a34a; color:#fff; border:none; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Aprobar</button>
-                        <button class="sug-no" data-id="${esc(a.id)}" style="background:#fff; color:#ef4444; border:1px solid #fca5a5; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Rechazar</button>
-                    </div>
+                    ${a.location ? `<div style="font-size:0.82rem; margin-top:0.2rem;"><strong>Lugar:</strong> ${esc(a.location)}</div>` : ''}
+                    ${a.description ? `<div style="font-size:0.82rem; color:#475569; margin-top:0.2rem;">${esc(a.description)}</div>` : ''}
                 </div>
-            </div>`).join('');
+                <div style="display:flex; gap:0.4rem; align-items:flex-start;">${actions}</div>
+            </div>
+        </div>`;
+
+    const secHeader = (t) => `<h4 style="margin:0.4rem 0 0.6rem; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-muted);">${t}</h4>`;
+
+    const render = () => {
+        const pend = sortByDate(pendingSuggestions());
+        const appr = sortByDate(approvedSuggestions());
+        let html = secHeader('Pendientes de aprobación');
+        if (!pend.length) {
+            html += '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.25rem 0 0.75rem;">No hay sugerencias pendientes.</div>';
+        } else {
+            html += pend.map(a => itemHTML(a,
+                `<button class="sug-ok" data-id="${esc(a.id)}" style="background:#16a34a; color:#fff; border:none; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Aprobar</button>
+                 <button class="sug-no" data-id="${esc(a.id)}" style="background:#fff; color:#ef4444; border:1px solid #fca5a5; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Rechazar</button>`
+            )).join('');
+        }
+        if (appr.length) {
+            html += secHeader('En la Agenda de la Mesa');
+            html += appr.map(a => itemHTML(a,
+                `<button class="sug-revert" data-id="${esc(a.id)}" style="background:#fff; color:#b45309; border:1px solid #fed7aa; border-radius:0.4rem; padding:0.4rem 0.7rem; font-weight:600; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Quitar de la Mesa</button>`
+            )).join('');
+        }
+        listEl.innerHTML = html;
 
         listEl.querySelectorAll('.sug-ok').forEach(b => b.onclick = async () => {
-            b.disabled = true;
-            await updateActivity(b.dataset.id, { me_estado: 'aprobada' });
-            render();
+            b.disabled = true; await updateActivity(b.dataset.id, { me_estado: 'aprobada' }); render();
         });
         listEl.querySelectorAll('.sug-no').forEach(b => b.onclick = async () => {
-            b.disabled = true;
-            await updateActivity(b.dataset.id, { me_estado: 'rechazada' });
-            render();
+            b.disabled = true; await updateActivity(b.dataset.id, { me_estado: 'rechazada' }); render();
+        });
+        listEl.querySelectorAll('.sug-revert').forEach(b => b.onclick = async () => {
+            b.disabled = true; await updateActivity(b.dataset.id, { me_estado: 'pendiente' }); render();
         });
     };
 

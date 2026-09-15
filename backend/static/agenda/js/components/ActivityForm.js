@@ -347,6 +347,7 @@ export function renderActivityForm(container, preData = null) {
 
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
             ${areaForeignForSec ? '' : '<button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>'}
+            ${(areaForeignForSec && act.me_estado === 'aprobada') ? '<button id="btn-revert-me" class="btn-primary" style="background:#b45309;">Quitar de la Mesa</button>' : ''}
             <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">${areaForeignForSec ? 'Cerrar' : 'Cancelar'}</button>
             ${showDelete ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
@@ -710,6 +711,15 @@ export function renderActivityForm(container, preData = null) {
             btnSave.disabled = false;
             btnSave.innerText = originalText;
         }
+    };
+
+    // Secretaría: revertir una actividad de área ya aprobada (sacarla de la Mesa).
+    const revertBtn = container.querySelector('#btn-revert-me');
+    if (revertBtn) revertBtn.onclick = async () => {
+        if (!confirm('¿Quitar esta actividad de la Agenda de la Mesa? Vuelve a "pendiente" para que la revises en la bandeja.')) return;
+        revertBtn.disabled = true;
+        await updateActivity(act.id, { me_estado: 'pendiente' });
+        window.closeActivitySheet();
     };
 
     if (showDelete) {
