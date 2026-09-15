@@ -306,6 +306,34 @@ def _canonical(request: Request, path: str) -> str:
 # Orden fijo de cultivos para la marquesina (como la home institucional).
 _PRECIO_ORDEN = {"trigo": 0, "maiz": 1, "maíz": 1, "girasol": 2, "soja": 3, "sorgo": 4, "cebada": 5}
 
+# TC BNA (billete comprador) para el US$ informativo de la marquesina.
+# Se cachea en memoria ~6h para no pegarle a la API en cada request.
+_TC_CACHE: dict[str, Any] = {"valor": None, "ts": 0.0}
+_TC_TTL_SEG = 6 * 3600
+
+
+def _tc_bna_comprador() -> float | None:
+    """Dólar oficial BNA (compra) para computar el US$ informativo. Cachea el
+    valor en memoria; ante cualquier falla devuelve el último conocido o None."""
+    import time
+
+    import requests
+
+    now = time.time()
+    if _TC_CACHE["valor"] is not None and (now - _TC_CACHE["ts"]) < _TC_TTL_SEG:
+        return _TC_CACHE["valor"]
+    try:
+        r = requests.get("https://dolarapi.com/v1/dolares/oficial", timeout=6)
+        r.raise_for_status()
+        compra = float(r.json().get("compra"))
+        if compra > 0:
+            _TC_CACHE["valor"] = compra
+            _TC_CACHE["ts"] = now
+            return compra
+    except Exception:
+        pass
+    return _TC_CACHE["valor"]
+
 
 def _latest_precios(db: Session) -> list[dict[str, Any]]:
     """Precios pizarra de la última fecha disponible (tabla del bot), con la
@@ -327,13 +355,16 @@ def _latest_precios(db: Session) -> list[dict[str, Any]]:
                 for r in db.query(PrecioPizarra).filter(PrecioPizarra.fecha == fechas[1]).all()
             }
         rows.sort(key=lambda r: _PRECIO_ORDEN.get((r.producto or "").lower(), 9))
+        tc = _tc_bna_comprador()
         out = []
         for r in rows:
             pv = prev.get((r.producto or "").lower())
             trend = "eq"
             if pv is not None:
                 trend = "up" if r.precio_ars_tn > pv else ("down" if r.precio_ars_tn < pv else "eq")
-            out.append({"producto": r.producto, "precio": r.precio_ars_tn, "fecha": fechas[0], "trend": trend})
+            usd = round(r.precio_ars_tn / tc, 2) if tc else None
+            out.append({"producto": r.producto, "precio": r.precio_ars_tn,
+                        "fecha": fechas[0], "trend": trend, "usd": usd})
         return out
     except Exception:
         return []
