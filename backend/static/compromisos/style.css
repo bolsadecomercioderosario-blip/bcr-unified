@@ -94,6 +94,21 @@ html, body {
 }
 .print-btn:hover { background: rgba(255, 255, 255, 0.28); }
 
+.topbar-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.scope-btn {
+    background: #fff;
+    color: #0742ab;
+    border: 1px solid #fff;
+    padding: 0.5rem 0.95rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+.scope-btn:hover { background: #eaf0fb; }
+.scope-btn.active { background: rgba(255,255,255,0.16); color: #fff; border-color: rgba(255,255,255,0.3); }
+
 /* --- Filtros --- */
 .filters {
     max-width: 900px;

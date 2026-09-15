@@ -7,7 +7,17 @@
  */
 
 const TOKEN = window.location.pathname.split('/compromisos/')[1] || '';
-const API_URL = `/api/compromisos/${TOKEN}`;
+// scope: 'mesa' (Agenda de la Mesa) | 'completa' (Mesa + áreas / Funcionarios).
+let scope = 'mesa';
+const apiUrl = () => `/api/compromisos/${TOKEN}` + (scope === 'completa' ? '?scope=completa' : '');
+
+// Nombres de las áreas para etiquetar de quién es cada actividad (slugs = auth.py).
+const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital' };
+function ownerLabel(act) {
+    if (act.origen === 'secretaria') return 'Mesa Ejecutiva';
+    if (act.origen === 'area') return AREA_NOMBRE[act.area] || (act.area || 'Área');
+    return '';
+}
 
 // Ícono de descarga (inline) para el link "Ver Información Adicional".
 const DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
@@ -142,6 +152,9 @@ function renderActivity(occ) {
     const dayBadge = occ.dayCount > 1 ? `<span class="activity-daybadge">Día ${occ.dayIndex} de ${occ.dayCount}</span>` : '';
     const descHtml = act.description ? `<div class="activity-description">${esc(act.description)}</div>` : '';
     const meta = [];
+    if (scope === 'completa' && act.origen === 'area') {
+        meta.push(`<span class="activity-meta-item"><strong>${esc(ownerLabel(act))}</strong></span>`);
+    }
     if (act.location) {
         meta.push(`<span class="activity-meta-item"><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     }
@@ -179,7 +192,7 @@ function esc(s) {
 async function loadAndRender() {
     const content = document.getElementById('content');
     try {
-        const res = await fetch(API_URL);
+        const res = await fetch(apiUrl());
         if (res.status === 404) {
             content.innerHTML = '<div class="error"><h2>Página no encontrada</h2><p>El enlace puede haber expirado. Pedile uno nuevo al equipo de Comunicación.</p></div>';
             return;
@@ -315,6 +328,16 @@ function printRange(from, to) {
 
 const printBtn = document.getElementById('print-btn');
 if (printBtn) printBtn.addEventListener('click', openPrintModal);
+
+// ---------- Toggle "Ver Agenda Completa" (Mesa + áreas) ----------
+const scopeBtn = document.getElementById('scope-btn');
+if (scopeBtn) scopeBtn.addEventListener('click', () => {
+    scope = (scope === 'mesa') ? 'completa' : 'mesa';
+    scopeBtn.textContent = (scope === 'mesa') ? 'Ver Agenda Completa' : 'Ver sólo la Mesa';
+    scopeBtn.classList.toggle('active', scope === 'completa');
+    document.getElementById('content').innerHTML = '<div class="loader">Cargando agenda…</div>';
+    loadAndRender();
+});
 
 // ---------- Auto-refresh cada 5 min ----------
 setInterval(loadAndRender, 5 * 60 * 1000);

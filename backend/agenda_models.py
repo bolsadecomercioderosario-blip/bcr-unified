@@ -180,6 +180,10 @@ class CompromisoPublicOut(BaseModel):
     location: Optional[str] = ""
     observations: Optional[str] = ""
     participants: Optional[str] = ""
+    # Dueño: para la vista "Agenda completa" (Mesa + áreas), etiquetar de quién
+    # es cada actividad. origen ∈ secretaria|area; area = slug del área.
+    origen: Optional[str] = ""
+    area: Optional[str] = ""
     # Adjunto: se expone en la pública como "Ver Información Adicional". OJO: esto
     # hace el archivo descargable por cualquiera con el link público (token).
     attachment_url: Optional[str] = ""

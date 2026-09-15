@@ -38,8 +38,12 @@ def _check_token(token: str) -> None:
 
 
 @router.get("/{token}", response_model=List[agenda_models.CompromisoPublicOut])
-def list_compromisos(token: str):
-    """Devuelve las actividades de la Agenda de Compromisos (origen='secretaria').
+def list_compromisos(token: str, scope: str = "mesa"):
+    """Actividades de la Agenda de Compromisos.
+
+    scope='mesa' (default): la Agenda de la Mesa = Secretaría + áreas aprobadas.
+    scope='completa': suma también toda la agenda de las áreas (Funcionarios),
+                      para el botón "Ver Agenda Completa" de la landing.
 
     Sin auth bearer — valida sólo por el token de la URL. Si el token es
     inválido, devuelve 404 (no 401/403) para no leak info de existencia.
@@ -47,15 +51,15 @@ def list_compromisos(token: str):
     _check_token(token)
     db = SessionLocal()
     try:
-        # La Agenda de la Mesa = actividades de Secretaría + las de áreas que
-        # Secretaría aprobó (me_estado='aprobada').
-        return db.query(agenda_models.Activity).filter(
-            agenda_models.Activity.is_custom == False,  # noqa: E712 — SQLAlchemy
-            or_(
-                agenda_models.Activity.origen == "secretaria",
-                agenda_models.Activity.me_estado == "aprobada",
-            ),
-            agenda_models.Activity.archived == False,  # noqa: E712 — no mostrar archivadas
-        ).all()
+        A = agenda_models.Activity
+        q = db.query(A).filter(
+            A.is_custom == False,  # noqa: E712 — SQLAlchemy
+            A.archived == False,   # noqa: E712 — no mostrar archivadas
+        )
+        if scope == "completa":
+            q = q.filter(A.origen.in_(["secretaria", "area"]))
+        else:
+            q = q.filter(or_(A.origen == "secretaria", A.me_estado == "aprobada"))
+        return q.all()
     finally:
         db.close()
