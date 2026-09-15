@@ -1,23 +1,25 @@
 """
 Autenticación simple para los endpoints API.
 
-Modelo: passwords compartidos por todo el equipo (env vars AGENDA_PASSWORD y
-SECGRAL_PASSWORD). Cuando el cliente hace login con cualquiera de ellos, recibe
-el mismo token de sesión opaco que tiene que mandar como
-`Authorization: Bearer <token>` en todos los requests siguientes.
+Modelo: password compartido por rol. Cada rol tiene su propio password (env
+vars) y, al loguearse, recibe un **token de sesión propio del rol** que manda
+como `Authorization: Bearer <token>` en cada request. Que el token sea distinto
+por rol es lo que permite que el backend sepa QUIÉN sos y aplique permisos
+(ej.: un área sólo edita lo suyo; sólo Secretaría edita la Mesa).
 
-Por qué dos passwords con mismos permisos: el equipo de Secretaría General
-también carga actividades (con canal "Agenda Compromisos"), y queremos que
-cada equipo tenga su propio password para que si uno se filtra podamos rotarlo
-sin romperle el acceso al otro. No hay roles ni granularidad de permisos —
-ambos passwords dan acceso completo.
+Roles:
+ - comunicacion  → app de Comunicación (coberturas).
+ - secretaria    → administra la Agenda de Compromisos (Mesa Ejecutiva).
+ - area:<slug>   → un área interna (DIyEE, Innova, CAC, BCR Digital…) que carga
+                   su propia agenda y sugiere actividades a la Mesa.
 
-El token es un único string fijo por proceso:
- - Si SESSION_TOKEN está en env vars, lo usa (recomendado en producción para
-   que reinicios de Render no invaliden sesiones).
- - Si no, se genera uno random al arranque (cada reinicio invalida sesiones
-   activas — aceptable en dev).
+Los tokens se derivan por HMAC de un secreto base (SESSION_TOKEN): son estables
+entre reinicios si SESSION_TOKEN está en el entorno, y no requieren almacenar
+sesiones. Si SESSION_TOKEN no está, se genera uno random al arranque (cada
+reinicio invalida sesiones — aceptable en dev).
 """
+import hashlib
+import hmac
 import os
 import secrets
 from typing import Optional
@@ -25,51 +27,117 @@ from typing import Optional
 from fastapi import Header, HTTPException
 
 
-# Passwords aceptados. El de Comunicación (AGENDA_PASSWORD) existe desde
-# siempre. El de SecGral se agregó para que Secretaría General también pueda
-# cargar actividades sin compartir credenciales.
+# --- Passwords por rol ------------------------------------------------------
+# Comunicación y Secretaría existen desde siempre. Las áreas se agregan para el
+# circuito de "Funcionarios" (cada área carga su agenda y sugiere a la Mesa).
 PASSWORD_AGENDA = os.environ.get("AGENDA_PASSWORD", "bcr2024")
 PASSWORD_SECGRAL = os.environ.get("SECGRAL_PASSWORD", "secgral2026")
 
-# Token de sesión. Idealmente seteado en Render como env var para sobrevivir
-# reinicios.
-SESSION_TOKEN = os.environ.get("SESSION_TOKEN") or secrets.token_urlsafe(32)
+# Áreas internas habilitadas a cargar su propia agenda. Extensible: sumar una
+# nueva es agregar acá y setear su env var AREA_<SLUG>_PASSWORD en Render.
+AREAS = [
+    {"slug": "diyee", "nombre": "DIyEE"},
+    {"slug": "innova", "nombre": "Innova"},
+    {"slug": "cac", "nombre": "CAC"},
+    {"slug": "bcrdigital", "nombre": "BCR Digital"},
+]
+AREA_SLUGS = {a["slug"] for a in AREAS}
+AREA_NOMBRE = {a["slug"]: a["nombre"] for a in AREAS}
 
 
-# Roles. Las dos passwords dan el mismo token de sesión (mismo acceso a la API),
-# pero el login devuelve además QUÉ rol entró para que el frontend ajuste la
-# interfaz. v1: la separación de roles es sólo de UI (frontend), el backend no
-# la enforcea todavía — ver blueprint del rediseño de Agenda.
+def _area_password(slug: str) -> str:
+    """Password del área desde AREA_<SLUG>_PASSWORD; fallback dev '<slug>2026'."""
+    return os.environ.get(f"AREA_{slug.upper()}_PASSWORD", f"{slug}2026")
+
+
+# --- Roles ------------------------------------------------------------------
 ROLE_COMUNICACION = "comunicacion"
 ROLE_SECRETARIA = "secretaria"
 
 
-def role_for_password(password: Optional[str]) -> Optional[str]:
-    """Devuelve el rol asociado al password, o None si no matchea ninguno.
-    Constant-time: siempre evalúa los dos compare_digest para no filtrar por
-    timing cuál de las dos passwords se probó."""
-    if not password:
-        return None
-    matches_agenda = secrets.compare_digest(password, PASSWORD_AGENDA)
-    matches_secgral = secrets.compare_digest(password, PASSWORD_SECGRAL)
-    if matches_secgral:
-        return ROLE_SECRETARIA
-    if matches_agenda:
-        return ROLE_COMUNICACION
+def role_area(slug: str) -> str:
+    return f"area:{slug}"
+
+
+def area_of_role(role: Optional[str]) -> Optional[str]:
+    """Si el rol es de un área, devuelve su slug; si no, None."""
+    if role and role.startswith("area:"):
+        return role[len("area:"):]
     return None
 
 
+def is_area_role(role: Optional[str]) -> bool:
+    return area_of_role(role) in AREA_SLUGS
+
+
+# Lista completa de roles válidos (para derivar/validar tokens).
+ALL_ROLES = [ROLE_COMUNICACION, ROLE_SECRETARIA] + [role_area(s) for s in AREA_SLUGS]
+
+
+# --- Secreto base y tokens por rol ------------------------------------------
+SESSION_SECRET = os.environ.get("SESSION_TOKEN") or secrets.token_urlsafe(32)
+
+
+def token_for_role(role: str) -> str:
+    """Token de sesión determinístico para un rol (HMAC del secreto base)."""
+    return hmac.new(SESSION_SECRET.encode(), role.encode(), hashlib.sha256).hexdigest()
+
+
+# Mapa token→rol precomputado al arranque.
+_TOKEN_TO_ROLE = {token_for_role(r): r for r in ALL_ROLES}
+
+
+def role_for_token(token: Optional[str]) -> Optional[str]:
+    """Rol asociado a un token, o None. compare_digest contra cada token conocido
+    para no filtrar por timing cuál matcheó."""
+    if not token:
+        return None
+    for tok, role in _TOKEN_TO_ROLE.items():
+        if secrets.compare_digest(token, tok):
+            return role
+    return None
+
+
+def role_for_password(password: Optional[str]) -> Optional[str]:
+    """Rol asociado al password, o None si no matchea. Constant-time: evalúa
+    todos los compare_digest para no filtrar por timing cuál se probó."""
+    if not password:
+        return None
+    matched: Optional[str] = None
+    if secrets.compare_digest(password, PASSWORD_SECGRAL):
+        matched = ROLE_SECRETARIA
+    if secrets.compare_digest(password, PASSWORD_AGENDA):
+        matched = matched or ROLE_COMUNICACION
+    for slug in AREA_SLUGS:
+        if secrets.compare_digest(password, _area_password(slug)):
+            matched = matched or role_area(slug)
+    return matched
+
+
 def verify_password(password: Optional[str]) -> bool:
-    """Acepta cualquiera de los dos passwords. Se mantiene por compatibilidad;
-    internamente usa role_for_password (que ya es constant-time)."""
+    """Acepta cualquier password válido. Compat: usa role_for_password."""
     return role_for_password(password) is not None
 
 
-def require_auth(authorization: Optional[str] = Header(None)) -> bool:
-    """Dependency de FastAPI: 401 si falta el header o no coincide el token."""
+# --- Dependencies de FastAPI ------------------------------------------------
+def _role_from_header(authorization: Optional[str]) -> Optional[str]:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Auth requerida")
+        return None
     token = authorization[len("Bearer "):].strip()
-    if not secrets.compare_digest(token, SESSION_TOKEN):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    return role_for_token(token)
+
+
+def require_auth(authorization: Optional[str] = Header(None)) -> bool:
+    """401 si falta el header o el token no corresponde a ningún rol."""
+    if _role_from_header(authorization) is None:
+        raise HTTPException(status_code=401, detail="Auth requerida")
     return True
+
+
+def get_role(authorization: Optional[str] = Header(None)) -> str:
+    """Devuelve el rol del token (401 si inválido). Para endpoints que necesitan
+    saber quién es (enforcement de permisos)."""
+    role = _role_from_header(authorization)
+    if role is None:
+        raise HTTPException(status_code=401, detail="Auth requerida")
+    return role

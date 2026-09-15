@@ -47,7 +47,17 @@ class Activity(Base):
     #   "comunicacion" → la crea Comunicación; vive sólo en la app de
     #                    Comunicación, nunca en la landing ni para Secretaría.
     # Reemplaza al viejo canal "Agenda Compromisos".
+    #   "area"         → la carga un área interna (Funcionarios). El slug del
+    #                    área va en `area`. Es visible entre áreas y puede
+    #                    sugerirse a la Agenda de Compromisos (ver me_estado).
     origen = Column(String, default="comunicacion")
+    # Slug del área dueña cuando origen='area' (ej. "diyee"). Vacío en el resto.
+    area = Column(String, default="")
+    # Estado de la sugerencia a la Mesa Ejecutiva (Agenda de Compromisos):
+    #   "" (no sugerida) | "pendiente" | "aprobada" | "rechazada".
+    # Una actividad de área aprobada aparece en la agenda de la Mesa; el área
+    # la sigue pudiendo editar (mismo registro).
+    me_estado = Column(String, default="")
     # Notas internas de Comunicación sobre la actividad (ej: "va a haber mucha
     # gente, llegar temprano"). Sólo las ve Comunicación — separadas de
     # `observations`, que es un campo de Datos Generales (de Secretaría).
@@ -99,7 +109,9 @@ class ActivityBase(BaseModel):
     order_index: Optional[int] = 0
     image_url: Optional[str] = ""
     block_type: Optional[str] = None  # "fixed" | "variable" | None
-    origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion"
+    origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion" | "area"
+    area: Optional[str] = ""  # slug del área dueña cuando origen='area'
+    me_estado: Optional[str] = ""  # "" | "pendiente" | "aprobada" | "rechazada"
     comunicacion_notes: Optional[str] = ""
     estado: Optional[str] = "Pendiente"
     sec_responsible: Optional[str] = ""
@@ -138,6 +150,8 @@ class ActivityUpdate(BaseModel):
     image_url: Optional[str] = None
     block_type: Optional[str] = None
     origen: Optional[str] = None
+    area: Optional[str] = None
+    me_estado: Optional[str] = None
     comunicacion_notes: Optional[str] = None
     estado: Optional[str] = None
     sec_responsible: Optional[str] = None

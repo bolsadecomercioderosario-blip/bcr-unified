@@ -134,6 +134,12 @@ def migrate():
     _try_exec("ALTER noticias add posicion",
               "ALTER TABLE noticias ADD COLUMN posicion VARCHAR DEFAULT 'normal'")
 
+    # Agenda multi-área (Funcionarios): área dueña + estado de sugerencia a Mesa.
+    _try_exec("ALTER activities add area",
+              "ALTER TABLE activities ADD COLUMN area VARCHAR DEFAULT ''")
+    _try_exec("ALTER activities add me_estado",
+              "ALTER TABLE activities ADD COLUMN me_estado VARCHAR DEFAULT ''")
+
     # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
     # toques) la primera vez que las tablas ab_ están vacías.
     from abuela.seed import seed_abuela_if_empty
