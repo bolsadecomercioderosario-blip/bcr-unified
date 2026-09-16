@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import traceback
+from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -47,6 +48,41 @@ def _phone_allowed(from_phone: str) -> bool:
     if not _WHITELIST:
         return True
     return _normalize_phone(from_phone) in _WHITELIST
+
+
+# ---------------------------------------------------------------------------
+# Diagnóstico: registro en memoria de los últimos webhooks recibidos, para poder
+# ver desde /admin/health por qué el bot contesta o no (sin depender de los logs
+# de Render). No guarda el texto del mensaje, sólo metadatos.
+# ---------------------------------------------------------------------------
+_LAST_WEBHOOKS: deque = deque(maxlen=25)
+
+
+def _candidate_urls(request: Request) -> list[str]:
+    """URLs posibles sobre las que Twilio pudo firmar. En Render (detrás de
+    proxy) str(request.url) puede venir http en vez de https, o con otro host;
+    probamos varias variantes para que la firma valide igual."""
+    cands: list[str] = []
+    xfu = request.headers.get("X-Forwarded-Url")
+    if xfu:
+        cands.append(xfu)
+    raw = str(request.url)
+    cands.append(raw)
+    if raw.startswith("http://"):
+        cands.append("https://" + raw[len("http://"):])
+    proto = (request.headers.get("X-Forwarded-Proto") or "https").split(",")[0].strip()
+    host = (request.headers.get("X-Forwarded-Host")
+            or request.headers.get("Host") or request.url.netloc)
+    path = request.url.path
+    q = request.url.query
+    built = f"{proto}://{host}{path}" + (f"?{q}" if q else "")
+    cands.append(built)
+    # dedup preservando orden
+    out: list[str] = []
+    for c in cands:
+        if c and c not in out:
+            out.append(c)
+    return out
 
 
 # /api/bot/test y /admin/* requieren bearer auth (consistente con el resto
@@ -125,11 +161,12 @@ def _get_or_create_session(db: Session, from_phone: str) -> tuple[db_models.BotS
     return session, session.last_response_id
 
 
-def _process_message(from_phone: str, body: str) -> None:
+def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None:
     """Corre el agente y manda la respuesta por REST. Va en SEGUNDO PLANO
     (BackgroundTask) para no colgar el webhook de Twilio, que corta a los ~15s
     — el ciclo de herramientas (varias llamadas a OpenAI + DB) puede pasarse de
     ahí. Usa su PROPIA sesión de DB porque la del request ya está cerrada."""
+    ev = ev if ev is not None else {}
     db = SessionLocal()
     try:
         session, previous_response_id = _get_or_create_session(db, from_phone)
@@ -152,6 +189,7 @@ def _process_message(from_phone: str, body: str) -> None:
             exchange.success = True
             session.last_response_id = result.response_id
             session.last_message_at = datetime.utcnow()
+            ev["agente_ok"] = True
         except Exception as exc:  # noqa: BLE001
             tb = traceback.format_exc()
             print(f"[bot.twilio-webhook] Agente falló: {exc}\n{tb}")
@@ -162,17 +200,25 @@ def _process_message(from_phone: str, body: str) -> None:
             exchange.reply = reply_text
             exchange.success = False
             exchange.error = f"{type(exc).__name__}: {exc}"
+            ev["agente_ok"] = False
+            ev["error"] = f"agente: {type(exc).__name__}: {exc}"
 
         db.commit()
 
         try:
             twilio_client.send_whatsapp(to=from_phone, body=reply_text)
+            ev["envio_ok"] = True
         except twilio_client.TwilioNotConfigured:
             print("[bot.twilio-webhook] Twilio no configurado; no se mandó respuesta.")
+            ev["envio_ok"] = False
+            ev["error"] = "twilio no configurado"
         except Exception as exc:  # noqa: BLE001
             print(f"[bot.twilio-webhook] Falló envío Twilio: {exc}")
+            ev["envio_ok"] = False
+            ev["error"] = f"envio: {type(exc).__name__}: {exc}"
     except Exception as exc:  # noqa: BLE001 — un background task nunca debe reventar
         print(f"[bot.twilio-webhook] _process_message falló: {type(exc).__name__}: {exc}")
+        ev["error"] = f"proceso: {type(exc).__name__}: {exc}"
     finally:
         db.close()
 
@@ -186,28 +232,39 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
     form = await request.form()
     params = {k: str(form[k]) for k in form.keys()}
 
-    # Validación de firma — sin esto cualquiera con la URL podría hacernos
-    # gastar tokens de OpenAI.
-    signature = request.headers.get("X-Twilio-Signature", "")
-    # Twilio firma sobre la URL pública. Si la app está detrás de un proxy/
-    # CDN (Render lo está), str(request.url) puede no coincidir. Como
-    # fallback, leemos un override opcional del header X-Forwarded-Url.
-    url = request.headers.get("X-Forwarded-Url") or str(request.url)
-
-    if not twilio_client.verify_signature(url, params, signature):
-        print(f"[bot.twilio-webhook] Firma inválida; rechazando. url={url}")
-        return Response(status_code=403)
-
     from_phone = params.get("From", "").strip()
     body = (params.get("Body") or "").strip()
+
+    # Registro de diagnóstico (visible en /admin/health).
+    ev: dict = {
+        "at": datetime.utcnow().isoformat(),
+        "from": from_phone,
+        "body_len": len(body),
+    }
+    _LAST_WEBHOOKS.appendleft(ev)
+
+    # Validación de firma — sin esto cualquiera con la URL podría hacernos gastar
+    # tokens de OpenAI. Probamos varias variantes de URL (Render está detrás de
+    # proxy y puede reconstruir http en vez de https).
+    signature = request.headers.get("X-Twilio-Signature", "")
+    urls = _candidate_urls(request)
+    sig_ok = any(twilio_client.verify_signature(u, params, signature) for u in urls)
+    ev["firma_ok"] = sig_ok
+    if not sig_ok:
+        ev["outcome"] = "firma_invalida"
+        ev["urls_probadas"] = urls
+        print(f"[bot.twilio-webhook] Firma inválida; rechazando. urls={urls}")
+        return Response(status_code=403)
 
     # Whitelist: si el número no está habilitado, se ignora en silencio (no se
     # llama al agente → no gasta tokens ni contesta).
     if from_phone and not _phone_allowed(from_phone):
+        ev["outcome"] = "no_whitelist"
         print(f"[bot.twilio-webhook] Número no habilitado, ignorado: {from_phone}")
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     if not from_phone or not body:
+        ev["outcome"] = "sin_texto"
         # Mensaje sin texto (media, sticker, etc.) — respondemos amable.
         if from_phone and twilio_client.is_configured():
             try:
@@ -220,7 +277,8 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     # Procesamos en segundo plano y le contestamos a Twilio YA.
-    background_tasks.add_task(_process_message, from_phone, body)
+    ev["outcome"] = "procesando"
+    background_tasks.add_task(_process_message, from_phone, body, ev)
     return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
 
@@ -663,7 +721,7 @@ def list_ingested(
 def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Diagnóstico rápido — qué hay configurado y qué no, y estado de los
     crons del scheduler (último firing y próximo)."""
-    from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
+    from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL, BOT_TWILIO_WHATSAPP_FROM
     from bot.openai_vector_stores import get_vector_store_id
     from bot.scheduler import scheduler
 
@@ -731,7 +789,9 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         "openai_configured": bool(BOT_OPENAI_API_KEY),
         "openai_model": BOT_OPENAI_MODEL,
         "twilio_configured": twilio_client.is_configured(),
+        "twilio_from": BOT_TWILIO_WHATSAPP_FROM,
         "whitelist": {"restringido": bool(_WHITELIST), "cantidad": len(_WHITELIST)},
+        "ultimos_webhooks": list(_LAST_WEBHOOKS),
         "vector_stores": {
             "institucional": get_vector_store_id(db, "institucional"),
             "informativo": get_vector_store_id(db, "informativo"),
