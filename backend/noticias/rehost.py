@@ -19,9 +19,13 @@ from typing import Any
 
 from sqlalchemy import or_
 
+# Sólo imágenes del WordPress de masbcr (no links externos como PDFs de rosgan).
 _WP_IMG = re.compile(
-    r"https?://[^\s\"')]+wp-content/uploads/[^\s\"')]+?\.(?:jpg|jpeg|png|webp|gif)", re.I
+    r"https?://[^\s\"')]*masbcr\.com\.ar/wp-content/uploads/[^\s\"')]+?\.(?:jpg|jpeg|png|webp|gif)",
+    re.I,
 )
+# Patrón SQL para seleccionar sólo lo re-hosteable (imágenes de masbcr).
+_LIKE_WP = "%masbcr.com.ar/wp-content%"
 
 
 def _to_cloudinary(url: str) -> str | None:
@@ -70,7 +74,7 @@ def rehost_batch(db, limit: int = 25) -> dict[str, Any]:
 
     # --- Kit ---
     kit = (db.query(MediaAsset)
-           .filter(MediaAsset.url.like("%wp-content%"))
+           .filter(MediaAsset.url.like(_LIKE_WP))
            .limit(limit).all())
     for m in kit:
         nu = _to_cloudinary(m.url)
@@ -86,12 +90,12 @@ def rehost_batch(db, limit: int = 25) -> dict[str, Any]:
     rest = max(0, limit - len(kit))
     if rest:
         notas = (db.query(Noticia)
-                 .filter(or_(Noticia.imagen_portada.like("%wp-content%"),
-                             Noticia.cuerpo.like("%wp-content%")))
+                 .filter(or_(Noticia.imagen_portada.like(_LIKE_WP),
+                             Noticia.cuerpo.like(_LIKE_WP)))
                  .limit(rest).all())
         for n in notas:
             changed = False
-            if n.imagen_portada and "wp-content" in n.imagen_portada:
+            if n.imagen_portada and "masbcr.com.ar/wp-content" in n.imagen_portada:
                 nu = _to_cloudinary(n.imagen_portada)
                 if nu and nu != n.imagen_portada:
                     n.imagen_portada = nu
@@ -99,7 +103,7 @@ def rehost_batch(db, limit: int = 25) -> dict[str, Any]:
                     changed = True
                 elif not nu:
                     errores.append(n.imagen_portada)
-            if n.cuerpo and "wp-content" in n.cuerpo:
+            if n.cuerpo and "masbcr.com.ar/wp-content" in n.cuerpo:
                 nuevo, c = _rewrite_body(n.cuerpo, errores)
                 if c:
                     n.cuerpo = nuevo
@@ -109,10 +113,10 @@ def rehost_batch(db, limit: int = 25) -> dict[str, Any]:
                 notas_ok += 1
         db.commit()
 
-    rem_kit = db.query(MediaAsset).filter(MediaAsset.url.like("%wp-content%")).count()
+    rem_kit = db.query(MediaAsset).filter(MediaAsset.url.like(_LIKE_WP)).count()
     rem_notas = (db.query(Noticia)
-                 .filter(or_(Noticia.imagen_portada.like("%wp-content%"),
-                             Noticia.cuerpo.like("%wp-content%")))
+                 .filter(or_(Noticia.imagen_portada.like(_LIKE_WP),
+                             Noticia.cuerpo.like(_LIKE_WP)))
                  .count())
     return {
         "kit_rehosteadas": kit_ok,
