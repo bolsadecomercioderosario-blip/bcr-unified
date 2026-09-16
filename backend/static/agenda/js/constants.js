@@ -11,6 +11,7 @@ export const AREA_NOMBRE = {
     innova: 'Innova',
     cac: 'CAC',
     bcrdigital: 'BCR Digital',
+    fundacion: 'Fundación BCR',
 };
 
 // Etiqueta del "dueño" de una actividad para las tarjetas de la agenda completa.
