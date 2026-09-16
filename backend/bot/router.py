@@ -15,6 +15,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import re
 import traceback
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -24,9 +25,28 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import require_auth
+from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
 from bot import agent, db_models, models, twilio_client
+
+
+# ---------------------------------------------------------------------------
+# Whitelist: sólo estos números pueden hablarle al bot. Vacío = abierto.
+# Se normaliza a dígitos para comparar sin importar 'whatsapp:', '+', espacios.
+# ---------------------------------------------------------------------------
+def _normalize_phone(p: str) -> str:
+    return re.sub(r"\D", "", p or "")
+
+
+_WHITELIST = {_normalize_phone(x) for x in BOT_WHATSAPP_WHITELIST.split(",") if x.strip()}
+
+
+def _phone_allowed(from_phone: str) -> bool:
+    """True si el número puede usar el bot. Whitelist vacía = abierto a todos."""
+    if not _WHITELIST:
+        return True
+    return _normalize_phone(from_phone) in _WHITELIST
 
 
 # /api/bot/test y /admin/* requieren bearer auth (consistente con el resto
@@ -180,6 +200,12 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
 
     from_phone = params.get("From", "").strip()
     body = (params.get("Body") or "").strip()
+
+    # Whitelist: si el número no está habilitado, se ignora en silencio (no se
+    # llama al agente → no gasta tokens ni contesta).
+    if from_phone and not _phone_allowed(from_phone):
+        print(f"[bot.twilio-webhook] Número no habilitado, ignorado: {from_phone}")
+        return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     if not from_phone or not body:
         # Mensaje sin texto (media, sticker, etc.) — respondemos amable.
@@ -705,6 +731,7 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         "openai_configured": bool(BOT_OPENAI_API_KEY),
         "openai_model": BOT_OPENAI_MODEL,
         "twilio_configured": twilio_client.is_configured(),
+        "whitelist": {"restringido": bool(_WHITELIST), "cantidad": len(_WHITELIST)},
         "vector_stores": {
             "institucional": get_vector_store_id(db, "institucional"),
             "informativo": get_vector_store_id(db, "informativo"),

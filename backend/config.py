@@ -74,6 +74,12 @@ BOT_TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 BOT_TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 BOT_TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
 
+# Whitelist del bot: números habilitados a hablarle (E.164, separados por coma).
+# Ej: "+5493416800028,+5491122334455". VACÍO = abierto (contesta a cualquiera).
+# Los no habilitados se ignoran en silencio (no se llama al agente → no gasta
+# tokens ni responde). El usuario administra esta lista en Render.
+BOT_WHATSAPP_WHITELIST = os.environ.get("BOT_WHATSAPP_WHITELIST", "")
+
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")
