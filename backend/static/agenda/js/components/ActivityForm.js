@@ -26,8 +26,10 @@ export function renderActivityForm(container, preData = null) {
         copy_instagram: (sourceAct.copy_instagram === 'undefined' || !sourceAct.copy_instagram) ? '' : sourceAct.copy_instagram,
         copy_linkedin: (sourceAct.copy_linkedin === 'undefined' || !sourceAct.copy_linkedin) ? '' : sourceAct.copy_linkedin,
         participants: sourceAct.participants || '',
+        participants_me: sourceAct.participants_me || '',
         story_type: sourceAct.story_type || 'Video',
         comunicacion_notes: sourceAct.comunicacion_notes || '',
+        sec_notes: sourceAct.sec_notes || '',
         estado: sourceAct.estado || 'Pendiente',
         sec_responsible: sourceAct.sec_responsible || '',
         sec_responsible_other: sourceAct.sec_responsible_other || '',
@@ -48,6 +50,8 @@ export function renderActivityForm(container, preData = null) {
     // Secretaría viendo una actividad de un ÁREA: solo lectura (el contenido lo
     // maneja el área; Secretaría sólo aprueba/rechaza desde la bandeja).
     const areaForeignForSec = isSec && actOrigen === 'area';
+    // ¿Es una actividad de área? (para etiquetas y campos propios del circuito área)
+    const esArea = isArea || actOrigen === 'area';
     // Datos Generales: los edita el dueño (Secretaría en las de Mesa; Área en
     // las suyas; Comunicación sólo en sus propias). En las de Secretaría,
     // Comunicación los ve en solo-lectura; en las de área, Secretaría también.
@@ -96,35 +100,65 @@ export function renderActivityForm(container, preData = null) {
             </div>`;
     }
 
-    // --- Sección "Estado" (sólo Secretaría) ---
+    // --- Sección de Secretaría ---
     const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
     const secRespIsOther = act.sec_responsible === 'Otro';
+    // Selector de Responsable de Secretaría (reutilizado).
+    const _respSelect = `
+        <div class="form-group">
+            <label>Responsable de Secretaría</label>
+            <select name="sec_responsible" id="sec-resp-select">
+                <option value="" ${!act.sec_responsible ? 'selected' : ''}>-- Seleccionar --</option>
+                ${SEC_RESPONSABLES.map(r => `<option value="${r}" ${act.sec_responsible === r ? 'selected' : ''}>${r}</option>`).join('')}
+                <option value="Otro" ${secRespIsOther ? 'selected' : ''}>Otro</option>
+            </select>
+        </div>
+        <div class="form-group" id="sec-resp-other-group" style="margin-top: 1rem; display: ${secRespIsOther ? 'block' : 'none'};">
+            <label>Nombre del responsable</label>
+            <input type="text" name="sec_responsible_other" value="${(act.sec_responsible_other || '').replace(/"/g, '&quot;')}" placeholder="Nombre y apellido">
+        </div>`;
+    const _secNotes = `
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>Notas internas · Secretaría</label>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: -0.35rem 0 0.5rem;">Sólo las ve Secretaría.</p>
+            <textarea name="sec_notes" rows="4" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${act.sec_notes}</textarea>
+        </div>`;
     let estadoHTML = '';
-    if (isSec) {
+    if (isSec && !areaForeignForSec) {
+        // Actividad propia de Secretaría: Estado de avance (semáforo) + Responsable.
         estadoHTML = `
             <section>
                 <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Estado</h3>
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label>Estado</label>
+                        <label>Estado de avance</label>
                         <select name="estado">
                             ${ESTADOS.map(s => `<option value="${s}" ${act.estado === s ? 'selected' : ''}>${s}</option>`).join('')}
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Responsable</label>
-                        <select name="sec_responsible" id="sec-resp-select">
-                            <option value="" ${!act.sec_responsible ? 'selected' : ''}>-- Seleccionar --</option>
-                            ${SEC_RESPONSABLES.map(r => `<option value="${r}" ${act.sec_responsible === r ? 'selected' : ''}>${r}</option>`).join('')}
-                            <option value="Otro" ${secRespIsOther ? 'selected' : ''}>Otro</option>
-                        </select>
-                    </div>
                 </div>
-                <div class="form-group" id="sec-resp-other-group" style="margin-top: 1rem; display: ${secRespIsOther ? 'block' : 'none'};">
-                    <label>Nombre del responsable</label>
-                    <input type="text" name="sec_responsible_other" value="${(act.sec_responsible_other || '').replace(/"/g, '&quot;')}" placeholder="Nombre y apellido">
-                </div>
+                <div style="margin-top: 1rem;">${_respSelect}</div>
             </section>`;
+    } else if (areaForeignForSec) {
+        // Actividad de área: INTERNO · Secretaría (Responsable + Notas), sin Estado de avance.
+        estadoHTML = `
+            <section>
+                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">INTERNO · Secretaría</h3>
+                ${_respSelect}
+                ${_secNotes}
+            </section>`;
+    }
+
+    // --- "Participa (por Mesa Ejecutiva)": lo carga Secretaría en las de área,
+    // va debajo de "Participa (por el área)". Área/Comunicación lo ven read-only. ---
+    let participaMeHTML = '';
+    if (actOrigen === 'area' && (areaForeignForSec || act.participants_me)) {
+        const dis = areaForeignForSec ? '' : 'disabled';
+        participaMeHTML = `
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>Participa (por Mesa Ejecutiva)</label>
+                <input type="text" name="participants_me" value="${(act.participants_me || '').replace(/"/g, '&quot;')}" ${dis} placeholder="Autoridades de la Mesa que participan...">
+            </div>`;
     }
 
     // --- Sección "Agenda de la Mesa" (sólo Área): sugerir a Compromisos ---
@@ -214,7 +248,11 @@ export function renderActivityForm(container, preData = null) {
                         <label>Descripción</label>
                         <textarea name="description" rows="3">${act.description}</textarea>
                     </div>` : ''}
-                    ${(showGen(act.location) || showGen(act.observations)) ? `
+                    ${esArea ? (showGen(act.location) ? `
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label>Lugar</label>
+                        <input type="text" name="location" value="${act.location}">
+                    </div>` : '') : ((showGen(act.location) || showGen(act.observations)) ? `
                     <div class="form-grid-2" style="margin-top: 1rem;">
                         ${showGen(act.location) ? `<div class="form-group">
                             <label>Lugar</label>
@@ -224,13 +262,14 @@ export function renderActivityForm(container, preData = null) {
                             <label>Observaciones</label>
                             <input type="text" name="observations" value="${act.observations}">
                         </div>` : ''}
-                    </div>` : ''}
+                    </div>` : '')}
                     ${showGen(act.participants) ? `
                     <div class="form-group" style="margin-top: 1rem;">
-                        <label>Participa</label>
+                        <label>${actOrigen === 'area' ? 'Participa (por el área)' : 'Participa'}</label>
                         <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>` : ''}
                     </fieldset>
+                    ${participaMeHTML}
                     ${attachmentHTML}
                 </section>
 
@@ -638,13 +677,14 @@ export function renderActivityForm(container, preData = null) {
 
         let data;
         if (areaForeignForSec) {
-            // Secretaría sobre una actividad de área: sólo sus campos de
-            // seguimiento (Estado). El contenido lo maneja el área; el backend
-            // ignora cualquier otro campo.
+            // Secretaría sobre una actividad de área: "Participa (por Mesa
+            // Ejecutiva)" + INTERNO (Responsable + Notas). NO toca el contenido
+            // del área ni el estado de avance; el backend ignora lo demás.
             data = {
-                estado: formData.get('estado') || 'Pendiente',
+                participants_me: formData.get('participants_me') || '',
                 sec_responsible: formData.get('sec_responsible') || '',
                 sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
+                sec_notes: formData.get('sec_notes') || '',
             };
         } else if (isSec) {
             // Secretaría: Datos Generales + sección Estado + adjunto. La

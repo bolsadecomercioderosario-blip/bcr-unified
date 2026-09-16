@@ -156,7 +156,8 @@ function cardHTML(occ) {
     const meta = [];
     if (act.origen === 'area') meta.push(`<span><strong>Área:</strong> ${esc(ownerLabel(act))}</span>`);
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
-    if (act.participants) meta.push(`<span><strong>Participa:</strong> ${esc(act.participants)}</span>`);
+    if (act.participants) meta.push(`<span><strong>${act.origen === 'area' ? 'Participa (por el área)' : 'Participa'}:</strong> ${esc(act.participants)}</span>`);
+    if (act.participants_me) meta.push(`<span><strong>Participa (por Mesa Ejecutiva):</strong> ${esc(act.participants_me)}</span>`);
     const metaHtml = meta.length ? `<div class="cmp-meta">${meta.join('')}</div>` : '';
     const dayBadge = occ.dayCount > 1 ? `<span class="cmp-daybadge">Día ${occ.dayIndex} de ${occ.dayCount}</span>` : '';
 

@@ -160,7 +160,11 @@ function renderActivity(occ) {
         meta.push(`<span class="activity-meta-item"><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     }
     if (act.participants) {
-        meta.push(`<span class="activity-meta-item"><strong>Participa:</strong> ${esc(act.participants)}</span>`);
+        const lbl = act.origen === 'area' ? 'Participa (por el área)' : 'Participa';
+        meta.push(`<span class="activity-meta-item"><strong>${lbl}:</strong> ${esc(act.participants)}</span>`);
+    }
+    if (act.participants_me) {
+        meta.push(`<span class="activity-meta-item"><strong>Participa (por Mesa Ejecutiva):</strong> ${esc(act.participants_me)}</span>`);
     }
     const metaHtml = meta.length ? `<div class="activity-meta">${meta.join('')}</div>` : '';
     const attachHtml = act.attachment_url

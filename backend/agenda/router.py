@@ -323,9 +323,12 @@ _ATTACHMENT = {"attachment_url", "attachment_name"}
 _OPERATIVE = {"responsible", "external_name", "channels", "done", "drive_bcr",
               "drive_santiago", "copy_instagram", "copy_linkedin", "story_type",
               "comunicacion_notes"}
-# Campos "propios de Secretaría" (seguimiento): los edita Secretaría tanto en sus
-# actividades como en las de área que aceptó.
-_SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other"}
+# Campos "propios de Secretaría" en SUS actividades (incluye el Estado de avance
+# que alimenta el semáforo).
+_SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other", "sec_notes"}
+# Lo que Secretaría edita en una actividad de ÁREA: su seguimiento SIN Estado de
+# avance, + "Participa (por Mesa Ejecutiva)" + sus notas internas.
+_SEC_AREA = {"sec_responsible", "sec_responsible_other", "sec_notes", "participants_me"}
 
 
 def _allowed_update_fields(db_activity, role: str) -> set:
@@ -341,7 +344,7 @@ def _allowed_update_fields(db_activity, role: str) -> set:
         if origen == "secretaria":
             return _GENERALS | _ATTACHMENT | _SEC_WORKFLOW
         if origen == "area":
-            return _SEC_WORKFLOW | {"me_estado"}   # su seguimiento + aprobar/rechazar
+            return _SEC_AREA | {"me_estado"}   # seguimiento (sin estado) + aprobar/rechazar
         return set()
     if is_area_role(role):
         if origen == "area" and (db_activity.area or "") == area_of_role(role):

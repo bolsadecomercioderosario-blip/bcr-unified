@@ -58,6 +58,13 @@ class Activity(Base):
     # Una actividad de área aprobada aparece en la agenda de la Mesa; el área
     # la sigue pudiendo editar (mismo registro).
     me_estado = Column(String, default="")
+    # "Participa (por Mesa Ejecutiva)": quiénes participan por la Mesa. Lo carga
+    # Secretaría en las actividades de área (va debajo de `participants`, que es
+    # el "Participa por el área"). Es público (aparece en la landing).
+    participants_me = Column(String, default="")
+    # Notas internas de Secretaría (sección INTERNO · Secretaría). Análogo a
+    # comunicacion_notes pero del lado de Secretaría. No es público.
+    sec_notes = Column(String, default="")
     # Notas internas de Comunicación sobre la actividad (ej: "va a haber mucha
     # gente, llegar temprano"). Sólo las ve Comunicación — separadas de
     # `observations`, que es un campo de Datos Generales (de Secretaría).
@@ -112,6 +119,8 @@ class ActivityBase(BaseModel):
     origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion" | "area"
     area: Optional[str] = ""  # slug del área dueña cuando origen='area'
     me_estado: Optional[str] = ""  # "" | "pendiente" | "aprobada" | "rechazada"
+    participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
+    sec_notes: Optional[str] = ""         # Notas internas · Secretaría
     comunicacion_notes: Optional[str] = ""
     estado: Optional[str] = "Pendiente"
     sec_responsible: Optional[str] = ""
@@ -152,6 +161,8 @@ class ActivityUpdate(BaseModel):
     origen: Optional[str] = None
     area: Optional[str] = None
     me_estado: Optional[str] = None
+    participants_me: Optional[str] = None
+    sec_notes: Optional[str] = None
     comunicacion_notes: Optional[str] = None
     estado: Optional[str] = None
     sec_responsible: Optional[str] = None
@@ -180,6 +191,7 @@ class CompromisoPublicOut(BaseModel):
     location: Optional[str] = ""
     observations: Optional[str] = ""
     participants: Optional[str] = ""
+    participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
     # Dueño: para la vista "Agenda completa" (Mesa + áreas), etiquetar de quién
     # es cada actividad. origen ∈ secretaria|area; area = slug del área.
     origen: Optional[str] = ""

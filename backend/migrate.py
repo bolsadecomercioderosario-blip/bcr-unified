@@ -139,6 +139,11 @@ def migrate():
               "ALTER TABLE activities ADD COLUMN area VARCHAR DEFAULT ''")
     _try_exec("ALTER activities add me_estado",
               "ALTER TABLE activities ADD COLUMN me_estado VARCHAR DEFAULT ''")
+    # "Participa (por Mesa Ejecutiva)" + Notas internas de Secretaría.
+    _try_exec("ALTER activities add participants_me",
+              "ALTER TABLE activities ADD COLUMN participants_me VARCHAR DEFAULT ''")
+    _try_exec("ALTER activities add sec_notes",
+              "ALTER TABLE activities ADD COLUMN sec_notes VARCHAR DEFAULT ''")
 
     # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
     # toques) la primera vez que las tablas ab_ están vacías.
