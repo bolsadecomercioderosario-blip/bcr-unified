@@ -65,7 +65,7 @@ _KIT_NOMBRE = {c["slug"]: c["nombre"] for c in KIT_CATEGORIAS}
 # acá se muestran planas (sin subtítulos).
 KIT_SUBCATS = {
     "institucional": ["Autoridades y funcionarios", "Edificios e instalaciones", "Fotos históricas"],
-    "cultivos": ["Soja", "Trigo", "Maíz", "Otros cultivos"],
+    "cultivos": ["Soja", "Trigo", "Maíz", "Girasol", "Otros cultivos"],
 }
 
 
