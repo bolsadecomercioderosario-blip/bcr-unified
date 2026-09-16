@@ -29,11 +29,13 @@ def _to_cloudinary(url: str) -> str | None:
     Determinístico e idempotente por public_id = hash de la URL origen."""
     if not url or "res.cloudinary.com" in url:
         return url  # ya está en Cloudinary
+    # El origen fuerza https (http hace 301 y Cloudinary no sigue el redirect).
+    src = re.sub(r"^http://", "https://", url)
     try:
         import cloudinary.uploader
-        pid = "masbcr-rehost/" + hashlib.md5(url.encode("utf-8")).hexdigest()
+        pid = "masbcr-rehost/" + hashlib.md5(src.encode("utf-8")).hexdigest()
         res = cloudinary.uploader.upload(
-            url, public_id=pid, overwrite=False, resource_type="image",
+            src, public_id=pid, overwrite=False, resource_type="image",
         )
         return res.get("secure_url")
     except Exception as exc:  # noqa: BLE001
