@@ -37,18 +37,10 @@ def _check_token(token: str) -> None:
         raise HTTPException(status_code=404, detail="No encontrado")
 
 
-@router.get("/{token}", response_model=List[agenda_models.CompromisoPublicOut])
-def list_compromisos(token: str, scope: str = "mesa"):
+def _query_compromisos(scope: str):
     """Actividades de la Agenda de Compromisos.
-
-    scope='mesa' (default): la Agenda de la Mesa = Secretaría + áreas aprobadas.
-    scope='completa': suma también toda la agenda de las áreas (Funcionarios),
-                      para el botón "Ver Agenda Completa" de la landing.
-
-    Sin auth bearer — valida sólo por el token de la URL. Si el token es
-    inválido, devuelve 404 (no 401/403) para no leak info de existencia.
-    """
-    _check_token(token)
+    scope='mesa' (default): Secretaría + áreas aprobadas.
+    scope='completa': suma toda la agenda de las áreas (Funcionarios)."""
     db = SessionLocal()
     try:
         A = agenda_models.Activity
@@ -63,3 +55,16 @@ def list_compromisos(token: str, scope: str = "mesa"):
         return q.all()
     finally:
         db.close()
+
+
+@router.get("", response_model=List[agenda_models.CompromisoPublicOut])
+def list_compromisos_public(scope: str = "mesa"):
+    """Endpoint público sin token (la landing vive en /compromisos)."""
+    return _query_compromisos(scope)
+
+
+@router.get("/{token}", response_model=List[agenda_models.CompromisoPublicOut])
+def list_compromisos(token: str, scope: str = "mesa"):
+    """Compat: links viejos con token en la URL (/compromisos/{token})."""
+    _check_token(token)
+    return _query_compromisos(scope)

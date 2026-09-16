@@ -6,10 +6,11 @@
  * COMPROMISOS_PUBLIC_TOKEN. Si no coincide, devuelve 404 y mostramos error.
  */
 
-const TOKEN = window.location.pathname.split('/compromisos/')[1] || '';
 // scope: 'mesa' (Agenda de la Mesa) | 'completa' (Mesa + áreas / Funcionarios).
 let scope = 'mesa';
-const apiUrl = () => `/api/compromisos/${TOKEN}` + (scope === 'completa' ? '?scope=completa' : '');
+// Endpoint público sin token — la landing vive en /compromisos (los links viejos
+// /compromisos/{token} también cargan esta página y usan este mismo endpoint).
+const apiUrl = () => `/api/compromisos` + (scope === 'completa' ? '?scope=completa' : '');
 
 // Nombres de las áreas para etiquetar de quién es cada actividad (slugs = auth.py).
 const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital' };

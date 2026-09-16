@@ -235,8 +235,16 @@ async def _murga_presentador():
 # Servimos el mismo HTML para cualquier token: el JS lee el token del path y
 # pega al /api/compromisos/{token} que sí valida y devuelve 404 si no coincide.
 # ---------------------------------------------------------
+@app.get("/compromisos")
+async def _compromisos_page_public():
+    return HTMLResponse(
+        content=get_module_html("compromisos"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 @app.get("/compromisos/{token}")
-async def _compromisos_page(token: str):  # noqa: ARG001 — token usado por el JS, no acá
+async def _compromisos_page(token: str):  # noqa: ARG001 — compat links viejos con token
     return HTMLResponse(
         content=get_module_html("compromisos"),
         headers={"Cache-Control": "no-cache, must-revalidate"},
