@@ -128,16 +128,65 @@ _KIT_PAGES = {
 _UPLOAD_IMG_RE = re.compile(r"https?://[^\s\"')]+wp-content/uploads/[^\s\"')]+\.(?:jpg|jpeg|png)", re.I)
 
 
-def scrape_kit_masbcr(db) -> dict[str, Any]:
+def _strip_accents_low(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "")
+    return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
+
+
+def _map_subcat(kit_cat: str, heading: str) -> str | None:
+    """Mapea el título de sección del sitio a nuestra subcategoría (KIT_SUBCATS).
+    Devuelve None si el heading no corresponde a una subcategoría conocida."""
+    h = _strip_accents_low(heading)
+    if kit_cat == "institucional":
+        if "autoridad" in h or "funcionario" in h:
+            return "Autoridades y funcionarios"
+        if "edificio" in h or "instalacion" in h:
+            return "Edificios e instalaciones"
+    if kit_cat == "cultivos":
+        if "soja" in h:
+            return "Soja"
+        if "trigo" in h:
+            return "Trigo"
+        if "maiz" in h:
+            return "Maíz"
+        if "otro" in h:
+            return "Otros cultivos"
+    return None
+
+
+def _is_heading(el) -> bool:
+    if el.name in ("h1", "h2", "h3", "h4"):
+        return True
+    cls = " ".join(el.get("class", []))
+    return "elementor-heading-title" in cls
+
+
+def scrape_kit_masbcr(db, reset: bool = False) -> dict[str, Any]:
     """Scrapea las 6 galerías del kit de masbcr y crea MediaAsset (URLs del host
-    WP; se re-hostean después). Idempotente: dedup por URL."""
+    WP; se re-hostean después).
+
+    Consciente de secciones: recorre cada página en orden y asigna cada imagen a
+    la subcategoría del último título de sección (Institucional → Autoridades /
+    Edificios; Cultivos → Soja/Trigo/Maíz/Otros si existieran). Dedup POR PÁGINA
+    (no global), así una imagen que aparece en dos galerías queda en ambas.
+
+    reset=True borra los MediaAsset antes de re-scrapear (estado limpio)."""
     import requests
     from bs4 import BeautifulSoup
 
     from noticias.models import MediaAsset
 
     headers = {"User-Agent": "Mozilla/5.0 (BCR importer)"}
-    existentes = {u for (u,) in db.query(MediaAsset.url).all()}
+    if reset:
+        db.query(MediaAsset).delete()
+        db.commit()
+
+    # dedup por (categoría, url) contra lo ya existente en esa categoría.
+    existentes: dict[str, set] = {}
+    for cat, u in db.query(MediaAsset.kit_cat, MediaAsset.url).all():
+        existentes.setdefault(cat, set()).add(u)
+
     resumen: dict[str, Any] = {}
     for slug, url in _KIT_PAGES.items():
         try:
@@ -147,25 +196,34 @@ def scrape_kit_masbcr(db) -> dict[str, Any]:
             resumen[slug] = {"error": str(exc)}
             continue
         soup = BeautifulSoup(r.text, "html.parser")
-        found: list[str] = []
-        # Los lightbox linkean a la imagen original con <a href="....jpg">.
-        for a in soup.find_all("a", href=True):
-            h = a["href"]
-            if _UPLOAD_IMG_RE.match(h) and not re.search(r"logo|logobolsa", h, re.I):
-                found.append(h)
-        # dedup preservando orden
-        seen, ordered = set(), []
-        for h in found:
-            if h not in seen:
-                seen.add(h); ordered.append(h)
+        ya = existentes.setdefault(slug, set())
+        cur_sub: str | None = None
+        seen_page: set = set()
         nuevas = 0
-        for h in ordered:
-            if h in existentes:
+        sub_count: dict[str, int] = {}
+        orden = 0
+        for el in soup.find_all(True):
+            if _is_heading(el):
+                txt = el.get_text(strip=True)
+                if txt:
+                    cur_sub = _map_subcat(slug, txt)
                 continue
-            db.add(MediaAsset(kit_cat=slug, url=h))
-            existentes.add(h)
-            nuevas += 1
-        resumen[slug] = {"en_pagina": len(ordered), "nuevas": nuevas}
+            if el.name == "a" and el.get("href"):
+                h = el["href"]
+                if not (_UPLOAD_IMG_RE.match(h) and not re.search(r"logo|logobolsa", h, re.I)):
+                    continue
+                if h in seen_page:
+                    continue
+                seen_page.add(h)
+                if h in ya:
+                    continue
+                db.add(MediaAsset(kit_cat=slug, subcat=cur_sub, url=h, orden=orden))
+                ya.add(h)
+                orden += 1
+                nuevas += 1
+                key = cur_sub or "(sin clasificar)"
+                sub_count[key] = sub_count.get(key, 0) + 1
+        resumen[slug] = {"nuevas": nuevas, "por_subcat": sub_count}
     db.commit()
     return resumen
 

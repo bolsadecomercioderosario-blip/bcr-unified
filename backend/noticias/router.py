@@ -321,10 +321,11 @@ def kit_borrar(aid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @kit_api.post("/importar-masbcr")
-def kit_importar_masbcr(db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Scrapea las 6 galerías del kit de masbcr y crea los MediaAsset."""
+def kit_importar_masbcr(reset: bool = False, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Scrapea las 6 galerías del kit de masbcr y crea los MediaAsset.
+    reset=true borra lo existente y re-scrapea limpio (consciente de secciones)."""
     from noticias.importer import scrape_kit_masbcr
-    return scrape_kit_masbcr(db)
+    return scrape_kit_masbcr(db, reset=reset)
 
 
 # ===========================================================================
