@@ -1,5 +1,6 @@
 import { state, updateActivity, deleteActivity, expandPastMonths } from '../state.js';
 import { RECORDATORIOS } from '../data/recordatorios.js';
+import { ownerLabel } from '../constants.js';
 
 export function renderList(container) {
     const today = new Date();
@@ -209,7 +210,7 @@ export function renderList(container) {
                                 </td>
                                 <td style="font-weight: 500; ${(act.time === 'A definir' || act.time === 'Sin horario') ? 'font-size: 0.78rem; color: var(--text-muted); font-style: italic;' : 'font-variant-numeric: tabular-nums;'}">${act.time === 'Sin horario' ? 'Todo el día' : act.time === 'A definir' ? 'A definir' : (act.end_time ? act.time + ' a ' + act.end_time : act.time)}</td>
                                 <td>
-                                    <div style="font-weight: 600; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">${act.title}${act.origen === 'secretaria' ? `<span style="font-weight: 600; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; color: #0742ab; background: #dbeafe; padding: 0.1rem 0.4rem; border-radius: 999px;">Secretaría</span>` : ''}</div>
+                                    <div style="font-weight: 600; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">${act.title}${act.origen !== 'comunicacion' ? `<span style="font-weight: 600; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; color: #0742ab; background: #dbeafe; padding: 0.1rem 0.4rem; border-radius: 999px;" title="Viene de la Agenda de Compromisos">${act.origen === 'secretaria' ? 'Secretaría' : ownerLabel(act)}</span>` : ''}</div>
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">${act.description.substring(0, 80)}${act.description.length > 80 ? '...' : ''}</div>
                                 </td>
                                 <td class="td-responsible"><span class="badge-user">${act.responsible || '-'}</span></td>
@@ -219,10 +220,10 @@ export function renderList(container) {
                                         <button class="btn-check-done ${act.done ? 'is-done' : ''}" data-id="${act.id}" title="Marcar como realizado">
                                             <i data-lucide="check-circle-2"></i>
                                         </button>
-                                        ${act.origen === 'secretaria' ? '' : `
+                                        ${act.origen === 'comunicacion' ? `
                                         <button class="btn-delete-activity" data-id="${act.id}" title="Eliminar actividad" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: inline-flex; align-items: center;">
                                             <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
-                                        </button>`}
+                                        </button>` : ''}
                                     </div>
                                 </td>
                             </tr>
