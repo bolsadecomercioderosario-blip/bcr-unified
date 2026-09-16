@@ -100,6 +100,29 @@ html, body {
 .scope-group { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
 .area-access { color: #fff; font-size: 0.8rem; font-weight: 600; text-decoration: underline; opacity: 0.92; white-space: nowrap; }
 .area-access:hover { opacity: 1; }
+
+/* Menú de sesión (cuando el dispositivo ya está logueado) */
+.area-menu { position: relative; }
+.area-menu-btn {
+    background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.area-menu-btn:hover { background: rgba(255,255,255,0.28); }
+.area-menu-btn .caret { margin-left: 0.2rem; }
+.area-menu-list {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18); overflow: hidden; min-width: 170px;
+    display: flex; flex-direction: column;
+}
+.area-menu-list a, .area-menu-list button {
+    display: block; width: 100%; text-align: left; background: #fff; border: none;
+    padding: 0.65rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #0742ab;
+    text-decoration: none; cursor: pointer; font-family: inherit;
+}
+.area-menu-list a:hover, .area-menu-list button:hover { background: #eaf0fb; }
+.area-menu-list button#area-logout { color: #b91c1c; border-top: 1px solid #f1f5f9; }
 @media (max-width: 600px) {
     .scope-group { flex-direction: row; align-items: center; gap: 0.6rem; }
 }

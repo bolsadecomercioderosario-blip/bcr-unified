@@ -13,7 +13,7 @@ let scope = 'mesa';
 const apiUrl = () => `/api/compromisos` + (scope === 'completa' ? '?scope=completa' : '');
 
 // Nombres de las áreas para etiquetar de quién es cada actividad (slugs = auth.py).
-const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital' };
+const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital', fundacion: 'Fundación BCR' };
 function ownerLabel(act) {
     if (act.origen === 'secretaria') return 'Mesa Ejecutiva';
     if (act.origen === 'area') return AREA_NOMBRE[act.area] || (act.area || 'Área');
@@ -344,8 +344,70 @@ if (scopeBtn) scopeBtn.addEventListener('click', () => {
     loadAndRender();
 });
 
+// ---------- Sesión: "Acceso áreas" o "Conectado como <Rol>" ----------
+// /compromisos y /agenda/ comparten dominio → comparten el localStorage donde el
+// login guarda token y rol. Si hay sesión válida, mostramos un menú con
+// "Ir a gestión" / "Cerrar sesión"; si no, el link "Acceso áreas →".
+const AUTH_TOKEN_KEY = 'bcr_session_token';
+const AUTH_ROLE_KEY = 'bcr_session_role';
+
+function roleLabel(role) {
+    if (role === 'secretaria') return 'Secretaría';
+    if (role === 'comunicacion') return 'Comunicación';
+    if (role && role.indexOf('area:') === 0) {
+        const slug = role.slice('area:'.length);
+        return AREA_NOMBRE[slug] || slug;
+    }
+    return 'sesión activa';
+}
+
+function renderAccesoLink() {
+    const slot = document.getElementById('area-access-slot');
+    if (slot) slot.innerHTML = '<a class="area-access" href="/agenda/">Acceso áreas →</a>';
+}
+
+function renderAccesoMenu(role) {
+    const slot = document.getElementById('area-access-slot');
+    if (!slot) return;
+    slot.innerHTML = `
+        <div class="area-menu">
+            <button type="button" class="area-menu-btn" id="area-menu-btn">Conectado como <b>${roleLabel(role)}</b> <span class="caret">▾</span></button>
+            <div class="area-menu-list" id="area-menu-list" hidden>
+                <a href="/agenda/">Ir a gestión</a>
+                <button type="button" id="area-logout">Cerrar sesión</button>
+            </div>
+        </div>`;
+    const btn = document.getElementById('area-menu-btn');
+    const list = document.getElementById('area-menu-list');
+    btn.addEventListener('click', (e) => { e.stopPropagation(); list.hidden = !list.hidden; });
+    document.addEventListener('click', () => { list.hidden = true; });
+    document.getElementById('area-logout').addEventListener('click', () => {
+        try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_ROLE_KEY); } catch (e) {}
+        renderAccesoLink();
+    });
+}
+
+async function initAccesoAreas() {
+    let token = '', role = '';
+    try { token = localStorage.getItem(AUTH_TOKEN_KEY) || ''; role = localStorage.getItem(AUTH_ROLE_KEY) || ''; } catch (e) {}
+    if (!token) { renderAccesoLink(); return; }
+    // Validamos el token contra el server; si venció, limpiamos y mostramos el link.
+    try {
+        const res = await fetch('/api/auth/check', { headers: { Authorization: 'Bearer ' + token } });
+        if (res.ok) {
+            renderAccesoMenu(role);
+        } else {
+            try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_ROLE_KEY); } catch (e) {}
+            renderAccesoLink();
+        }
+    } catch (e) {
+        renderAccesoLink();
+    }
+}
+
 // ---------- Auto-refresh cada 5 min ----------
 setInterval(loadAndRender, 5 * 60 * 1000);
 
 // ---------- Boot ----------
 loadAndRender();
+initAccesoAreas();
