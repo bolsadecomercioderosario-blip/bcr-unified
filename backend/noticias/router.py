@@ -229,6 +229,16 @@ async def subir_imagen(file: UploadFile = File(...)) -> dict[str, Any]:
     return {"url": f"/static/uploads/{filename}"}
 
 
+@router.post("/rehost")
+def rehost_imagenes(limit: int = 25, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Re-hostea a Cloudinary las imágenes que aún apuntan a wp-content (portadas
+    y cuerpos de notas + fotos del Kit), en lotes. Llamar hasta restantes=0."""
+    if not CLOUDINARY_ENABLED:
+        raise HTTPException(503, "Cloudinary no está configurado en el servidor")
+    from noticias.rehost import rehost_batch
+    return rehost_batch(db, limit=limit)
+
+
 @router.post("/importar-wp")
 async def importar_wp(
     files: list[UploadFile] = File(...),
