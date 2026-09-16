@@ -237,6 +237,8 @@ footer .ico{fill:#fff;opacity:.9}
 .galgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
 .galsub{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:19px;letter-spacing:.01em;text-transform:uppercase;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--line)}
 .galsub:first-of-type{margin-top:10px}
+.galfig{margin:0;display:flex;flex-direction:column}
+.galcap{font-size:13px;font-weight:600;color:var(--navy);margin-top:7px;line-height:1.3}
 .gal{position:relative;display:block;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#e5e7eb}
 .gal img{width:100%;height:100%;object-fit:cover}
 .gal span{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,49,75,.85));color:#fff;font-size:12px;font-weight:600;padding:18px 10px 8px;opacity:0;transition:.15s}
@@ -318,6 +320,7 @@ def base_page(*, title: str, description: str, body: str, canonical: str,
 <html lang="es"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E🌾%3C/text%3E%3C/svg%3E">
 <title>{_esc(title)}</title>
 <meta name="description" content="{_esc(description)}">
 <link rel="canonical" href="{_esc(canonical)}">
@@ -530,9 +533,12 @@ def render_kit_index(cats: list[dict]) -> str:
 
 
 def _gal_item(a) -> str:
-    return (f'<a class="gal" href="{_esc(a.url)}" target="_blank" rel="noopener" download>'
+    cap = (f'<figcaption class="galcap">{_esc(a.titulo)}</figcaption>'
+           if getattr(a, "titulo", None) else "")
+    return (f'<figure class="galfig">'
+            f'<a class="gal" href="{_esc(a.url)}" target="_blank" rel="noopener" download>'
             f'<img src="{_esc(a.url)}" alt="{_esc(a.titulo or "")}">'
-            f'<span>&#10515; Descargar</span></a>')
+            f'<span>&#10515; Descargar</span></a>{cap}</figure>')
 
 
 def _gal_grupo(titulo: str | None, assets: list) -> str:

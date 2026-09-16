@@ -64,7 +64,7 @@ _KIT_NOMBRE = {c["slug"]: c["nombre"] for c in KIT_CATEGORIAS}
 # orden en que se muestran en la galería pública. Las galerías que no figuran
 # acá se muestran planas (sin subtítulos).
 KIT_SUBCATS = {
-    "institucional": ["Autoridades y funcionarios", "Edificios e instalaciones"],
+    "institucional": ["Autoridades y funcionarios", "Edificios e instalaciones", "Fotos históricas"],
     "cultivos": ["Soja", "Trigo", "Maíz", "Otros cultivos"],
 }
 
@@ -120,6 +120,8 @@ class MediaAssetIn(BaseModel):
 
 class MediaAssetUpdate(BaseModel):
     subcat: Optional[str] = None
+    kit_cat: Optional[str] = None   # mover de galería
+    titulo: Optional[str] = None    # epígrafe (ej. nombre y cargo)
 
 
 class Video(Base):

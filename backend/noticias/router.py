@@ -313,9 +313,19 @@ def kit_actualizar(aid: int, payload: MediaAssetUpdate, db: Session = Depends(ge
     a = db.query(MediaAsset).filter(MediaAsset.id == aid).first()
     if a is None:
         raise HTTPException(404, "Recurso no encontrado")
-    if not _subcat_valida(a.kit_cat, payload.subcat):
-        raise HTTPException(400, "Subcategoría inválida para esta galería")
-    a.subcat = payload.subcat or None
+    # Mover de galería (kit_cat) si viene.
+    if payload.kit_cat is not None:
+        if payload.kit_cat not in _KIT_SLUGS:
+            raise HTTPException(400, "Categoría de kit inválida")
+        a.kit_cat = payload.kit_cat
+    # Subcat: si viene explícita se usa; si no, se mantiene. Se valida contra la
+    # categoría (nueva o actual); si no aplica, queda sin clasificar.
+    sub = payload.subcat if payload.subcat is not None else a.subcat
+    if not _subcat_valida(a.kit_cat, sub):
+        sub = None
+    a.subcat = sub or None
+    if payload.titulo is not None:
+        a.titulo = payload.titulo or None
     db.commit()
     return {"id": a.id, "kit_cat": a.kit_cat, "subcat": a.subcat, "url": a.url, "titulo": a.titulo}
 
@@ -523,10 +533,17 @@ async def kit_index(request: Request, db: Session = Depends(get_db)):
     cats = []
     for c in KIT_CATEGORIAS:
         assets = [a for a in rows if a.kit_cat == c["slug"]]
+        thumb = assets[0].url if assets else None
+        # Institucional: preferir una foto de edificio como portada (la primera
+        # suele ser de un funcionario, no queda bien de miniatura).
+        if c["slug"] == "institucional":
+            ed = [a for a in assets if a.subcat == "Edificios e instalaciones"]
+            if ed:
+                thumb = ed[0].url
         cats.append({
             "slug": c["slug"], "nombre": c["nombre"], "desc": c["desc"],
             "count": len(assets),
-            "thumb": assets[0].url if assets else None,
+            "thumb": thumb,
         })
     body = render.render_kit_index(cats)
     html = render.base_page(
