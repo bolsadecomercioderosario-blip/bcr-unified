@@ -18,7 +18,11 @@ const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes
 
 // Estado de sugerencia a la Mesa → color e etiqueta.
 const ME_COLOR = { '': '#cbd5e1', pendiente: '#f59e0b', aprobada: '#16a34a', rechazada: '#ef4444' };
-const ME_LABEL = { pendiente: 'Sugerida a la Mesa', aprobada: 'En la Agenda de la Mesa', rechazada: 'No sumada a la Mesa' };
+const ME_LABEL = {
+    pendiente: 'Sugerido a Agenda de ME',
+    aprobada: 'Aprobado: está en Agenda de ME',
+    rechazada: 'Rechazado: no aparece en Agenda de ME',
+};
 
 const FILTERS = [
     { key: 'proximas', label: 'Próximas' },
@@ -261,8 +265,9 @@ export function renderAreaAgenda(container) {
         tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === currentTab));
         filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === currentFilter));
         if (pastBtn) pastBtn.classList.toggle('active', showPast);
-        // "Nueva actividad" sólo tiene sentido en Mi agenda.
-        newBtn.style.display = currentTab === 'mias' ? '' : 'none';
+        // "Nueva actividad" siempre visible (en ambas solapas): lo que se cargue
+        // pertenece al área igual, sin importar qué solapa esté activa.
+        newBtn.style.display = '';
         content.innerHTML = contentHTML();
         if (window.lucide) window.lucide.createIcons();
     };

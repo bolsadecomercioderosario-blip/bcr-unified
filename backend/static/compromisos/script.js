@@ -13,7 +13,7 @@ let scope = 'mesa';
 const apiUrl = () => `/api/compromisos` + (scope === 'completa' ? '?scope=completa' : '');
 
 // Nombres de las áreas para etiquetar de quién es cada actividad (slugs = auth.py).
-const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital', fundacion: 'Fundación BCR' };
+const AREA_NOMBRE = { diyee: 'DIyEE', innova: 'Innova', cac: 'CAC', bcrdigital: 'BCR Digital', fundacion: 'Fundación BCR', legales: 'Legales', bcrlabs: 'BCRlabs' };
 function ownerLabel(act) {
     if (act.origen === 'secretaria') return 'Mesa Ejecutiva';
     if (act.origen === 'area') return AREA_NOMBRE[act.area] || (act.area || 'Área');
