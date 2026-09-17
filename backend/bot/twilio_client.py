@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 from typing import Mapping
 
 import requests
@@ -29,6 +30,7 @@ from config import (
 
 
 _TWILIO_API_BASE = "https://api.twilio.com/2010-04-01"
+_TWILIO_CONTENT_BASE = "https://content.twilio.com/v1"
 
 
 class TwilioNotConfigured(RuntimeError):
@@ -83,6 +85,76 @@ def send_whatsapp(to: str, body: str, timeout_s: float = 15.0) -> dict:
             "From": BOT_TWILIO_WHATSAPP_FROM,
             "Body": body,
         },
+        timeout=timeout_s,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+# ---------------------------------------------------------------------------
+# Menú interactivo (WhatsApp list-picker) — 6 opciones para la Mesa Ejecutiva.
+# WhatsApp permite máx. 3 botones de respuesta rápida; con 6 opciones va una
+# LISTA (list-picker), que se puede mandar como respuesta dentro de la ventana
+# de 24h (no requiere aprobación de Meta). Se manda por ContentSid (Content API).
+# Títulos ≤24 chars, descripciones ≤72, botón ≤20 (límites de WhatsApp).
+# ---------------------------------------------------------------------------
+MENU_SALUDO = ("Hola! Este es el bot de la Bolsa de Comercio de Rosario para los "
+               "miembros de la Mesa Ejecutiva. ¿En qué puedo ayudarte?")
+
+_MENU_CONTENT_DEFINITION = {
+    "friendly_name": "bcr_menu_mesa",
+    "language": "es",
+    "types": {
+        "twilio/list-picker": {
+            "body": MENU_SALUDO,
+            "button": "Ver opciones",
+            "items": [
+                {"id": "agenda", "item": "Agenda de Compromisos", "description": "Actividades de la Mesa Ejecutiva"},
+                {"id": "precios", "item": "Precios y mercado", "description": "Pizarra y comentarios diarios"},
+                {"id": "informativo", "item": "Informativo Semanal", "description": "Resumen semanal del mercado"},
+                {"id": "gea", "item": "Estimaciones y clima", "description": "GEA: cultivos y campaña"},
+                {"id": "asuntos", "item": "Asuntos Públicos", "description": "Agenda de asuntos públicos"},
+                {"id": "conectados", "item": "Qué hizo la BCR", "description": "Newsletter Conectados"},
+            ],
+        },
+        # Fallback para clientes que no rendericen la lista.
+        "twilio/text": {
+            "body": MENU_SALUDO + "\n\nOpciones: 1) Agenda de Compromisos · 2) Precios "
+            "y mercado · 3) Informativo Semanal · 4) Estimaciones y clima (GEA) · "
+            "5) Asuntos Públicos · 6) Qué hizo la BCR (Conectados). Escribime tu consulta.",
+        },
+    },
+}
+
+
+def create_menu_content_sid() -> str:
+    """Crea el Content template del menú (list-picker) vía Content API y devuelve
+    su ContentSid (HX...). Se llama una vez; el SID se persiste en bot_config."""
+    if not is_configured():
+        raise TwilioNotConfigured("TWILIO_ACCOUNT_SID/AUTH_TOKEN no seteados.")
+    r = requests.post(
+        f"{_TWILIO_CONTENT_BASE}/Content",
+        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
+        json=_MENU_CONTENT_DEFINITION,
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.json()["sid"]
+
+
+def send_whatsapp_content(to: str, content_sid: str, content_variables: dict | None = None,
+                          timeout_s: float = 15.0) -> dict:
+    """Manda un mensaje de contenido (template/interactivo) por ContentSid."""
+    if not is_configured():
+        raise TwilioNotConfigured("TWILIO_ACCOUNT_SID/AUTH_TOKEN no seteados.")
+    url = f"{_TWILIO_API_BASE}/Accounts/{BOT_TWILIO_ACCOUNT_SID}/Messages.json"
+    data = {"To": to, "From": BOT_TWILIO_WHATSAPP_FROM, "ContentSid": content_sid}
+    if content_variables:
+        data["ContentVariables"] = json.dumps(content_variables)
+    response = requests.post(
+        url,
+        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
+        data=data,
         timeout=timeout_s,
     )
     response.raise_for_status()

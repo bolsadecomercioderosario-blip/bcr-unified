@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import traceback
+import unicodedata
 from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -161,6 +162,46 @@ def _get_or_create_session(db: Session, from_phone: str) -> tuple[db_models.BotS
     return session, session.last_response_id
 
 
+# ---------------------------------------------------------------------------
+# Menú inicial (list-picker de WhatsApp): ante un saludo o pedido de menú, en
+# vez de correr el agente, mandamos el saludo + la lista de 6 opciones.
+# ---------------------------------------------------------------------------
+_MENU_GREETINGS = {
+    "hola", "holaa", "holis", "buenas", "buenass", "buen dia", "buenos dias",
+    "buenas tardes", "buenas noches", "menu", "menu principal", "opciones",
+    "inicio", "empezar", "comenzar", "start", "ayuda", "hi", "hello",
+}
+
+
+def _norm_txt(s: str) -> str:
+    s = unicodedata.normalize("NFKD", (s or "").strip().lower())
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
+def _is_menu_request(text: str) -> bool:
+    t = _norm_txt(text)
+    if t in _MENU_GREETINGS:
+        return True
+    return bool(re.match(r"^(hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches)\b", t))
+
+
+def ensure_menu_content_sid(db: Session, force: bool = False) -> str:
+    """Devuelve el ContentSid del menú, creándolo (Content API) y persistiéndolo
+    en bot_config la primera vez. force=True recrea el template (para iterar)."""
+    from bot.db_models import BotConfig
+    row = db.query(BotConfig).filter(BotConfig.key == "menu_content_sid").first()
+    if row and row.value and not force:
+        return row.value
+    sid = twilio_client.create_menu_content_sid()
+    if row:
+        row.value = sid
+        row.updated_at = datetime.utcnow()
+    else:
+        db.add(BotConfig(key="menu_content_sid", value=sid))
+    db.commit()
+    return sid
+
+
 def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None:
     """Corre el agente y manda la respuesta por REST. Va en SEGUNDO PLANO
     (BackgroundTask) para no colgar el webhook de Twilio, que corta a los ~15s
@@ -169,6 +210,24 @@ def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None
     ev = ev if ev is not None else {}
     db = SessionLocal()
     try:
+        # Saludo / pedido de menú → mostramos la lista interactiva (no corre el agente).
+        if _is_menu_request(body):
+            try:
+                sid = ensure_menu_content_sid(db)
+                twilio_client.send_whatsapp_content(from_phone, sid)
+                ev["menu"] = True
+                ev["envio_ok"] = True
+            except Exception as exc:  # noqa: BLE001 — fallback a texto si el menú falla
+                print(f"[bot.twilio-webhook] Falló menú interactivo: {type(exc).__name__}: {exc}")
+                ev["menu"] = True
+                ev["error"] = f"menu: {type(exc).__name__}: {exc}"
+                try:
+                    twilio_client.send_whatsapp(from_phone, twilio_client.MENU_SALUDO)
+                    ev["envio_ok"] = True
+                except Exception:  # noqa: BLE001
+                    ev["envio_ok"] = False
+            return
+
         session, previous_response_id = _get_or_create_session(db, from_phone)
 
         exchange = db_models.BotExchange(from_phone=from_phone, message=body, reply="")
@@ -714,6 +773,14 @@ def list_ingested(
     return {"error": f"source desconocido: {source!r}", "valid": ["informativo", "comentarios", "gea_informes"]}
 
 
+@router.post("/admin/setup-menu", dependencies=[Depends(require_auth)])
+def setup_menu(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """(Re)crea el template del menú (list-picker) en Twilio y guarda su
+    ContentSid en bot_config. Útil para iterar el texto/opciones del menú."""
+    sid = ensure_menu_content_sid(db, force=True)
+    return {"content_sid": sid}
+
+
 @router.get(
     "/admin/health",
     dependencies=[Depends(require_auth)],
@@ -791,6 +858,8 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
         "twilio_configured": twilio_client.is_configured(),
         "twilio_from": BOT_TWILIO_WHATSAPP_FROM,
         "whitelist": {"restringido": bool(_WHITELIST), "cantidad": len(_WHITELIST)},
+        "menu_content_sid": (lambda r: r.value if r else None)(
+            db.query(db_models.BotConfig).filter(db_models.BotConfig.key == "menu_content_sid").first()),
         "ultimos_webhooks": list(_LAST_WEBHOOKS),
         "vector_stores": {
             "institucional": get_vector_store_id(db, "institucional"),
