@@ -116,6 +116,9 @@ html, body {
     box-shadow: 0 12px 30px rgba(0,0,0,0.18); overflow: hidden; min-width: 170px;
     display: flex; flex-direction: column;
 }
+/* El atributo `hidden` debe ganarle al display:flex de arriba (si no, el menú
+   queda siempre abierto y el toggle del clic no tiene efecto). */
+.area-menu-list[hidden] { display: none; }
 .area-menu-list a, .area-menu-list button {
     display: block; width: 100%; text-align: left; background: #fff; border: none;
     padding: 0.65rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #0742ab;

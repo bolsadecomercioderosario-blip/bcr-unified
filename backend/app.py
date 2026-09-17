@@ -327,34 +327,6 @@ async def root():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-# ---------------------------------------------------------
-# Redirects de URLs viejas de WordPress (masbcr.com.ar/{slug}/) → nota nueva.
-# Catch-all de UN solo segmento, registrado al final: sólo captura paths que no
-# matchearon ninguna ruta anterior. Si el slug corresponde a una nota publicada
-# y vigente, hace 301 a /noticias/nota/{slug}; si no, 404. Las páginas viejas de
-# WP (contacto, sobre-nosotros, etc.) no se redirigen acá.
-# ---------------------------------------------------------
-@app.get("/{slug}")
-@app.get("/{slug}/")
-async def _wp_legacy_redirect(slug: str):
-    from datetime import datetime
-    from database import SessionLocal
-    from noticias.models import Noticia
-
-    db = SessionLocal()
-    try:
-        n = (
-            db.query(Noticia)
-            .filter(Noticia.slug == slug, Noticia.estado == "publicado")
-            .first()
-        )
-        if n and (n.fecha_pub is None or n.fecha_pub <= datetime.utcnow()):
-            return RedirectResponse(url=f"/noticias/nota/{slug}", status_code=301)
-        raise HTTPException(status_code=404, detail="No encontrado")
-    finally:
-        db.close()
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
