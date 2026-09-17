@@ -34,6 +34,7 @@ const FILTERS = [
 
 // Estado de la vista (module-level, sobrevive a los re-render del polling).
 let currentTab = 'mias';       // 'mias' | 'completa'
+let completaScope = 'todas';   // 'todas' (Mesa + áreas) | 'me' (sólo Mesa Ejecutiva)
 let currentFilter = 'proximas';
 let searchQuery = '';
 let showPast = false;
@@ -102,7 +103,9 @@ function mySlug() { return getAreaSlug(); }
 function belongsToTab(a) {
     if (a.is_custom) return false;
     if (currentTab === 'mias') return a.origen === 'area' && a.area === mySlug();
-    // completa: Mesa Ejecutiva + todas las áreas (no Comunicación).
+    // completa: por default Mesa Ejecutiva + todas las áreas (no Comunicación);
+    // con el filtro rápido en 'me', sólo la Agenda de la Mesa Ejecutiva.
+    if (completaScope === 'me') return a.origen === 'secretaria';
     return a.origen === 'secretaria' || a.origen === 'area';
 }
 
@@ -239,6 +242,11 @@ export function renderAreaAgenda(container) {
 
         <nav class="cmp-filters"></nav>
 
+        <div id="area-scope" class="cmp-filters" style="display:none; gap:.5rem;">
+            <button class="cmp-filter-btn area-scope-btn" data-scope="todas">Todas las áreas</button>
+            <button class="cmp-filter-btn area-scope-btn" data-scope="me">Sólo Mesa Ejecutiva</button>
+        </div>
+
         <div class="cmp-toolbar">
             <div class="cmp-search">
                 <i data-lucide="search"></i>
@@ -257,6 +265,8 @@ export function renderAreaAgenda(container) {
     const filtersNav = wrapper.querySelectorAll('.cmp-filters')[1];
     const newBtn = wrapper.querySelector('#area-new-btn');
     const pastBtn = wrapper.querySelector('#area-past-toggle');
+    const scopeWrap = wrapper.querySelector('#area-scope');
+    const scopeBtns = scopeWrap.querySelectorAll('.area-scope-btn');
 
     filtersNav.innerHTML = FILTERS.map(f => `<button class="cmp-filter-btn" data-filter="${f.key}">${f.label}</button>`).join('');
     const filterBtns = filtersNav.querySelectorAll('.cmp-filter-btn');
@@ -268,12 +278,16 @@ export function renderAreaAgenda(container) {
         // "Nueva actividad" siempre visible (en ambas solapas): lo que se cargue
         // pertenece al área igual, sin importar qué solapa esté activa.
         newBtn.style.display = '';
+        // Filtro rápido Mesa/Todas: sólo en la solapa "Agenda completa".
+        scopeWrap.style.display = currentTab === 'completa' ? 'flex' : 'none';
+        scopeBtns.forEach(b => b.classList.toggle('active', b.dataset.scope === completaScope));
         content.innerHTML = contentHTML();
         if (window.lucide) window.lucide.createIcons();
     };
 
     tabBtns.forEach(b => b.onclick = () => { currentTab = b.dataset.tab; paint(); });
     filterBtns.forEach(b => b.onclick = () => { currentFilter = b.dataset.filter; paint(); });
+    scopeBtns.forEach(b => b.onclick = () => { completaScope = b.dataset.scope; paint(); });
 
     const searchInput = wrapper.querySelector('#area-search');
     searchInput.addEventListener('input', () => { searchQuery = searchInput.value; paint(); });
