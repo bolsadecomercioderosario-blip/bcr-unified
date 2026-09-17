@@ -40,13 +40,15 @@ def _norm(s: str) -> str:
 
 # Texto (normalizado) que llega al tocar cada opción de la lista, o el número
 # del fallback de texto. Match EXACTO para no interceptar consultas libres.
+# Al tocar una opción de la lista, Twilio manda el `id` del ítem (no el título).
+# Incluimos el id, el título y el número (del fallback de texto). Match EXACTO.
 _OPTIONS: dict[str, set] = {
-    "agenda": {"agenda de compromisos", "1"},
-    "precios": {"precios y mercado", "precios de pizarra", "precios de pizarra / comentarios de mercado", "2"},
-    "informativo": {"informativo semanal", "3"},
-    "gea": {"estimaciones y clima", "estimaciones y clima (gea)", "gea", "4"},
-    "asuntos": {"asuntos publicos", "agenda de asuntos publicos", "asuntos publicos ", "5"},
-    "conectados": {"que hizo la bcr", "que hizo la bcr (conectados)", "conectados", "6"},
+    "agenda": {"agenda", "agenda de compromisos", "1"},
+    "precios": {"precios", "precios y mercado", "precios de pizarra", "precios de pizarra / comentarios de mercado", "2"},
+    "informativo": {"informativo", "informativo semanal", "3"},
+    "gea": {"gea", "estimaciones y clima", "estimaciones y clima (gea)", "4"},
+    "asuntos": {"asuntos", "asuntos publicos", "agenda de asuntos publicos", "5"},
+    "conectados": {"conectados", "que hizo la bcr", "que hizo la bcr (conectados)", "6"},
 }
 
 

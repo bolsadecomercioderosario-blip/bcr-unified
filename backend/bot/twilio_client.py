@@ -64,31 +64,62 @@ def verify_signature(url: str, params: Mapping[str, str], signature: str) -> boo
     return hmac.compare_digest(expected, signature)
 
 
-def send_whatsapp(to: str, body: str, timeout_s: float = 15.0) -> dict:
-    """Manda un mensaje de WhatsApp vía Twilio. Devuelve el JSON de respuesta.
+# WhatsApp corta los mensajes a ~1600 caracteres; si mandamos más, Twilio
+# devuelve 400 y el usuario no recibe nada. Partimos a ~1500 por las dudas.
+_WA_MAX = 1500
 
-    `to` debe venir en formato 'whatsapp:+549...' (Twilio lo requiere así).
-    Si Twilio rechaza el request, levanta requests.HTTPError — el caller
-    decide si reintentar o degradar.
+
+def _split_message(text: str, limit: int = _WA_MAX) -> list[str]:
+    """Parte un texto largo en trozos <= limit, respetando líneas/párrafos."""
+    text = text or ""
+    if len(text) <= limit:
+        return [text]
+    parts: list[str] = []
+    buf = ""
+    for line in text.split("\n"):
+        # Una sola línea más larga que el límite: la cortamos duro.
+        while len(line) > limit:
+            if buf:
+                parts.append(buf); buf = ""
+            parts.append(line[:limit])
+            line = line[limit:]
+        add = (buf + "\n" + line) if buf else line
+        if len(add) > limit:
+            parts.append(buf); buf = line
+        else:
+            buf = add
+    if buf:
+        parts.append(buf)
+    return parts or [""]
+
+
+def _send_one(to: str, body: str, timeout_s: float) -> dict:
+    url = f"{_TWILIO_API_BASE}/Accounts/{BOT_TWILIO_ACCOUNT_SID}/Messages.json"
+    response = requests.post(
+        url,
+        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
+        data={"To": to, "From": BOT_TWILIO_WHATSAPP_FROM, "Body": body},
+        timeout=timeout_s,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def send_whatsapp(to: str, body: str, timeout_s: float = 15.0) -> dict:
+    """Manda un mensaje de WhatsApp vía Twilio. Devuelve el JSON del último envío.
+
+    `to` debe venir en formato 'whatsapp:+549...' (Twilio lo requiere así). Si el
+    texto excede ~1600 caracteres, se parte en varios mensajes (WhatsApp lo corta
+    y Twilio devuelve 400). Si Twilio rechaza, levanta requests.HTTPError.
     """
     if not is_configured():
         raise TwilioNotConfigured(
             "TWILIO_ACCOUNT_SID y/o TWILIO_AUTH_TOKEN no están seteados."
         )
-
-    url = f"{_TWILIO_API_BASE}/Accounts/{BOT_TWILIO_ACCOUNT_SID}/Messages.json"
-    response = requests.post(
-        url,
-        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
-        data={
-            "To": to,
-            "From": BOT_TWILIO_WHATSAPP_FROM,
-            "Body": body,
-        },
-        timeout=timeout_s,
-    )
-    response.raise_for_status()
-    return response.json()
+    last: dict = {}
+    for part in _split_message(body):
+        last = _send_one(to, part, timeout_s)
+    return last
 
 
 # ---------------------------------------------------------------------------
