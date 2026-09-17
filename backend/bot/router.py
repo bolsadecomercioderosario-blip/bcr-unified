@@ -30,7 +30,7 @@ from auth import require_auth
 from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
-from bot import agent, db_models, models, twilio_client
+from bot import agent, db_models, menu_handlers, models, twilio_client
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +223,26 @@ def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None
                 ev["error"] = f"menu: {type(exc).__name__}: {exc}"
                 try:
                     twilio_client.send_whatsapp(from_phone, twilio_client.MENU_SALUDO)
+                    ev["envio_ok"] = True
+                except Exception:  # noqa: BLE001
+                    ev["envio_ok"] = False
+            return
+
+        # Opción del menú tocada → handler propio (rápido, formato consistente),
+        # sin correr el agente.
+        opt = menu_handlers.match_option(body)
+        if opt:
+            try:
+                reply = menu_handlers.handle(opt, db)
+                twilio_client.send_whatsapp(from_phone, reply)
+                ev["opcion"] = opt
+                ev["envio_ok"] = True
+            except Exception as exc:  # noqa: BLE001
+                print(f"[bot.twilio-webhook] Falló opción '{opt}': {type(exc).__name__}: {exc}")
+                ev["opcion"] = opt
+                ev["error"] = f"opcion: {type(exc).__name__}: {exc}"
+                try:
+                    twilio_client.send_whatsapp(from_phone, "Tuve un problema con esa opción. Probá de nuevo en un momento.")
                     ev["envio_ok"] = True
                 except Exception:  # noqa: BLE001
                     ev["envio_ok"] = False
@@ -779,6 +799,15 @@ def setup_menu(db: Session = Depends(get_db)) -> dict[str, Any]:
     ContentSid en bot_config. Útil para iterar el texto/opciones del menú."""
     sid = ensure_menu_content_sid(db, force=True)
     return {"content_sid": sid}
+
+
+@router.get("/admin/menu-preview", dependencies=[Depends(require_auth)])
+def menu_preview(opt: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Devuelve el texto que respondería una opción del menú, sin mandar WhatsApp.
+    Para revisar el formato con datos reales. opt: agenda|precios|informativo|gea|asuntos|conectados"""
+    if opt not in ("agenda", "precios", "informativo", "gea", "asuntos", "conectados"):
+        raise HTTPException(400, "opción inválida")
+    return {"opcion": opt, "reply": menu_handlers.handle(opt, db)}
 
 
 @router.get(
