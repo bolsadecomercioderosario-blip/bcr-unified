@@ -321,6 +321,11 @@ app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte
 app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")
 app.mount("/abuela", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "abuela"), html=False), name="abuela_ui")
 
+# Prototipo de la nueva web institucional (HTML estáticos autocontenidos). El hub
+# lo abre en /portal/bcr_home_mvp_34.html; las páginas se enlazan entre sí por
+# nombre relativo. NoCache para poder iterar el prototipo sin caché del browser.
+app.mount("/portal", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "portal"), html=False), name="portal")
+
 
 @app.get("/")
 async def root():

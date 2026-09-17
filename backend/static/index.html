@@ -27,6 +27,7 @@
             --accent-bot: #fbbf24;
             --accent-web: #fb923c;
             --accent-conv: #f59e0b;
+            --accent-news: #2dd4bf;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -156,6 +157,7 @@
         .tool-card.bot::before { background: var(--accent-bot); }
         .tool-card.web::before { background: var(--accent-web); }
         .tool-card.conv::before { background: var(--accent-conv); }
+        .tool-card.news::before { background: var(--accent-news); }
 
         .tool-card.rain:hover { border-color: rgba(56, 189, 248, 0.3); }
         .tool-card.social:hover { border-color: rgba(244, 114, 182, 0.3); }
@@ -164,6 +166,7 @@
         .tool-card.bot:hover { border-color: rgba(251, 191, 36, 0.3); }
         .tool-card.web:hover { border-color: rgba(251, 146, 60, 0.3); }
         .tool-card.conv:hover { border-color: rgba(245, 158, 11, 0.3); }
+        .tool-card.news:hover { border-color: rgba(45, 212, 191, 0.3); }
 
         .tool-icon {
             width: 56px;
@@ -187,6 +190,7 @@
         .tool-card.bot .tool-icon { background: rgba(251, 191, 36, 0.15); }
         .tool-card.web .tool-icon { background: rgba(251, 146, 60, 0.15); }
         .tool-card.conv .tool-icon { background: rgba(245, 158, 11, 0.15); }
+        .tool-card.news .tool-icon { background: rgba(45, 212, 191, 0.15); }
 
         .tool-card h3 {
             font-size: 1.15rem;
@@ -216,6 +220,7 @@
         .tool-card.bot .tool-badge { background: rgba(251, 191, 36, 0.12); color: var(--accent-bot); }
         .tool-card.web .tool-badge { background: rgba(251, 146, 60, 0.12); color: var(--accent-web); }
         .tool-card.conv .tool-badge { background: rgba(245, 158, 11, 0.12); color: var(--accent-conv); }
+        .tool-card.news .tool-badge { background: rgba(45, 212, 191, 0.12); color: var(--accent-news); }
 
         .footer-text {
             margin-top: 3rem;
@@ -289,7 +294,13 @@
                 <h3>Bot BCR</h3>
             </a>
 
-            <a href="https://bcr-portal-poc.onrender.com/" target="_blank" rel="noopener noreferrer" class="tool-card web" id="tool-web">
+            <a href="/noticias/" class="tool-card news" id="tool-noticias">
+                <div class="tool-icon">📰</div>
+                <h3>Noticias</h3>
+                <span class="tool-badge">MásBCR</span>
+            </a>
+
+            <a href="/portal/bcr_home_mvp_34.html" target="_blank" rel="noopener noreferrer" class="tool-card web" id="tool-web">
                 <div class="tool-icon">🌐</div>
                 <h3>Web</h3>
             </a>
