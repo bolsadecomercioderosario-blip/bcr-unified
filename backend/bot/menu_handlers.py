@@ -10,6 +10,7 @@ Cada respuesta termina con una pregunta de seguimiento propia del tópico.
 """
 from __future__ import annotations
 
+import re
 import unicodedata
 from datetime import date, datetime, timedelta
 from typing import Optional
@@ -58,6 +59,13 @@ def match_option(body: str) -> Optional[str]:
         if t in keys:
             return opt
     return None
+
+
+def _no_autolink(text: str) -> str:
+    """Evita que WhatsApp convierta en link cosas tipo 'Bs.As' (lee '.as' como
+    dominio). Inserta un carácter invisible (U+200B) entre un punto y la letra
+    que le sigue sin espacio. No afecta texto normal (que lleva '. ' con espacio)."""
+    return re.sub(r"\.(?=[A-Za-z])", ".​", text or "")
 
 
 # --- Helpers de fecha ------------------------------------------------------
@@ -169,7 +177,7 @@ def _agenda(db) -> str:
             return "_Sin actividades._"
         out = []
         for a in items:
-            line = f"- *{_fmt_hora(a)}* · {a.title}"
+            line = f"- {_fmt_hora(a)} · {a.title}"
             extra = []
             if (a.location or "").strip():
                 extra.append(f"Lugar: {a.location.strip()}")
@@ -182,6 +190,9 @@ def _agenda(db) -> str:
         return "\n".join(out)
 
     return (
+        "Los miembros de la Mesa Ejecutiva que quieran participar de alguna de las "
+        "actividades pueden comunicarse con la Secretaría de Presidencia (Daniel Vicente) "
+        "para coordinar su participación.\n\n"
         "Estas son las actividades de la Agenda de Compromisos para hoy y mañana:\n\n"
         f"*Hoy — {_fecha_dia(today)}*\n{blk(hoy)}\n\n"
         f"*Mañana — {_fecha_dia(manana)}*\n{blk(man)}\n\n"
@@ -302,4 +313,4 @@ _HANDLERS = {
 
 
 def handle(option: str, db) -> str:
-    return _HANDLERS[option](db)
+    return _no_autolink(_HANDLERS[option](db))
