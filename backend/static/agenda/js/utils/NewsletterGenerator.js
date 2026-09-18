@@ -83,8 +83,11 @@ function renderColumn(act, baseUrl) {
     }
 
     const containerId = uniqueContainerId();
-    const title = act.title || '';
-    const text = act.copy_linkedin || act.conectados_text || '';
+    // Conectados es independiente de la Agenda: preferimos los campos propios del
+    // newsletter (conectados_title / conectados_text) y sólo caemos al título /
+    // copy de la actividad como valor inicial si aún no se editó en Conectados.
+    const title = (act.conectados_title && act.conectados_title.trim()) || act.title || '';
+    const text = (act.conectados_text && act.conectados_text.trim()) || act.copy_linkedin || '';
     const imageUrl = act.image_url
         ? (act.image_url.startsWith('http') ? act.image_url : baseUrl + act.image_url)
         : 'https://via.placeholder.com/600x400?text=BCR+Agenda';

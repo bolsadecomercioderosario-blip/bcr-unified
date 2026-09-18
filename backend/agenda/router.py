@@ -323,6 +323,12 @@ _ATTACHMENT = {"attachment_url", "attachment_name"}
 _OPERATIVE = {"responsible", "external_name", "channels", "done", "drive_bcr",
               "drive_santiago", "copy_instagram", "copy_linkedin", "story_type",
               "comunicacion_notes"}
+# Campos del armado del newsletter Conectados. Comunicación cura el newsletter
+# para TODAS las actividades que ve (propias, de Secretaría o de área ya en la
+# Mesa); estos campos son propios del newsletter y NO tocan los Datos Generales
+# de la actividad (el título/cuerpo de Conectados es independiente del de la
+# Agenda), por eso van aparte y sólo los edita Comunicación.
+_NEWSLETTER = {"conectados_title", "conectados_text", "image_url", "order_index", "block_type"}
 # Campos "propios de Secretaría" en SUS actividades (incluye el Estado de avance
 # que alimenta el semáforo).
 _SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other", "sec_notes"}
@@ -336,9 +342,9 @@ def _allowed_update_fields(db_activity, role: str) -> set:
     origen = db_activity.origen or "comunicacion"
     if role == ROLE_COMUNICACION:
         if origen == "comunicacion":
-            return _GENERALS | _ATTACHMENT | _OPERATIVE
+            return _GENERALS | _ATTACHMENT | _OPERATIVE | _NEWSLETTER
         if origen == "secretaria" or (origen == "area" and db_activity.me_estado == "aprobada"):
-            return set(_OPERATIVE)          # ajena: sólo sus campos operativos
+            return _OPERATIVE | _NEWSLETTER  # ajena: sus campos operativos + armado del newsletter
         return set()
     if role == ROLE_SECRETARIA:
         if origen == "secretaria":

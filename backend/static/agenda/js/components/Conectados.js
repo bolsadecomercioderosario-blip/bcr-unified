@@ -63,16 +63,22 @@ function previewSnippet(text, maxWords = 22) {
     return words.slice(0, maxWords).join(' ') + '…';
 }
 
-// Texto que aparece como cuerpo del bloque: en bloques de actividad, el
-// LinkedIn copy de la actividad pisa al conectados_text si está cargado.
+// Título que se muestra en Conectados. Es INDEPENDIENTE del título de la
+// actividad en la Agenda: si hay conectados_title cargado, manda ése; si no
+// (bloque nuevo o actividad nunca editada en Conectados), cae al título de la
+// actividad como valor inicial. Editar el título acá NO toca la Agenda.
+function blockTitle(act) {
+    return (act.conectados_title && act.conectados_title.trim()) || act.title || '';
+}
+
+// Cuerpo del bloque en Conectados, también independiente de la Agenda: si hay
+// conectados_text cargado, manda ése; si no, cae al copy de LinkedIn / la
+// descripción de la actividad como valor inicial.
 function blockBodyText(act) {
-    if (blockKind(act) === 'activity') {
-        return (act.copy_linkedin && act.copy_linkedin.trim())
-            || act.conectados_text
-            || act.description
-            || '';
-    }
-    return act.conectados_text || act.copy_linkedin || act.description || '';
+    return (act.conectados_text && act.conectados_text.trim())
+        || act.copy_linkedin
+        || act.description
+        || '';
 }
 
 // =================================================================
@@ -211,7 +217,7 @@ export function renderConectados(container) {
                 <div class="conectados-mobile-handle">
                     <i data-lucide="grip-vertical"></i>
                 </div>
-                <div class="conectados-mobile-title">${(act.title || '').replace(/</g, '&lt;') || '<span style="color: var(--text-muted); font-weight: 400;">(sin título)</span>'}</div>
+                <div class="conectados-mobile-title">${(blockTitle(act) || '').replace(/</g, '&lt;') || '<span style="color: var(--text-muted); font-weight: 400;">(sin título)</span>'}</div>
                 <i class="conectados-mobile-chevron" data-lucide="chevron-down"></i>
             </div>
             <div class="drag-handle">
@@ -239,7 +245,7 @@ export function renderConectados(container) {
                     <div class="conectados-block-badge" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; background: ${badge.bg}; color: ${badge.color}; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem;">
                         ${badge.icon} ${badge.label}
                     </div>
-                    <div class="conectados-preview-title">${(act.title || '<span style="color: var(--text-muted); font-weight: 400;">(sin título)</span>').toString().replace(/</g, m => m === '<' ? '&lt;' : m)}</div>
+                    <div class="conectados-preview-title">${(blockTitle(act) || '<span style="color: var(--text-muted); font-weight: 400;">(sin título)</span>').toString().replace(/</g, m => m === '<' ? '&lt;' : m)}</div>
                     <div class="conectados-preview-snippet">${snippet ? snippet.replace(/</g, '&lt;') : '<span style="color: var(--text-muted); font-style: italic;">(sin contenido)</span>'}</div>
                 </div>
             </div>
@@ -328,7 +334,7 @@ export function renderConectados(container) {
     if (btnCopy) {
         btnCopy.onclick = async () => {
             const text = conectadosActivities
-                .map(a => (a.title || '').trim() || '(sin título)')
+                .map(a => (blockTitle(a) || '').trim() || '(sin título)')
                 .join('\n');
             try {
                 await navigator.clipboard.writeText(text);
@@ -393,7 +399,7 @@ function openConectadosEditor(act) {
 
                 <!-- Título sin label -->
                 <input id="editor-title" type="text"
-                    value="${(act.title || '').replace(/"/g, '&quot;')}"
+                    value="${(blockTitle(act) || '').replace(/"/g, '&quot;')}"
                     placeholder="Título del bloque"
                     style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.05rem; font-weight: 600;">
 
@@ -534,9 +540,10 @@ function openConectadosEditor(act) {
 
     // --- Guardar ---
     overlay.querySelector('#btn-editor-save').onclick = () => {
+        // Conectados es INDEPENDIENTE de la Agenda: guardamos sólo los campos
+        // propios del newsletter. NO tocamos title/copy_linkedin de la actividad,
+        // para que editar acá no altere el título ni el copy en la Agenda.
         updateActivity(act.id, {
-            title: inputTitle.value,
-            copy_linkedin: inputBody.value,
             conectados_title: inputTitle.value,
             conectados_text: inputBody.value,
             image_url: currentImageUrl,
@@ -612,7 +619,7 @@ function openNewsletterPreview(listContainer) {
     modal.querySelector('#save-newsletter-bot').onclick = async () => {
         const btn = modal.querySelector('#save-newsletter-bot');
         const bloques = liveActivities.map(a => ({
-            titulo: (a.title || '').trim(),
+            titulo: (blockTitle(a) || '').trim(),
             texto: (blockBodyText(a) || '').trim(),
         })).filter(b => b.titulo || b.texto);
         if (bloques.length === 0) {
