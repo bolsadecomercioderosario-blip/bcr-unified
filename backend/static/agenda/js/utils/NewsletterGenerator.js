@@ -79,7 +79,10 @@ function dividerHtml() {
  */
 function renderColumn(act, baseUrl) {
     if (!act) {
-        return `<th style="width: 50%; padding: 10px;" role="presentation"></th>`;
+        // Columna de relleno (número impar de bloques). Debe declarar el MISMO
+        // ancho que una columna real (290px, no 50%): con 50% el navegador le da
+        // de más y deja al bloque solo más angosto que una columna normal.
+        return `<th data-container-width="50.00" style="width: 290px; padding: 10px; vertical-align: top;" role="presentation"></th>`;
     }
 
     const containerId = uniqueContainerId();
