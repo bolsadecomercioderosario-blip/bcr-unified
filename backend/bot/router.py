@@ -61,6 +61,27 @@ def _phone_allowed(from_phone: str) -> bool:
 # ---------------------------------------------------------------------------
 _LAST_WEBHOOKS: deque = deque(maxlen=25)
 
+# Anti-replay: MessageSid ya procesados (en memoria, acotado). Twilio reintenta
+# el webhook si no contestamos a tiempo, y un request firmado capturado podría
+# reenviarse → deduplicamos para no correr el agente (ni gastar OpenAI) dos veces
+# por el mismo mensaje. Se resetea en cada reinicio (aceptable: cubre la ventana
+# de reintentos, que es de minutos).
+_SEEN_SIDS: deque = deque(maxlen=500)
+_SEEN_SIDS_SET: set = set()
+
+
+def _already_processed(message_sid: str) -> bool:
+    """True si este MessageSid ya se procesó (y lo registra si es nuevo)."""
+    if not message_sid:
+        return False
+    if message_sid in _SEEN_SIDS_SET:
+        return True
+    if len(_SEEN_SIDS) >= _SEEN_SIDS.maxlen:
+        _SEEN_SIDS_SET.discard(_SEEN_SIDS.popleft())
+    _SEEN_SIDS.append(message_sid)
+    _SEEN_SIDS_SET.add(message_sid)
+    return False
+
 
 def _candidate_urls(request: Request) -> list[str]:
     """URLs posibles sobre las que Twilio pudo firmar. En Render (detrás de
@@ -318,6 +339,12 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"[bot.twilio-webhook] Falló mandar respuesta no-text: {exc}")
+        return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
+
+    # Anti-replay: si ya procesamos este MessageSid (reintento de Twilio o replay
+    # de un request firmado), no lo corremos de nuevo.
+    if _already_processed(params.get("MessageSid", "")):
+        ev["outcome"] = "duplicado"
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     # Procesamos en segundo plano y le contestamos a Twilio YA.

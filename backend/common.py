@@ -2,13 +2,46 @@
 Helpers compartidos entre módulos. Por ahora sólo lo de Twitter publishing
 (usado tanto por Lluvias como por Social).
 """
+import ipaddress
 import os
+import socket
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import HTTPException
 from pydantic import BaseModel
 
 from config import STATIC_DIR, UPLOADS_DIR, EXTERNAL_INTEGRATIONS_ENABLED, GOOGLE_DRIVE_ENABLED
+
+
+def assert_safe_url(url: str, allowed_hosts: Optional[set] = None) -> None:
+    """Guard anti-SSRF para URLs que el server va a descargar.
+
+    - Sólo http/https.
+    - Si se pasa `allowed_hosts`, el hostname debe estar en esa lista.
+    - El hostname debe resolver SOLO a IPs públicas: se rechaza loopback,
+      privada, link-local, reservada, multicast o no especificada (evita que
+      alguien haga que el server pegue a 127.0.0.1, 169.254.169.254, 10.x, etc.).
+    Levanta HTTPException(400) si algo no cumple.
+    """
+    p = urlparse((url or "").strip())
+    if p.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="URL no permitida (esquema inválido)")
+    host = (p.hostname or "").lower()
+    if not host:
+        raise HTTPException(status_code=400, detail="URL sin host")
+    if allowed_hosts is not None and host not in allowed_hosts:
+        raise HTTPException(status_code=400, detail=f"Dominio no permitido: {host}")
+    port = p.port or (443 if p.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except Exception:
+        raise HTTPException(status_code=400, detail="No se pudo resolver el host de la URL")
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            raise HTTPException(status_code=400, detail="La URL apunta a una IP no permitida")
 
 
 def require_external_integrations():
@@ -60,8 +93,9 @@ def resolve_image_to_local_path(image_url: str) -> tuple[str, Optional[str]]:
         return path, None
     if url.startswith("http"):
         import tempfile, requests
+        assert_safe_url(url)  # anti-SSRF: no IPs internas, solo http/https
         try:
-            r = requests.get(url, timeout=30)
+            r = requests.get(url, timeout=30, allow_redirects=False)
             r.raise_for_status()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"No se pudo descargar la imagen: {e}")

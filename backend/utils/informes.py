@@ -12,6 +12,12 @@ Eso evita parsear el HTML completo y es estable frente a cambios de plantilla.
 import requests
 from bs4 import BeautifulSoup
 
+from common import assert_safe_url
+
+# El informativo semanal siempre vive en el sitio de la BCR. Restringimos el
+# scrape a ese dominio (anti-SSRF): no tiene sentido bajar URLs arbitrarias.
+_ALLOWED_HOSTS = {"bcr.com.ar", "www.bcr.com.ar"}
+
 
 class InformeNotFound(Exception):
     """La URL no respondió 200 o no expone los meta tags og: esperados."""
@@ -25,6 +31,7 @@ def fetch_informe(url: str, timeout: float = 15.0) -> dict:
     Raises:
         InformeNotFound si la URL no es accesible o no expone og:title/og:description.
     """
+    assert_safe_url(url, allowed_hosts=_ALLOWED_HOSTS)  # anti-SSRF + solo bcr.com.ar
     headers = {"User-Agent": "Mozilla/5.0 (compatible; BCRSemanaDatos/1.0)"}
     try:
         r = requests.get(url, timeout=timeout, headers=headers)

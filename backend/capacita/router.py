@@ -206,6 +206,15 @@ def borrar_lead(
     db.commit()
 
 
+def _csv_safe(value) -> str:
+    """Evita CSV injection: si una celda arranca con = + - @ (o tab/CR), Excel la
+    puede interpretar como fórmula. Le anteponemos un apóstrofo para neutralizarla."""
+    s = "" if value is None else str(value)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+
 @router.get("/leads/export.csv")
 def exportar_csv(
     db: Session = Depends(get_db),
@@ -222,11 +231,11 @@ def exportar_csv(
         writer.writerow([
             out.id,
             out.created_at.strftime("%Y-%m-%d %H:%M") if out.created_at else "",
-            out.email,
-            out.whatsapp,
-            " | ".join(out.intereses),
+            _csv_safe(out.email),
+            _csv_safe(out.whatsapp),
+            _csv_safe(" | ".join(out.intereses)),
             "sí" if out.autorizacion else "no",
-            out.origen,
+            _csv_safe(out.origen),
         ])
 
     buf.seek(0)

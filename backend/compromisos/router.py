@@ -5,17 +5,14 @@ El equipo de Secretaría carga actividades en la app de Agenda. Las que tienen
 origen='secretaria' conforman la Agenda de Compromisos y aparecen acá, en una
 URL que se les comparte a las autoridades y al ecosistema BCR.
 
-Seguridad: la URL incluye un token (env var COMPROMISOS_PUBLIC_TOKEN). Si el
-token cambia, los links viejos dejan de funcionar — útil si se filtra. No hay
-auth fuerte, es "security through obscurity" intencional para que las
-autoridades no tengan que loguearse. La respuesta usa CompromisoPublicOut, que
-expone SÓLO los Datos Generales (nada operativo ni notas internas).
+Seguridad: es una vista PÚBLICA e intencional (para que las autoridades no
+tengan que loguearse). La respuesta usa CompromisoPublicOut, que expone SÓLO los
+Datos Generales (nada operativo ni notas internas), así que ser pública no filtra
+nada interno. Ya no hay token: la landing vive en /compromisos.
 """
-import os
-import secrets
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -24,17 +21,6 @@ from database import SessionLocal
 
 
 router = APIRouter(prefix="/api/compromisos")
-
-
-# Token público que valida los GET. Default razonable para dev — en Render
-# se setea COMPROMISOS_PUBLIC_TOKEN con un valor real (largo, random).
-PUBLIC_TOKEN = os.environ.get("COMPROMISOS_PUBLIC_TOKEN", "bcr-agenda-x9k7m2")
-
-
-def _check_token(token: str) -> None:
-    """compare_digest para no filtrar el token via timing attack."""
-    if not token or not secrets.compare_digest(token, PUBLIC_TOKEN):
-        raise HTTPException(status_code=404, detail="No encontrado")
 
 
 def _query_compromisos(scope: str):
@@ -59,12 +45,6 @@ def _query_compromisos(scope: str):
 
 @router.get("", response_model=List[agenda_models.CompromisoPublicOut])
 def list_compromisos_public(scope: str = "mesa"):
-    """Endpoint público sin token (la landing vive en /compromisos)."""
-    return _query_compromisos(scope)
-
-
-@router.get("/{token}", response_model=List[agenda_models.CompromisoPublicOut])
-def list_compromisos(token: str, scope: str = "mesa"):
-    """Compat: links viejos con token en la URL (/compromisos/{token})."""
-    _check_token(token)
+    """Endpoint público sin token (la landing vive en /compromisos). Los links
+    viejos /compromisos/{token} siguen cargando la página y usan este endpoint."""
     return _query_compromisos(scope)

@@ -416,11 +416,16 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
 
 
 @router.post("/actividades/{activity_id}/notify-santiago")
-def notify_santiago(activity_id: str, payload: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def notify_santiago(activity_id: str, payload: dict, background_tasks: BackgroundTasks,
+                    db: Session = Depends(get_db), role: str = Depends(get_role)):
     require_external_integrations()
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+    # Sólo quien puede editar el campo operativo drive_santiago de ESTA actividad
+    # (no cualquier token autenticado) — evita IDOR sobre actividades ajenas.
+    if "drive_santiago" not in _allowed_update_fields(db_activity, role):
+        raise HTTPException(status_code=403, detail="No podés operar sobre esta actividad")
 
     link = payload.get("drive_santiago")
     if not link:
@@ -438,11 +443,14 @@ def notify_santiago(activity_id: str, payload: dict, background_tasks: Backgroun
 
 
 @router.post("/actividades/{activity_id}/create-folder")
-def manual_create_folder(activity_id: str, db: Session = Depends(get_db)):
+def manual_create_folder(activity_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
     require_google_drive()
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
+    # Sólo quien puede editar drive_bcr de ESTA actividad (evita IDOR).
+    if "drive_bcr" not in _allowed_update_fields(db_activity, role):
+        raise HTTPException(status_code=403, detail="No podés operar sobre esta actividad")
 
     if db_activity.drive_bcr:
         return {"link": db_activity.drive_bcr, "already_existed": True}

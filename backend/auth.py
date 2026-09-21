@@ -27,11 +27,32 @@ from typing import Optional
 from fastapi import Depends, Header, HTTPException
 
 
+# --- Fail-closed de secretos ------------------------------------------------
+# En PRODUCCIÓN (Render = hay DATABASE_URL) nunca caemos a un password por
+# defecto conocido: si falta la env var, usamos un valor aleatorio inutilizable
+# (esa credencial no funciona hasta configurarla) y avisamos por log. Así un
+# secreto sin setear NO deja una puerta abierta con clave adivinable, y a la vez
+# no tiramos abajo toda la app ni rompemos a los demás roles. En dev local
+# (SQLite, sin DATABASE_URL) se usa el default de conveniencia de siempre.
+_IS_PROD = bool(os.environ.get("DATABASE_URL"))
+
+
+def _secret(env_name: str, dev_default: str) -> str:
+    val = os.environ.get(env_name)
+    if val:
+        return val
+    if _IS_PROD:
+        print(f"[auth] ADVERTENCIA: falta {env_name} en producción → esa credencial "
+              f"queda DESHABILITADA (valor aleatorio, no el default del código).")
+        return secrets.token_urlsafe(32)
+    return dev_default
+
+
 # --- Passwords por rol ------------------------------------------------------
 # Comunicación y Secretaría existen desde siempre. Las áreas se agregan para el
 # circuito de "Funcionarios" (cada área carga su agenda y sugiere a la Mesa).
-PASSWORD_AGENDA = os.environ.get("AGENDA_PASSWORD", "bcr2024")
-PASSWORD_SECGRAL = os.environ.get("SECGRAL_PASSWORD", "secgral2026")
+PASSWORD_AGENDA = _secret("AGENDA_PASSWORD", "bcr2024")
+PASSWORD_SECGRAL = _secret("SECGRAL_PASSWORD", "secgral2026")
 
 # Áreas internas habilitadas a cargar su propia agenda. Extensible: sumar una
 # nueva es agregar acá y setear su env var AREA_<SLUG>_PASSWORD en Render.
@@ -49,8 +70,9 @@ AREA_NOMBRE = {a["slug"]: a["nombre"] for a in AREAS}
 
 
 def _area_password(slug: str) -> str:
-    """Password del área desde AREA_<SLUG>_PASSWORD; fallback dev '<slug>2026'."""
-    return os.environ.get(f"AREA_{slug.upper()}_PASSWORD", f"{slug}2026")
+    """Password del área desde AREA_<SLUG>_PASSWORD; en dev cae a '<slug>2026',
+    en prod (sin la env var) queda deshabilitado (ver _secret)."""
+    return _secret(f"AREA_{slug.upper()}_PASSWORD", f"{slug}2026")
 
 
 # --- Roles ------------------------------------------------------------------
@@ -78,7 +100,12 @@ ALL_ROLES = [ROLE_COMUNICACION, ROLE_SECRETARIA] + [role_area(s) for s in AREA_S
 
 
 # --- Secreto base y tokens por rol ------------------------------------------
+# Si falta SESSION_TOKEN: en dev se genera uno al vuelo; en prod también, pero
+# eso rota los tokens en cada deploy (todos deben re-loguear) → conviene setearlo.
 SESSION_SECRET = os.environ.get("SESSION_TOKEN") or secrets.token_urlsafe(32)
+if not os.environ.get("SESSION_TOKEN") and _IS_PROD:
+    print("[auth] ADVERTENCIA: falta SESSION_TOKEN en producción → las sesiones se "
+          "invalidan en cada deploy. Setealo en Render.")
 
 
 def token_for_role(role: str) -> str:

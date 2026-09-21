@@ -78,12 +78,33 @@ async def auth_check(_: bool = Depends(require_auth)):
     return {"ok": True}
 
 
+# CORS restringido a los dominios propios (antes era "*"). Los frontends de la
+# app son same-origin (se sirven del mismo host que la API), así que esto no los
+# afecta; sólo evita que sitios de terceros llamen a la API desde el navegador.
+ALLOWED_ORIGINS = [
+    "https://bcrapps.com",
+    "https://www.bcrapps.com",
+    "https://bcr-lluvias-app.onrender.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Cabeceras de seguridad en todas las respuestas. No incluimos CSP ni
+# X-Frame-Options global a propósito: la app usa estilos/scripts inline y algunas
+# páginas públicas podrían embeberse — eso se define aparte si hace falta.
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 # ---------------------------------------------------------

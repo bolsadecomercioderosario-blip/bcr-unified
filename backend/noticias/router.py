@@ -252,11 +252,15 @@ async def importar_wp(
     tmpdir = tempfile.mkdtemp()
     paths = []
     try:
-        for i, f in enumerate(files):
-            p = os.path.join(tmpdir, f.filename or f"wxr_{i}.xml")
-            with open(p, "wb") as buf:
-                buf.write(await f.read())
-            paths.append(p)
+        for f in files:
+            # No usamos f.filename (viene del cliente; podría traer ../ o rutas
+            # absolutas → path traversal). Generamos un nombre seguro en tmpdir.
+            fd = tempfile.NamedTemporaryFile(dir=tmpdir, suffix=".xml", delete=False)
+            try:
+                fd.write(await f.read())
+            finally:
+                fd.close()
+            paths.append(fd.name)
         posts = parse_wxr(paths)
         return importar_posts(db, posts)
     finally:

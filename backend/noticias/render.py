@@ -14,7 +14,38 @@ import html
 from datetime import datetime
 from urllib.parse import quote
 
+import nh3
+
 from noticias.models import CATEGORIAS
+
+# Cuerpo de la nota: es HTML enriquecido (lo carga Comunicación), así que NO se
+# escapa como el resto de los campos — se SANITIZA con una allowlist. Esto saca
+# <script>, manejadores on* y URLs javascript: (XSS almacenado), preservando el
+# formato y los embeds (iframe de video/Power BI). Se aplica en el render, así
+# quedan protegidas también las notas ya guardadas.
+_HTML_TAGS = {
+    "a", "abbr", "b", "blockquote", "br", "caption", "code", "col", "colgroup",
+    "div", "em", "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
+    "i", "iframe", "img", "li", "ol", "p", "pre", "s", "small", "span", "strong",
+    "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+}
+_HTML_ATTRS = {
+    "*": {"style", "class", "id"},
+    "a": {"href", "title", "target"},
+    "img": {"src", "alt", "title", "width", "height", "loading"},
+    "iframe": {"src", "width", "height", "allow", "allowfullscreen", "frameborder", "loading", "title"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan"},
+}
+
+
+def _sanitize_body(html_str: str | None) -> str:
+    return nh3.clean(
+        html_str or "",
+        tags=_HTML_TAGS,
+        attributes=_HTML_ATTRS,
+        url_schemes={"http", "https", "mailto"},
+    )
 
 _MESES = [
     "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -618,7 +649,7 @@ def render_article(n, relacionadas: list, canonical: str) -> str:
     <div class="meta">{fecha_es(n.fecha_pub)}</div>
     {bajada}
     {cover}
-    <div class="body">{n.cuerpo or ""}</div>
+    <div class="body">{_sanitize_body(n.cuerpo)}</div>
   </div>
   {aside}
 </div></div>"""
