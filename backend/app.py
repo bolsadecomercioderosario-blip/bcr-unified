@@ -26,7 +26,6 @@ import agenda_models  # noqa: F401
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
-import aapresid.models  # noqa: F401  — registra tablas aap_* (Congreso Aapresid)
 import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
 import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
 import canciones.models  # noqa: F401  — registra tabla canciones_respuestas (encuesta versión B, solo canciones)
@@ -43,7 +42,6 @@ from lluvias.router import router as lluvias_api
 from metricas.router import router as metricas_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
-from aapresid.router import router as aapresid_api
 from murga.router import router as murga_api
 from corte.router import router as corte_api
 from canciones.router import router as canciones_api
@@ -106,7 +104,6 @@ app.include_router(buscador_api)
 app.include_router(capacita_api)
 app.include_router(metricas_api)
 app.include_router(compromisos_api)
-app.include_router(aapresid_api)
 app.include_router(murga_api)
 app.include_router(corte_api)
 app.include_router(canciones_api)
@@ -152,7 +149,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "aapresid", "murga", "corte", "canciones", "abuela"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "murga", "corte", "canciones", "abuela"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -315,7 +312,6 @@ app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR,
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
 app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
-app.mount("/aapresid", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "aapresid"), html=False), name="aapresid_ui")
 app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
 app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte"), html=False), name="corte_ui")
 app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")

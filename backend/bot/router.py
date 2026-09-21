@@ -9,9 +9,12 @@ Tools enchufadas:
     hasta que los scrapers del chunk 3.x los llenen
 
 Endpoints:
-  - /api/bot/test — para probar desde el browser (requiere auth bearer)
   - /api/bot/twilio-webhook — público (firmado por Twilio); recibe WhatsApp
-  - /api/bot/admin/exchanges — lista los últimos exchanges (debug)
+  - /api/bot/admin/* — protegidos por auth bearer (debug/admin)
+
+Nota: el chat web /api/bot/test se eliminó — el bot está 100% en WhatsApp. Era
+público y exponía el agente (costo OpenAI + material interno) a cualquiera con
+el link, así que se sacó por seguridad.
 """
 from __future__ import annotations
 
@@ -92,47 +95,9 @@ def _candidate_urls(request: Request) -> list[str]:
 router = APIRouter(prefix="/api/bot")
 
 
-# ---------------------------------------------------------------------------
-# Endpoint de testing local (browser/curl).
-# ---------------------------------------------------------------------------
-@router.post(
-    "/test",
-    response_model=models.BotTestResponse,
-)
-def bot_test(
-    payload: models.BotTestRequest,
-    db: Session = Depends(get_db),
-) -> models.BotTestResponse:
-    """Endpoint del chat web del bot (página pública /bot). PÚBLICO a propósito
-    (sin require_auth): la web /bot es de acceso libre. Los endpoints /admin/*
-    del bot siguen protegidos. Ojo: esto expone el agente (costo OpenAI) y el
-    material interno que consulta a cualquiera con el link."""
-    try:
-        result = agent.run_agent(
-            message=payload.message,
-            from_phone=payload.from_phone,
-            db=db,
-            previous_response_id=payload.previous_response_id,
-        )
-        return models.BotTestResponse(
-            reply=result.reply,
-            tools_used=result.tools_used,
-            response_id=result.response_id,
-            debug={"iterations": result.iterations, **result.debug},
-        )
-    except Exception as exc:  # noqa: BLE001 — bring-up: queremos el error legible
-        tb = traceback.format_exc()
-        print(f"[bot.test] ERROR procesando mensaje {payload.message!r}: {exc}\n{tb}")
-        return models.BotTestResponse(
-            reply=f"Se cayó el bot procesando tu mensaje. Detalle: {type(exc).__name__}: {exc}",
-            tools_used=[],
-            response_id=None,
-            debug={
-                "error": str(exc),
-                "error_type": type(exc).__name__,
-                "traceback_tail": tb.splitlines()[-6:],
-            },
-        )
+# El chat web /api/bot/test se eliminó: el bot está 100% en WhatsApp y ese
+# endpoint era público (exponía el agente y el material interno a cualquiera con
+# el link). El flujo entrante ahora es sólo /twilio-webhook.
 
 
 # ---------------------------------------------------------------------------
