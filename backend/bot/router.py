@@ -41,7 +41,13 @@ from bot import agent, agenda_writer, db_models, menu_handlers, models, twilio_c
 # Se normaliza a dígitos para comparar sin importar 'whatsapp:', '+', espacios.
 # ---------------------------------------------------------------------------
 def _normalize_phone(p: str) -> str:
-    return re.sub(r"\D", "", p or "")
+    d = re.sub(r"\D", "", p or "")
+    # Argentina: colapsar el "9" de celular que va después del código país 54,
+    # porque Meta/Twilio mandan el número a veces CON y a veces SIN ese 9. Así
+    # "+54 9 341 ..." y "+54 341 ..." matchean igual (whitelist y writers).
+    if d.startswith("549"):
+        d = "54" + d[3:]
+    return d
 
 
 _WHITELIST = {_normalize_phone(x) for x in BOT_WHATSAPP_WHITELIST.split(",") if x.strip()}

@@ -38,7 +38,12 @@ def _now_art() -> datetime:
 
 # --- Mapeo número → rol -----------------------------------------------------
 def _norm_phone(p: str) -> str:
-    return re.sub(r"\D", "", p or "")
+    d = re.sub(r"\D", "", p or "")
+    # Argentina: colapsar el "9" de celular después del 54 (Meta/Twilio mandan
+    # ambas formas), para que el número matchee lo cargues como lo cargues.
+    if d.startswith("549"):
+        d = "54" + d[3:]
+    return d
 
 
 def _parse_writers(raw: str) -> dict:
