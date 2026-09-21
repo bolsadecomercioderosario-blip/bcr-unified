@@ -26,9 +26,6 @@ import agenda_models  # noqa: F401
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
-import murga.models  # noqa: F401  — registra tabla murga_participantes (sorteo estreno)
-import corte.models  # noqa: F401  — registra tabla corte_respuestas (encuesta versión reducida)
-import canciones.models  # noqa: F401  — registra tabla canciones_respuestas (encuesta versión B, solo canciones)
 import noticias.models  # noqa: F401  — registra tabla noticias (sitio Más BCR)
 import abuela.models  # noqa: F401  — registra tablas ab_* (panel interno de la murga: caja, ensayos, toques)
 
@@ -42,9 +39,6 @@ from lluvias.router import router as lluvias_api
 from metricas.router import router as metricas_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
-from murga.router import router as murga_api
-from corte.router import router as corte_api
-from canciones.router import router as canciones_api
 from noticias.router import (
     router as noticias_api, site as noticias_site,
     kit_api as noticias_kit_api, videos_api as noticias_videos_api,
@@ -104,9 +98,6 @@ app.include_router(buscador_api)
 app.include_router(capacita_api)
 app.include_router(metricas_api)
 app.include_router(compromisos_api)
-app.include_router(murga_api)
-app.include_router(corte_api)
-app.include_router(canciones_api)
 app.include_router(noticias_api)      # API del admin (/api/noticias)
 app.include_router(noticias_kit_api)     # API del Kit Multimedia (/api/kit)
 app.include_router(noticias_videos_api)  # API de Videos (/api/videos)
@@ -149,31 +140,10 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "murga", "corte", "canciones", "abuela"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "abuela"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
-
-
-# Corte — encuesta de la versión reducida. El home (/corte/) es la encuesta
-# pública; /corte/resultados sirve el MISMO SPA y el JS muestra los resultados
-# tras validar el token contra el API. Antes del mount estático para precedencia.
-@app.get("/corte/resultados")
-async def _corte_resultados():
-    return HTMLResponse(
-        content=get_module_html("corte"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
-# Canciones — versión B (misma lógica, sólo canciones). /canciones/resultados
-# sirve el mismo SPA y el JS valida el token contra el API.
-@app.get("/canciones/resultados")
-async def _canciones_resultados():
-    return HTMLResponse(
-        content=get_module_html("canciones"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
 
 
 # Bot — página de revisión/aprobación de la coyuntura automática. Protegida por
@@ -209,21 +179,6 @@ async def _noticias_videos_admin():
     with open(os.path.join(STATIC_DIR, "noticias", "videos-admin.html"), encoding="utf-8") as f:
         html = f.read().replace("__VERSION__", APP_VERSION)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
-
-
-# Murga — sorteo del estreno. El home (/murga/) es el formulario público al que
-# apunta el QR. Las vistas del presentador viven en sub-rutas y sirven el MISMO
-# SPA: el JS mira location.pathname para decidir qué mostrar, y valida el token
-# (?k=...) contra el API. Se registran antes del mount estático para precedencia.
-@app.get("/murga/panel")
-@app.get("/murga/voluntades")
-@app.get("/murga/sorteo")
-@app.get("/murga/export")
-async def _murga_presentador():
-    return HTMLResponse(
-        content=get_module_html("murga"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
 
 
 # ---------------------------------------------------------
@@ -312,9 +267,6 @@ app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR,
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
 app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
 app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
-app.mount("/murga", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "murga"), html=False), name="murga_ui")
-app.mount("/corte", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "corte"), html=False), name="corte_ui")
-app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")
 app.mount("/abuela", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "abuela"), html=False), name="abuela_ui")
 
 # Prototipo de la nueva web institucional (HTML estáticos autocontenidos). El hub
