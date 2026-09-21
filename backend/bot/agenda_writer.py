@@ -26,6 +26,7 @@ import agenda_models
 from database import SessionLocal
 from config import BOT_AGENDA_WRITERS, BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
 from bot import twilio_client
+from bot.db_models import BotConfig
 
 
 _ARG = timedelta(hours=3)  # ART = UTC-3 (sin DST)
@@ -94,6 +95,11 @@ def _pop_pending(from_phone: str) -> Optional[dict]:
     return row["draft"] if row else None
 
 
+def _peek_pending(from_phone: str) -> Optional[dict]:
+    row = _PENDING.get(_norm_phone(from_phone))
+    return row["draft"] if row else None
+
+
 # --- OpenAI -----------------------------------------------------------------
 def _client():
     if not BOT_OPENAI_API_KEY:
@@ -129,61 +135,85 @@ def _transcribe(audio_bytes: bytes, media_type: str) -> Optional[str]:
         return None
 
 
-_EXTRACT_PROMPT = """\
-Sos un asistente que arma una actividad de agenda a partir de lo que dijo una \
-persona. Hoy es {hoy} ({dia_semana}), horario de Argentina.
-
-De este texto, extraé los datos de la actividad y devolvé SÓLO un JSON (sin texto \
-alrededor, sin ```), con exactamente estas claves:
-- "title": título breve de la actividad (obligatorio).
-- "date": fecha en formato YYYY-MM-DD. Resolvé expresiones relativas ("mañana", \
-"el martes que viene", "el 20") a la fecha concreta. Si no se menciona ninguna \
-fecha, dejá "".
-- "time": hora de inicio en formato HH:MM (24h), o "" si no se menciona.
-- "end_time": hora de fin HH:MM, o "".
-- "location": lugar, o "".
-- "participants": personas/áreas que participan, o "".
-- "description": detalle adicional, o "".
-
-Texto: {texto}
-"""
+_FIELDS = ("title", "date", "time", "end_time", "location", "participants", "description")
 
 
-def _extract(texto: str) -> Optional[dict]:
+def _llm_json(prompt: str) -> Optional[dict]:
+    """Corre el LLM y parsea su respuesta como JSON (tolerando fences ```)."""
     c = _client()
     if not c:
         return None
-    now = _now_art()
-    prompt = _EXTRACT_PROMPT.format(
-        hoy=now.strftime("%Y-%m-%d"),
-        dia_semana=_WEEKDAYS[now.weekday()],
-        texto=texto,
-    )
     try:
         r = c.responses.create(model=BOT_OPENAI_MODEL, input=prompt)
         raw = (getattr(r, "output_text", "") or "").strip()
     except Exception as exc:  # noqa: BLE001
-        print(f"[agenda_writer] extracción falló: {type(exc).__name__}: {exc}")
+        print(f"[agenda_writer] LLM falló: {type(exc).__name__}: {exc}")
         return None
-    # Sacamos posibles fences ```json ... ```
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
     try:
         data = json.loads(raw)
     except Exception:  # noqa: BLE001
         print(f"[agenda_writer] JSON inválido del LLM: {raw!r}")
         return None
-    if not isinstance(data, dict):
+    return data if isinstance(data, dict) else None
+
+
+def _clean_fields(data: dict) -> dict:
+    return {k: (str(data.get(k) or "")).strip() for k in _FIELDS}
+
+
+_UNDERSTAND_PROMPT = """\
+Sos el asistente de la Secretaría de la Bolsa de Comercio de Rosario. Hoy es \
+{hoy} ({dia_semana}), horario de Argentina. La persona te mandó este mensaje.
+
+Decidí qué quiere y devolvé SÓLO un JSON (sin texto alrededor, sin ```):
+- "intent": "crear" si está describiendo una actividad para AGENDAR; "otro" si es \
+un saludo, una pregunta, un pedido de consulta, o cualquier otra cosa.
+- Si "intent" es "crear", agregá estas claves:
+  "title" (título breve, obligatorio), "date" (YYYY-MM-DD, resolviendo expresiones \
+relativas como "mañana" o "el martes que viene"; "" si no se menciona), "time" \
+(HH:MM 24h o ""), "end_time" (HH:MM o ""), "location" (o ""), "participants" (o ""), \
+"description" (o "").
+
+Mensaje: {texto}
+"""
+
+
+def _understand(texto: str) -> Optional[dict]:
+    """Devuelve {intent, ...campos}. None si el LLM no está disponible/falló."""
+    now = _now_art()
+    data = _llm_json(_UNDERSTAND_PROMPT.format(
+        hoy=now.strftime("%Y-%m-%d"), dia_semana=_WEEKDAYS[now.weekday()], texto=texto,
+    ))
+    if data is None:
         return None
-    # Normalizamos claves esperadas.
-    return {
-        "title": (data.get("title") or "").strip(),
-        "date": (data.get("date") or "").strip(),
-        "time": (data.get("time") or "").strip(),
-        "end_time": (data.get("end_time") or "").strip(),
-        "location": (data.get("location") or "").strip(),
-        "participants": (data.get("participants") or "").strip(),
-        "description": (data.get("description") or "").strip(),
-    }
+    intent = (data.get("intent") or "").strip().lower()
+    out = {"intent": "crear" if intent == "crear" else "otro"}
+    out.update(_clean_fields(data))
+    return out
+
+
+_EDIT_PROMPT = """\
+Tenés una actividad en preparación (JSON). La persona pide un cambio. Devolvé SÓLO \
+el JSON actualizado (sin texto alrededor, sin ```), con EXACTAMENTE las mismas \
+claves, aplicando el cambio pedido y dejando el resto igual. Hoy es {hoy}; resolvé \
+fechas relativas con eso.
+
+Actividad actual: {actual}
+Cambio pedido: {cambio}
+"""
+
+
+def _apply_edit(draft: dict, instruction: str) -> Optional[dict]:
+    now = _now_art()
+    data = _llm_json(_EDIT_PROMPT.format(
+        hoy=now.strftime("%Y-%m-%d"),
+        actual=json.dumps({k: draft.get(k, "") for k in _FIELDS}, ensure_ascii=False),
+        cambio=instruction,
+    ))
+    if data is None:
+        return None
+    return _clean_fields(data)
 
 
 # --- Resumen para confirmar -------------------------------------------------
@@ -255,35 +285,127 @@ _NO = {"no", "nop", "cancelar", "cancela", "cancelalo", "borrar", "descartar",
        "nada", "negativo"}
 
 
+# --- Confirmación con botones (quick-reply Sí/No) ---------------------------
+def ensure_confirm_content_sid() -> Optional[str]:
+    """SID del template de botones Sí/No; lo crea y persiste la primera vez."""
+    db = SessionLocal()
+    try:
+        row = db.query(BotConfig).filter(BotConfig.key == "confirm_content_sid").first()
+        if row and row.value:
+            return row.value
+        sid = twilio_client.create_confirm_content_sid()
+        if row:
+            row.value = sid
+            row.updated_at = datetime.utcnow()
+        else:
+            db.add(BotConfig(key="confirm_content_sid", value=sid))
+        db.commit()
+        return sid
+    finally:
+        db.close()
+
+
+def _send_confirmation(from_phone: str, draft: dict, encabezado: str) -> None:
+    """Manda el resumen + botones Sí/No. Si el template falla, cae a texto."""
+    full = f"{encabezado}\n\n{_resumen(draft)}"
+    try:
+        sid = ensure_confirm_content_sid()
+        if sid:
+            twilio_client.send_whatsapp_content(from_phone, sid, {"1": full})
+            return
+    except Exception as exc:  # noqa: BLE001
+        print(f"[agenda_writer] botones confirmación fallaron, fallback a texto: {exc}")
+    twilio_client.send_whatsapp(from_phone, full + "\n\n¿La confirmo? Respondé *SÍ* o *NO*.")
+
+
+# --- Núcleo: procesa un mensaje (texto ya transcripto si vino por audio) -----
+def _core(from_phone: str, role: str, text: str, ev: dict) -> None:
+    text = (text or "").strip()
+    if not text:
+        return
+
+    # Con un borrador pendiente: SÍ carga, NO descarta, cualquier otra cosa se
+    # interpreta como una CORRECCIÓN al borrador.
+    if has_pending(from_phone):
+        resp = _norm(text)
+        if resp in _YES:
+            draft = _pop_pending(from_phone)
+            if not draft:
+                twilio_client.send_whatsapp(from_phone, "No tengo ninguna actividad pendiente. Mandame la actividad (audio o texto).")
+                ev["outcome"] = "writer_sin_pendiente"
+                return
+            try:
+                _create_activity(role, draft)
+                twilio_client.send_whatsapp(from_phone, f"✅ Actividad cargada:\n\n{_resumen(draft)}")
+                ev["outcome"] = "writer_cargada"
+            except Exception as exc:  # noqa: BLE001
+                print(f"[agenda_writer] _create_activity error: {type(exc).__name__}: {exc}")
+                ev["error"] = f"writer_create: {type(exc).__name__}: {exc}"
+                twilio_client.send_whatsapp(from_phone, "No pude guardar la actividad. Probá de nuevo.")
+            return
+        if resp in _NO:
+            _pop_pending(from_phone)
+            twilio_client.send_whatsapp(from_phone, "Listo, la descarté. Si querés, mandame otra actividad.")
+            ev["outcome"] = "writer_descartada"
+            return
+        # Corrección al borrador
+        updated = _apply_edit(_peek_pending(from_phone), text)
+        if not updated or not updated.get("title"):
+            twilio_client.send_whatsapp(from_phone, "No pude aplicar ese cambio. ¿Me lo decís de otra forma?")
+            ev["outcome"] = "writer_edit_fallo"
+            return
+        _set_pending(from_phone, updated)
+        _send_confirmation(from_phone, updated, "Actualicé la actividad:")
+        ev["outcome"] = "writer_editada"
+        return
+
+    # Sin borrador: entender si quiere CREAR una actividad o es otra cosa.
+    u = _understand(text)
+    if u is None:
+        twilio_client.send_whatsapp(from_phone, "No pude procesar el mensaje en este momento. Probá de nuevo.")
+        ev["outcome"] = "writer_llm_off"
+        return
+    if u["intent"] == "crear" and u["title"] and u["date"]:
+        draft = {k: u[k] for k in _FIELDS}
+        _set_pending(from_phone, draft)
+        _send_confirmation(from_phone, draft, "Voy a cargar esta actividad en la Agenda de la Mesa Ejecutiva:")
+        ev["outcome"] = "writer_pendiente"
+        return
+    if u["intent"] == "crear":
+        falta = "el título" if not u["title"] else "la fecha"
+        twilio_client.send_whatsapp(from_phone, f"Me faltó {falta} de la actividad. ¿Me decís qué es y para cuándo?")
+        ev["outcome"] = "writer_incompleto"
+        return
+    twilio_client.send_whatsapp(
+        from_phone,
+        "Puedo *cargar actividades* en la agenda: mandame un audio o escribime la "
+        "actividad (qué es, cuándo y dónde). Para consultar la agenda, escribí "
+        "\"hola\" y usá el menú.",
+    )
+    ev["outcome"] = "writer_otro"
+
+
 # --- Handlers (llamados desde el webhook, en segundo plano) -----------------
+def handle_text(from_phone: str, role: str, text: str, ev: dict) -> None:
+    """Mensaje de texto de un writer: crear / corregir / confirmar."""
+    try:
+        _core(from_phone, role, text, ev)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[agenda_writer] handle_text error: {type(exc).__name__}: {exc}")
+        ev["error"] = f"writer_text: {type(exc).__name__}: {exc}"
+
+
 def handle_voice(from_phone: str, role: str, media_url: str, media_type: str, ev: dict) -> None:
-    """Descarga+transcribe el audio, extrae la actividad y pide confirmación."""
+    """Audio de un writer: se transcribe y sigue el mismo flujo que el texto."""
     try:
         audio, ctype = twilio_client.download_media(media_url)
-        media_type = media_type or ctype
-        texto = _transcribe(audio, media_type)
+        texto = _transcribe(audio, media_type or ctype)
         if not texto:
             twilio_client.send_whatsapp(from_phone, "No pude entender el audio. ¿Lo probás de nuevo, más claro?")
             ev["outcome"] = "writer_audio_vacio"
             return
         ev["transcripcion_len"] = len(texto)
-        draft = _extract(texto)
-        if not draft or not draft.get("title") or not draft.get("date"):
-            falta = "el título" if (draft and not draft.get("title")) else "la fecha"
-            twilio_client.send_whatsapp(
-                from_phone,
-                f"Entendí: \"{texto}\"\n\nPero me faltó {falta}. ¿Me mandás un audio "
-                "diciendo qué actividad es y para cuándo?",
-            )
-            ev["outcome"] = "writer_incompleto"
-            return
-        _set_pending(from_phone, draft)
-        twilio_client.send_whatsapp(
-            from_phone,
-            "Voy a cargar esta actividad en la Agenda de la Mesa Ejecutiva:\n\n"
-            f"{_resumen(draft)}\n\n¿La confirmo? Respondé *SÍ* para cargarla, o *NO* para descartar.",
-        )
-        ev["outcome"] = "writer_pendiente"
+        _core(from_phone, role, texto, ev)
     except Exception as exc:  # noqa: BLE001
         print(f"[agenda_writer] handle_voice error: {type(exc).__name__}: {exc}")
         ev["error"] = f"writer_voice: {type(exc).__name__}: {exc}"
@@ -291,31 +413,3 @@ def handle_voice(from_phone: str, role: str, media_url: str, media_type: str, ev
             twilio_client.send_whatsapp(from_phone, "Tuve un problema procesando el audio. Probá de nuevo en un momento.")
         except Exception:  # noqa: BLE001
             pass
-
-
-def handle_confirmation(from_phone: str, body: str, role: str, ev: dict) -> None:
-    """Procesa el SÍ/NO cuando hay un borrador pendiente."""
-    resp = _norm(body)
-    if resp in _YES:
-        draft = _pop_pending(from_phone)
-        if not draft:
-            twilio_client.send_whatsapp(from_phone, "No tengo ninguna actividad pendiente de confirmar. Mandame un audio con la actividad.")
-            ev["outcome"] = "writer_sin_pendiente"
-            return
-        try:
-            _create_activity(role, draft)
-            twilio_client.send_whatsapp(from_phone, f"✅ Actividad cargada:\n\n{_resumen(draft)}")
-            ev["outcome"] = "writer_cargada"
-        except Exception as exc:  # noqa: BLE001
-            print(f"[agenda_writer] _create_activity error: {type(exc).__name__}: {exc}")
-            ev["error"] = f"writer_create: {type(exc).__name__}: {exc}"
-            twilio_client.send_whatsapp(from_phone, "No pude guardar la actividad. Probá de nuevo.")
-        return
-    if resp in _NO:
-        _pop_pending(from_phone)
-        twilio_client.send_whatsapp(from_phone, "Listo, la descarté. Si querés, mandame otro audio con la actividad.")
-        ev["outcome"] = "writer_descartada"
-        return
-    # Cualquier otra cosa: mantenemos el pendiente y aclaramos.
-    twilio_client.send_whatsapp(from_phone, "¿Cargo la actividad? Respondé *SÍ* o *NO*.")
-    ev["outcome"] = "writer_confirm_ambiguo"

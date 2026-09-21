@@ -188,6 +188,42 @@ def create_menu_content_sid() -> str:
     return r.json()["sid"]
 
 
+# Botones de confirmación (quick-reply, 2 botones Sí/No). El cuerpo es dinámico
+# ({{1}} = resumen de la actividad). Al tocar un botón, WhatsApp manda el `id`
+# ("si"/"no") como Body — se procesa igual que si lo hubieran escrito.
+_CONFIRM_CONTENT_DEFINITION = {
+    "friendly_name": "bcr_confirm_actividad",
+    "language": "es",
+    "variables": {"1": "resumen de la actividad"},
+    "types": {
+        "twilio/quick-reply": {
+            "body": "{{1}}",
+            "actions": [
+                {"id": "si", "title": "Sí, cargar"},
+                {"id": "no", "title": "No, descartar"},
+            ],
+        },
+        "twilio/text": {
+            "body": "{{1}}\n\nRespondé *SÍ* para cargar o *NO* para descartar.",
+        },
+    },
+}
+
+
+def create_confirm_content_sid() -> str:
+    """Crea el template de confirmación (quick-reply Sí/No) y devuelve su SID."""
+    if not is_configured():
+        raise TwilioNotConfigured("TWILIO_ACCOUNT_SID/AUTH_TOKEN no seteados.")
+    r = requests.post(
+        f"{_TWILIO_CONTENT_BASE}/Content",
+        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
+        json=_CONFIRM_CONTENT_DEFINITION,
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.json()["sid"]
+
+
 def send_whatsapp_content(to: str, content_sid: str, content_variables: dict | None = None,
                           timeout_s: float = 15.0) -> dict:
     """Manda un mensaje de contenido (template/interactivo) por ContentSid."""

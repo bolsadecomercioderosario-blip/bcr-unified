@@ -342,8 +342,10 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         ev["outcome"] = "duplicado"
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
-    # Writers: carga de actividades por voz + confirmación (única acción de
-    # ESCRITURA del bot). Un audio arranca el flujo; un SÍ/NO confirma un borrador.
+    # Writers: cargar/editar actividades por voz o texto (única acción de
+    # ESCRITURA del bot). Un audio o un texto de actividad arranca el flujo; con
+    # un borrador pendiente, el texto confirma (SÍ/NO por botón o palabra) o
+    # corrige. Los saludos SIN borrador pendiente caen al menú normal.
     if w_role:
         num_media = int(params.get("NumMedia", "0") or 0)
         media_url = params.get("MediaUrl0")
@@ -352,11 +354,11 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
             ev["outcome"] = "writer_voz"
             background_tasks.add_task(agenda_writer.handle_voice, from_phone, w_role, media_url, media_type, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
-        if body and agenda_writer.has_pending(from_phone):
-            ev["outcome"] = "writer_confirm"
-            background_tasks.add_task(agenda_writer.handle_confirmation, from_phone, body, w_role, ev)
+        if body and (agenda_writer.has_pending(from_phone) or not _is_menu_request(body)):
+            ev["outcome"] = "writer_texto"
+            background_tasks.add_task(agenda_writer.handle_text, from_phone, w_role, body, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
-        # writer sin audio ni borrador pendiente → sigue como consulta normal (lectura).
+        # writer que saluda y no tiene borrador → cae al menú normal.
 
     if not from_phone or not body:
         ev["outcome"] = "sin_texto"
