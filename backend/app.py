@@ -95,15 +95,23 @@ app.add_middleware(
 )
 
 
-# Cabeceras de seguridad en todas las respuestas. No incluimos CSP ni
-# X-Frame-Options global a propósito: la app usa estilos/scripts inline y algunas
-# páginas públicas podrían embeberse — eso se define aparte si hace falta.
+# Cabeceras de seguridad en todas las respuestas.
+# - Anti-clickjacking: ninguna página de la app debe embeberse en sitios de
+#   terceros (MásBCR y los paneles incluidos). X-Frame-Options (navegadores
+#   viejos) + CSP frame-ancestors 'self' (moderno). 'self' permite que las
+#   páginas de la app se embeban entre sí (mismo origen) pero no desde afuera.
+#   frame-ancestors NO afecta a que NOSOTROS embebamos a otros (ej. Power BI en
+#   el tablero) ni a los scripts/estilos inline.
+# - No ponemos una CSP completa (script-src/style-src) porque la app usa mucho
+#   inline y la rompería; frame-ancestors es seguro de agregar solo.
 @app.middleware("http")
 async def _security_headers(request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
     return response
 
 

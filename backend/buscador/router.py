@@ -12,6 +12,7 @@ devuelva URLs que estaban en el payload original (anti-alucinación).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -74,6 +75,17 @@ def _norm_query(q: str) -> str:
     return " ".join(ascii_q.lower().split())
 
 
+def _cache_key(q: str, destinos) -> str:
+    """Clave de caché que incluye la query normalizada Y la lista de destinos.
+    Antes la clave era sólo la query → un usuario podía 'ocupar' la entrada con
+    sus propios destinos y el siguiente con la misma query recibía ESOS destinos
+    (cache poisoning lógico). Al hashear también los destinos, cada combinación
+    tiene su propia entrada."""
+    q_norm = _norm_query(q)
+    urls = "|".join(sorted(d.u for d in destinos))
+    return hashlib.sha256(f"{q_norm}\x00{urls}".encode("utf-8")).hexdigest()
+
+
 # --- Schemas --------------------------------------------------------------
 class DestinoIn(BaseModel):
     t: str = Field(..., max_length=200)
@@ -111,10 +123,10 @@ def buscar(payload: BuscarPayload, request: Request) -> dict:
             detail="Demasiadas consultas. Esperá unos segundos.",
         )
 
-    q_norm = _norm_query(payload.q)
+    cache_key = _cache_key(payload.q, payload.destinos)
     with _cache_lock:
-        if q_norm in _cache:
-            return {"matches": _cache[q_norm], "cached": True}
+        if cache_key in _cache:
+            return {"matches": _cache[cache_key], "cached": True}
 
     destinos_text = "\n".join(
         f"- {d.t}: {d.d} → {d.u}" for d in payload.destinos
@@ -159,6 +171,6 @@ def buscar(payload: BuscarPayload, request: Request) -> dict:
     with _cache_lock:
         if len(_cache) >= _CACHE_MAX:
             _cache.clear()
-        _cache[q_norm] = matches
+        _cache[cache_key] = matches
 
     return {"matches": matches, "cached": False}
