@@ -80,6 +80,13 @@ BOT_TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+141
 # tokens ni responde). El usuario administra esta lista en Render.
 BOT_WHATSAPP_WHITELIST = os.environ.get("BOT_WHATSAPP_WHITELIST", "")
 
+# Números habilitados a CARGAR actividades por WhatsApp (voz/texto), con su rol.
+# Formato: "+549341xxxxxxx=secretaria,+549341yyyyyyy=area:diyee". Vacío = nadie
+# escribe por WhatsApp. Un "writer" se deja pasar aunque no esté en la whitelist
+# de lectura. OJO: da permiso de ESCRITURA en la Agenda → sólo números de
+# confianza. La carga siempre pasa por un paso de confirmación en el chat.
+BOT_AGENDA_WRITERS = os.environ.get("BOT_AGENDA_WRITERS", "")
+
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")

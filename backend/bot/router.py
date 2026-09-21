@@ -33,7 +33,7 @@ from auth import require_roles, ROLE_COMUNICACION
 from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
-from bot import agent, db_models, menu_handlers, models, twilio_client
+from bot import agent, agenda_writer, db_models, menu_handlers, models, twilio_client
 
 
 # ---------------------------------------------------------------------------
@@ -321,12 +321,36 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         print(f"[bot.twilio-webhook] Firma inválida; rechazando. urls={urls}")
         return Response(status_code=403)
 
-    # Whitelist: si el número no está habilitado, se ignora en silencio (no se
-    # llama al agente → no gasta tokens ni contesta).
-    if from_phone and not _phone_allowed(from_phone):
+    # Whitelist: si el número no está habilitado se ignora en silencio. Los
+    # "writers" (habilitados a CARGAR actividades) pasan aunque no estén en la
+    # whitelist de lectura.
+    w_role = agenda_writer.writer_role(from_phone)
+    if from_phone and not _phone_allowed(from_phone) and not w_role:
         ev["outcome"] = "no_whitelist"
         print(f"[bot.twilio-webhook] Número no habilitado, ignorado: {from_phone}")
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
+
+    # Anti-replay: si ya procesamos este MessageSid (reintento de Twilio o replay
+    # de un request firmado), no lo corremos de nuevo. Aplica a todo (incl. audios).
+    if _already_processed(params.get("MessageSid", "")):
+        ev["outcome"] = "duplicado"
+        return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
+
+    # Writers: carga de actividades por voz + confirmación (única acción de
+    # ESCRITURA del bot). Un audio arranca el flujo; un SÍ/NO confirma un borrador.
+    if w_role:
+        num_media = int(params.get("NumMedia", "0") or 0)
+        media_url = params.get("MediaUrl0")
+        media_type = params.get("MediaContentType0", "")
+        if num_media and media_url and media_type.startswith("audio"):
+            ev["outcome"] = "writer_voz"
+            background_tasks.add_task(agenda_writer.handle_voice, from_phone, w_role, media_url, media_type, ev)
+            return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
+        if body and agenda_writer.has_pending(from_phone):
+            ev["outcome"] = "writer_confirm"
+            background_tasks.add_task(agenda_writer.handle_confirmation, from_phone, body, w_role, ev)
+            return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
+        # writer sin audio ni borrador pendiente → sigue como consulta normal (lectura).
 
     if not from_phone or not body:
         ev["outcome"] = "sin_texto"
@@ -339,12 +363,6 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"[bot.twilio-webhook] Falló mandar respuesta no-text: {exc}")
-        return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
-
-    # Anti-replay: si ya procesamos este MessageSid (reintento de Twilio o replay
-    # de un request firmado), no lo corremos de nuevo.
-    if _already_processed(params.get("MessageSid", "")):
-        ev["outcome"] = "duplicado"
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     # Procesamos en segundo plano y le contestamos a Twilio YA.

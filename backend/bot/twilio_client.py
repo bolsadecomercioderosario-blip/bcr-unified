@@ -105,6 +105,21 @@ def _send_one(to: str, body: str, timeout_s: float) -> dict:
     return response.json()
 
 
+def download_media(url: str, timeout_s: float = 20.0) -> tuple[bytes, str]:
+    """Descarga un adjunto (ej. un audio de WhatsApp) desde un MediaUrl de Twilio.
+    Los MediaUrl requieren autenticación con el Account SID/Auth Token. Devuelve
+    (bytes, content_type)."""
+    if not is_configured():
+        raise TwilioNotConfigured("TWILIO_ACCOUNT_SID/AUTH_TOKEN no seteados.")
+    r = requests.get(
+        url,
+        auth=HTTPBasicAuth(BOT_TWILIO_ACCOUNT_SID, BOT_TWILIO_AUTH_TOKEN),
+        timeout=timeout_s,
+    )
+    r.raise_for_status()
+    return r.content, r.headers.get("Content-Type", "")
+
+
 def send_whatsapp(to: str, body: str, timeout_s: float = 15.0) -> dict:
     """Manda un mensaje de WhatsApp vía Twilio. Devuelve el JSON del último envío.
 
