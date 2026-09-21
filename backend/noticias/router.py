@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from config import CLOUDINARY_ENABLED, MASBCR_TABLERO_URL, UPLOADS_DIR
 from database import get_db
 from noticias import render
@@ -116,7 +116,7 @@ def _to_dict(n: Noticia) -> dict[str, Any]:
 # ===========================================================================
 # API del admin (con auth)
 # ===========================================================================
-router = APIRouter(prefix="/api/noticias", dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/noticias", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 
 @router.get("")
@@ -270,7 +270,7 @@ async def importar_wp(
 # ===========================================================================
 # API del Kit Multimedia (con auth) — prefijo propio para no chocar con /{nid}
 # ===========================================================================
-kit_api = APIRouter(prefix="/api/kit", dependencies=[Depends(require_auth)])
+kit_api = APIRouter(prefix="/api/kit", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 
 @kit_api.get("")
@@ -351,7 +351,7 @@ def kit_importar_masbcr(reset: bool = False, db: Session = Depends(get_db)) -> d
 # ===========================================================================
 # API de Videos (con auth)
 # ===========================================================================
-videos_api = APIRouter(prefix="/api/videos", dependencies=[Depends(require_auth)])
+videos_api = APIRouter(prefix="/api/videos", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 
 @videos_api.get("")

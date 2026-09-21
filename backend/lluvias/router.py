@@ -7,13 +7,13 @@ import time
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from config import UPLOADS_DIR
 from common import PublicarTwitterRequest, publish_to_twitter, require_external_integrations
 from scraper import get_rainfall_metadata, create_animated_video_from_data
 
 
-router = APIRouter(prefix="/api/lluvias", dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/lluvias", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 # Estado global del video animado para esta instancia del worker.
 # Se reinicia con el proceso — aceptable porque cada generación es on-demand.

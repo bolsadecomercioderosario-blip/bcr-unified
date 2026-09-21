@@ -9,13 +9,13 @@ import uuid
 from fastapi import APIRouter, Depends, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from config import UPLOADS_DIR, ASSETS_DIR
 from common import PublicarTwitterRequest, publish_to_twitter, require_external_integrations
 from processor import extract_pdf_data, generate_pdf_thumbnail, create_ig_mockup, to_bold_serif
 
 
-router = APIRouter(prefix="/api/social", dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/social", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 
 @router.post("/pre-procesar")

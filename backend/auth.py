@@ -24,7 +24,7 @@ import os
 import secrets
 from typing import Optional
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 
 # --- Passwords por rol ------------------------------------------------------
@@ -144,3 +144,21 @@ def get_role(authorization: Optional[str] = Header(None)) -> str:
     if role is None:
         raise HTTPException(status_code=401, detail="Auth requerida")
     return role
+
+
+def require_roles(*allowed_roles: str):
+    """Factory de dependency: exige que el token sea de UNO de los roles dados.
+
+    Diferencia con require_auth: require_auth sólo verifica que haya un token
+    válido (cualquier rol); require_roles además chequea AUTORIZACIÓN por rol
+    (401 si no hay token, 403 si el rol no está permitido). Usar en módulos que
+    no son para todos (ej. las herramientas operativas son sólo de Comunicación).
+    """
+    allowed = set(allowed_roles)
+
+    def _dep(role: str = Depends(get_role)) -> str:
+        if role not in allowed:
+            raise HTTPException(status_code=403, detail="Tu rol no tiene acceso a esta sección")
+        return role
+
+    return _dep

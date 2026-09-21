@@ -32,7 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from database import get_db
 
 from .models import CapacitaLead
@@ -187,7 +187,7 @@ def _to_out(lead: CapacitaLead) -> LeadOut:
 @router.get("/leads", response_model=list[LeadOut])
 def listar_leads(
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> list[LeadOut]:
     leads = db.query(CapacitaLead).order_by(CapacitaLead.created_at.desc()).all()
     return [_to_out(l) for l in leads]
@@ -197,7 +197,7 @@ def listar_leads(
 def borrar_lead(
     lead_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> None:
     lead = db.get(CapacitaLead, lead_id)
     if not lead:
@@ -209,7 +209,7 @@ def borrar_lead(
 @router.get("/leads/export.csv")
 def exportar_csv(
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> StreamingResponse:
     leads = db.query(CapacitaLead).order_by(CapacitaLead.created_at.desc()).all()
 

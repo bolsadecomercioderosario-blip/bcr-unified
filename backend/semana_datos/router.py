@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from config import UPLOADS_DIR
 from common import require_external_integrations
 from utils.informes import fetch_informe, InformeNotFound
@@ -27,7 +27,7 @@ from utils.youtube_upload import (
 )
 
 
-router = APIRouter(prefix="/api/semana-datos", dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/semana-datos", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 
 
 # ---------------------------------------------------------

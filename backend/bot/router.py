@@ -29,7 +29,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
@@ -91,7 +91,7 @@ def _candidate_urls(request: Request) -> list[str]:
 
 # /api/bot/test y /admin/* requieren bearer auth (consistente con el resto
 # del API). /twilio-webhook se valida con X-Twilio-Signature en el endpoint
-# mismo, así que NO va por require_auth.
+# mismo, así que NO va por require_roles.
 router = APIRouter(prefix="/api/bot")
 
 
@@ -331,7 +331,7 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
 # ---------------------------------------------------------------------------
 @router.get(
     "/admin/exchanges",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def list_recent_exchanges(
     limit: int = 50,
@@ -367,7 +367,7 @@ def list_recent_exchanges(
 
 @router.post(
     "/admin/scrape-pizarra",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_pizarra(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Dispara manualmente el scraper de precios pizarra. Útil para debug y
@@ -379,7 +379,7 @@ def trigger_scrape_pizarra(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @router.post(
     "/admin/scrape-comentarios",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_comentarios(
     source: str = "local",
@@ -396,7 +396,7 @@ def trigger_scrape_comentarios(
 
 @router.post(
     "/admin/scrape-informativo",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_informativo(
     max_uploads: int = 20,
@@ -411,7 +411,7 @@ def trigger_scrape_informativo(
 
 @router.post(
     "/admin/backfill-informativo",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_backfill_informativo(
     max_editions: int = 8,
@@ -436,7 +436,7 @@ def trigger_backfill_informativo(
 
 @router.post(
     "/admin/scrape-gea-panel",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_gea_panel(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Dispara manualmente el scraper del panel GEA. Útil para llenar la
@@ -448,7 +448,7 @@ def trigger_scrape_gea_panel(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @router.post(
     "/admin/scrape-gea-informes",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_gea_informes(
     max_pages: int = 1,
@@ -464,7 +464,7 @@ def trigger_scrape_gea_informes(
 
 @router.post(
     "/admin/scrape-gea-seguimiento",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_gea_seguimiento(
     max_upload: int = 12,
@@ -479,7 +479,7 @@ def trigger_scrape_gea_seguimiento(
 
 @router.post(
     "/admin/scrape-gea-noticias",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_gea_noticias(
     max_upload: int = 12,
@@ -513,7 +513,7 @@ class _ArchivarConectadoRequest(BaseModel):
 
 @router.post(
     "/admin/archivar-conectado",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def archivar_conectado_endpoint(
     payload: _ArchivarConectadoRequest,
@@ -569,7 +569,7 @@ class _CoyunturaEditarRequest(BaseModel):
     contenido: str
 
 
-@router.get("/admin/coyuntura", dependencies=[Depends(require_auth)])
+@router.get("/admin/coyuntura", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def coyuntura_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Estado de todos los temas (aprobado + borrador pendiente) para la página
     de revisión."""
@@ -593,7 +593,7 @@ def _bg_generar_coyuntura() -> None:
         db.close()
 
 
-@router.post("/admin/coyuntura/generar", dependencies=[Depends(require_auth)])
+@router.post("/admin/coyuntura/generar", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def coyuntura_generar(background_tasks: BackgroundTasks) -> dict[str, Any]:
     """Dispara la generación de borradores (búsqueda web) para todos los temas, en
     SEGUNDO PLANO (la búsqueda web de varios temas puede tardar 1-2 min). NO publica
@@ -602,7 +602,7 @@ def coyuntura_generar(background_tasks: BackgroundTasks) -> dict[str, Any]:
     return {"status": "iniciado", "detalle": "Generando borradores en segundo plano. Refrescá en 1-2 min."}
 
 
-@router.post("/admin/coyuntura/aprobar", dependencies=[Depends(require_auth)])
+@router.post("/admin/coyuntura/aprobar", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def coyuntura_aprobar(
     payload: _CoyunturaAprobarRequest,
     db: Session = Depends(get_db),
@@ -620,7 +620,7 @@ def coyuntura_aprobar(
     return {"status": "ok" if ok else "error", "tema": payload.tema, "aprobado": ok}
 
 
-@router.post("/admin/coyuntura/editar", dependencies=[Depends(require_auth)])
+@router.post("/admin/coyuntura/editar", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def coyuntura_editar(
     payload: _CoyunturaEditarRequest,
     db: Session = Depends(get_db),
@@ -635,7 +635,7 @@ def coyuntura_editar(
 
 @router.post(
     "/admin/scrape-capacita",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_capacita(
     fetch_details: bool = True,
@@ -651,7 +651,7 @@ def trigger_scrape_capacita(
 
 @router.post(
     "/admin/scrape-innova-novedades",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_innova_novedades(
     max_upload: int = 15,
@@ -666,7 +666,7 @@ def trigger_scrape_innova_novedades(
 
 @router.post(
     "/admin/scrape-startups-innova",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def trigger_scrape_startups_innova(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Dispara manualmente el scraper del Startup Network."""
@@ -677,7 +677,7 @@ def trigger_scrape_startups_innova(db: Session = Depends(get_db)) -> dict[str, A
 
 @router.get(
     "/admin/ingested",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def list_ingested(
     source: str = "informativo",
@@ -758,7 +758,7 @@ def list_ingested(
     return {"error": f"source desconocido: {source!r}", "valid": ["informativo", "comentarios", "gea_informes"]}
 
 
-@router.post("/admin/setup-menu", dependencies=[Depends(require_auth)])
+@router.post("/admin/setup-menu", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def setup_menu(db: Session = Depends(get_db)) -> dict[str, Any]:
     """(Re)crea el template del menú (list-picker) en Twilio y guarda su
     ContentSid en bot_config. Útil para iterar el texto/opciones del menú."""
@@ -766,7 +766,7 @@ def setup_menu(db: Session = Depends(get_db)) -> dict[str, Any]:
     return {"content_sid": sid}
 
 
-@router.get("/admin/menu-preview", dependencies=[Depends(require_auth)])
+@router.get("/admin/menu-preview", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
 def menu_preview(opt: str, db: Session = Depends(get_db)) -> dict[str, Any]:
     """Devuelve el texto que respondería una opción del menú, sin mandar WhatsApp.
     Para revisar el formato con datos reales. opt: agenda|precios|informativo|gea|asuntos|conectados"""
@@ -777,7 +777,7 @@ def menu_preview(opt: str, db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @router.get(
     "/admin/health",
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
 )
 def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Diagnóstico rápido — qué hay configurado y qué no, y estado de los

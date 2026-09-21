@@ -6,7 +6,7 @@ Público (lo consume el dashboard):
   - GET /api/metricas/instancias          → instancias (filtrable por ?programa=slug)
   - GET /api/metricas/kpis                → KPIs de impacto acumulado
 
-Admin (require_auth — lo consume el formulario):
+Admin (solo rol Comunicación — lo consume el formulario):
   - POST   /api/metricas/instancias       → alta
   - PUT    /api/metricas/instancias/{id}  → edición
   - DELETE /api/metricas/instancias/{id}  → baja
@@ -24,7 +24,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth import require_auth
+from auth import require_roles, ROLE_COMUNICACION
 from database import get_db
 
 from . import source
@@ -198,7 +198,7 @@ def _guard_writable() -> None:
 def crear_instancia(
     payload: InstanciaIn,
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> Instancia:
     _guard_writable()
     if not db.get(Programa, payload.programa_id):
@@ -215,7 +215,7 @@ def editar_instancia(
     inst_id: int,
     payload: InstanciaIn,
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> Instancia:
     _guard_writable()
     inst = db.get(Instancia, inst_id)
@@ -234,7 +234,7 @@ def editar_instancia(
 def borrar_instancia(
     inst_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> None:
     _guard_writable()
     inst = db.get(Instancia, inst_id)
@@ -247,7 +247,7 @@ def borrar_instancia(
 @router.get("/export.csv")
 def exportar_csv(
     db: Session = Depends(get_db),
-    _: bool = Depends(require_auth),
+    _: bool = Depends(require_roles(ROLE_COMUNICACION)),
 ) -> StreamingResponse:
     # Exporta lo que se está mostrando (Sheet si está configurado, o la DB).
     data = source.load(db)
