@@ -357,8 +357,10 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         # Si tocó un botón (quick-reply), el id ("si"/"no") viene en ButtonPayload;
         # si no, usamos el texto que escribió. Al tocar botón, el Body trae el
         # TÍTULO ("Sí, cargar") — igual lo reconocemos, pero el id es más directo.
+        # TODO el texto de un writer va a su flujo propio (incluidos los saludos,
+        # que reciben su bienvenida específica, no el menú de lectura).
         eff_body = (params.get("ButtonPayload") or body or "").strip()
-        if eff_body and (agenda_writer.has_pending(from_phone) or not _is_menu_request(eff_body)):
+        if eff_body:
             ev["outcome"] = "writer_texto"
             background_tasks.add_task(agenda_writer.handle_text, from_phone, w_role, eff_body, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")

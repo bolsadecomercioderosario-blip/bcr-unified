@@ -135,7 +135,11 @@ def _transcribe(audio_bytes: bytes, media_type: str) -> Optional[str]:
         return None
 
 
-_FIELDS = ("title", "date", "time", "end_time", "location", "participants", "description")
+# Campos que el bot carga desde WhatsApp. A propósito NO incluye "participants"
+# (ese campo es "quién participa por BCR" y se completa desde la app, no se infiere
+# de lo que se dice) ni otros. Obligatorios: fecha, hora y título.
+_FIELDS = ("title", "date", "time", "location", "description")
+_REQUIRED = (("title", "el título"), ("date", "la fecha"), ("time", "la hora"))
 
 
 def _llm_json(prompt: str) -> Optional[dict]:
@@ -169,11 +173,17 @@ Sos el asistente de la Secretaría de la Bolsa de Comercio de Rosario. Hoy es \
 Decidí qué quiere y devolvé SÓLO un JSON (sin texto alrededor, sin ```):
 - "intent": "crear" si está describiendo una actividad para AGENDAR; "otro" si es \
 un saludo, una pregunta, un pedido de consulta, o cualquier otra cosa.
-- Si "intent" es "crear", agregá estas claves:
-  "title" (título breve, obligatorio), "date" (YYYY-MM-DD, resolviendo expresiones \
-relativas como "mañana" o "el martes que viene"; "" si no se menciona), "time" \
-(HH:MM 24h o ""), "end_time" (HH:MM o ""), "location" (o ""), "participants" (o ""), \
-"description" (o "").
+- Si "intent" es "crear", agregá EXACTAMENTE estas claves (y ninguna más):
+  "title": título de la actividad. Incluí el evento completo tal como se dice, por \
+ejemplo "Reunión con el Ministro de Economía" va ENTERO en el título. No separes a \
+nadie como participante.
+  "date": fecha YYYY-MM-DD, resolviendo expresiones relativas ("mañana", "el martes \
+que viene"); "" si no se menciona.
+  "time": hora de inicio HH:MM (24h); "" si no se menciona.
+  "location": lugar; "" si no se menciona.
+  "description": detalle adicional si lo hay; "" si no.
+
+Importante: NO infieras participantes ni ningún otro dato. Sólo esas 5 claves.
 
 Mensaje: {texto}
 """
@@ -228,16 +238,9 @@ def _fmt_fecha(iso: str) -> str:
 def _resumen(draft: dict) -> str:
     lineas = [f"📌 *{draft.get('title') or '(sin título)'}*"]
     lineas.append(f"📅 {_fmt_fecha(draft.get('date',''))}")
-    hora = draft.get("time") or ""
-    if hora:
-        hora_txt = f"{hora} a {draft['end_time']}" if draft.get("end_time") else hora
-        lineas.append(f"🕒 {hora_txt}")
-    else:
-        lineas.append("🕒 (sin horario)")
+    lineas.append(f"🕒 {draft.get('time') or '(sin horario)'}")
     if draft.get("location"):
         lineas.append(f"📍 {draft['location']}")
-    if draft.get("participants"):
-        lineas.append(f"👥 {draft['participants']}")
     if draft.get("description"):
         lineas.append(f"📝 {draft['description']}")
     return "\n".join(lineas)
@@ -257,11 +260,11 @@ def _create_activity(role: str, draft: dict) -> None:
             date=draft.get("date") or _now_art().strftime("%Y-%m-%d"),
             time=draft.get("time") or "A definir",
             end_date="",
-            end_time=draft.get("end_time") or "",
+            end_time="",
             title=draft.get("title") or "(sin título)",
             description=draft.get("description") or "",
             location=draft.get("location") or "",
-            participants=draft.get("participants") or "",
+            participants="",   # se completa desde la app (quién participa por BCR)
             channels=[],
             origen=origen,
             area=area,
@@ -288,6 +291,28 @@ _YES = {"si", "s", "si cargar", "cargar", "cargala", "dale", "ok", "oka", "okay"
         "de una", "correcto", "asi es"}
 _NO = {"no", "no descartar", "nop", "cancelar", "cancela", "cancelalo", "borrar",
        "descartar", "nada", "negativo"}
+
+# Saludos → mensaje de bienvenida propio del writer (no el menú de lectura).
+_GREETINGS = {"hola", "holaa", "holis", "buenas", "buenass", "buen dia",
+              "buenos dias", "buenas tardes", "buenas noches", "menu", "opciones",
+              "inicio", "empezar", "comenzar", "hi", "hello", "ayuda", "que onda"}
+
+_WELCOME = ("Puedo cargar actividades en la agenda: mandame un audio o escribime "
+            "la actividad (qué es, cuándo y dónde).")
+
+
+def _missing_required(draft: dict) -> list:
+    """Lista de etiquetas de los campos obligatorios que faltan (título/fecha/hora)."""
+    return [label for key, label in _REQUIRED if not (draft.get(key) or "").strip()]
+
+
+def _y_join(items: list) -> str:
+    """['la fecha','la hora'] → 'la fecha y la hora'."""
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + " y " + items[-1]
 
 
 # --- Confirmación con botones (quick-reply Sí/No) ---------------------------
@@ -364,29 +389,36 @@ def _core(from_phone: str, role: str, text: str, ev: dict) -> None:
         ev["outcome"] = "writer_editada"
         return
 
-    # Sin borrador: entender si quiere CREAR una actividad o es otra cosa.
+    # Sin borrador: un saludo devuelve el mensaje de bienvenida propio.
+    if _norm(text) in _GREETINGS:
+        twilio_client.send_whatsapp(from_phone, _WELCOME)
+        ev["outcome"] = "writer_bienvenida"
+        return
+
+    # Entender si quiere CREAR una actividad o es otra cosa.
     u = _understand(text)
     if u is None:
         twilio_client.send_whatsapp(from_phone, "No pude procesar el mensaje en este momento. Probá de nuevo.")
         ev["outcome"] = "writer_llm_off"
         return
-    if u["intent"] == "crear" and u["title"] and u["date"]:
+    if u["intent"] == "crear":
         draft = {k: u[k] for k in _FIELDS}
+        faltan = _missing_required(draft)
+        if faltan:
+            twilio_client.send_whatsapp(
+                from_phone,
+                f"Para cargar la actividad me falta {_y_join(faltan)}. "
+                "Decime al menos el título, la fecha y la hora.",
+            )
+            ev["outcome"] = "writer_incompleto"
+            return
         _set_pending(from_phone, draft)
         _send_confirmation(from_phone, draft, "Voy a cargar esta actividad en la Agenda de la Mesa Ejecutiva:")
         ev["outcome"] = "writer_pendiente"
         return
-    if u["intent"] == "crear":
-        falta = "el título" if not u["title"] else "la fecha"
-        twilio_client.send_whatsapp(from_phone, f"Me faltó {falta} de la actividad. ¿Me decís qué es y para cuándo?")
-        ev["outcome"] = "writer_incompleto"
-        return
-    twilio_client.send_whatsapp(
-        from_phone,
-        "Puedo *cargar actividades* en la agenda: mandame un audio o escribime la "
-        "actividad (qué es, cuándo y dónde). Para consultar la agenda, escribí "
-        "\"hola\" y usá el menú.",
-    )
+
+    # Cualquier otra cosa → bienvenida (qué puede hacer).
+    twilio_client.send_whatsapp(from_phone, _WELCOME)
     ev["outcome"] = "writer_otro"
 
 
