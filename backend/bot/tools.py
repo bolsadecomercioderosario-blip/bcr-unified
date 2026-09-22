@@ -290,6 +290,34 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         ),
         "parameters": {"type": "object", "properties": {}},
     },
+    {
+        "type": "function",
+        "name": "buscar_info_oficial",
+        "description": (
+            "Busca información ACTUAL en FUENTES OFICIALES del gobierno argentino "
+            "(argentina.gob.ar, Boletín Oficial y organismos como Transporte, ANPYN, "
+            "ARCA, Cancillería, BCRA, CNV, SENASA, Agricultura, Energía, Vialidad). "
+            "Usala SÓLO como ÚLTIMO RECURSO cuando la pregunta es sobre un tema "
+            "institucional, de política pública, económico, del agro, de "
+            "infraestructura/transporte, regulatorio o de coyuntura relevante para la "
+            "BCR y consultar_asuntos_publicos NO lo cubre (ej.: estado de una "
+            "licitación puntual, una norma o decreto reciente, un tema sectorial no "
+            "curado). NO la uses para temas ajenos a la BCR (dólar blue, deportes, "
+            "horóscopo, cultura general, opiniones): esos se deflectan igual. "
+            "Devuelve un resumen con la fuente y la fecha. OJO: lo que devuelve NO es "
+            "la posición institucional de la BCR."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {
+                    "type": "string",
+                    "description": "El tema o pregunta concreta a investigar en fuentes oficiales.",
+                },
+            },
+            "required": ["consulta"],
+        },
+    },
 ]
 
 
@@ -913,6 +941,78 @@ def consultar_asuntos_publicos(ctx: ToolContext) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Implementación: buscar_info_oficial (fallback a fuentes oficiales).
+# Cuando un tema de asuntos públicos/coyuntura NO está en la fuente curada, se
+# busca en la web RESTRINGIDA a dominios oficiales del Estado argentino. Lo que
+# devuelve NO es posición institucional: el agente lo presenta como "según
+# información de fuentes oficiales". No pasa por aprobación humana (a diferencia
+# de la coyuntura curada), por eso el disclaimer es obligatorio.
+# ---------------------------------------------------------------------------
+_OFFICIAL_DOMAINS = [
+    "argentina.gob.ar", "boletinoficial.gob.ar", "arca.gob.ar", "afip.gob.ar",
+    "cancilleria.gob.ar", "mercosur.int", "indec.gob.ar", "bcra.gob.ar",
+    "cnv.gov.ar", "magyp.gob.ar", "senasa.gob.ar", "santafe.gob.ar",
+]
+
+_INFO_OFICIAL_INSTRUCTIONS = (
+    "Sos un asistente que busca información en FUENTES OFICIALES del gobierno "
+    "argentino (dominios .gob.ar / .gov.ar, el Boletín Oficial y organismos "
+    "nacionales). Respondé en español rioplatense, BREVE (máximo ~5 líneas), y "
+    "SÓLO con información de fuentes oficiales. Citá el organismo/fuente y la "
+    "fecha del dato. No inventes. Si NO encontrás información oficial confiable, "
+    "respondé EXACTAMENTE: SIN_INFO_OFICIAL"
+)
+
+
+def buscar_info_oficial(ctx: ToolContext, consulta: str = "") -> dict[str, Any]:
+    q = (consulta or "").strip()
+    if not q:
+        return {"fuente": "info_oficial", "error": "consulta_vacia"}
+    client = ctx.openai_client
+    payload = {
+        "model": BOT_OPENAI_MODEL,
+        "instructions": _INFO_OFICIAL_INSTRUCTIONS,
+        "input": [{"role": "user", "content": q}],
+    }
+    # Probamos con filtro de dominios (si el modelo/SDK lo soporta) y, si falla,
+    # sin filtro (la instrucción igual pide sólo fuentes oficiales). Y con los dos
+    # nombres posibles de la tool de búsqueda web.
+    variants = [
+        [{"type": "web_search", "filters": {"allowed_domains": _OFFICIAL_DOMAINS}}],
+        [{"type": "web_search_preview", "filters": {"allowed_domains": _OFFICIAL_DOMAINS}}],
+        [{"type": "web_search"}],
+        [{"type": "web_search_preview"}],
+    ]
+    last_err = None
+    for tool_variant in variants:
+        try:
+            r = client.responses.create(tools=tool_variant, **payload)
+            texto = (getattr(r, "output_text", "") or "").strip()
+            if not texto:
+                continue
+            if "SIN_INFO_OFICIAL" in texto:
+                return {
+                    "fuente": "info_oficial",
+                    "sin_resultado": True,
+                    "detalle": "No se encontró información en fuentes oficiales sobre eso.",
+                }
+            return {
+                "fuente": "info_oficial",
+                "es_oficial_no_validado": True,
+                "texto": texto,
+                "instruccion_al_agente": (
+                    "Presentá esto como 'Según información de fuentes oficiales' (con la "
+                    "fuente y fecha que trae el texto). Aclará que NO es la posición "
+                    "institucional de la BCR."
+                ),
+            }
+        except Exception as exc:  # noqa: BLE001 — probamos la siguiente variante
+            last_err = exc
+            continue
+    return {"fuente": "info_oficial", "error": f"busqueda_no_disponible: {last_err}"}
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher.
 # ---------------------------------------------------------------------------
 _TOOL_REGISTRY = {
@@ -924,6 +1024,7 @@ _TOOL_REGISTRY = {
     "buscar_informe_gea": buscar_informe_gea,
     "buscar_conectados": buscar_conectados,
     "consultar_asuntos_publicos": consultar_asuntos_publicos,
+    "buscar_info_oficial": buscar_info_oficial,
 }
 
 
