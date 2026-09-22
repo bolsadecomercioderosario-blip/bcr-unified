@@ -199,12 +199,12 @@ _CONFIRM_CONTENT_DEFINITION = {
         "twilio/quick-reply": {
             "body": "{{1}}",
             "actions": [
-                {"id": "si", "title": "Sí, cargar"},
-                {"id": "no", "title": "No, descartar"},
+                {"id": "si", "title": "Sí"},
+                {"id": "no", "title": "No"},
             ],
         },
         "twilio/text": {
-            "body": "{{1}}\n\nRespondé *SÍ* para cargar o *NO* para descartar.",
+            "body": "{{1}}\n\nRespondé *SÍ* o *NO*.",
         },
     },
 }

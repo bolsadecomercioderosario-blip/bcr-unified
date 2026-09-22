@@ -73,31 +73,34 @@ def writer_role(from_phone: str) -> Optional[str]:
 # {phone_norm: {"draft": {...}, "at": datetime}}. Se descartan a los 30 min.
 _PENDING: dict = {}
 _PENDING_TTL = timedelta(minutes=30)
+# El "state" guarda en qué punto de la conversación está el writer:
+#   {"mode": "crear",   "draft": {...}}                         → confirmar alta
+#   {"mode": "editar",  "draft": {...}, "id": "<act>"}          → confirmar edición
+#   {"mode": "cancelar","draft": {...}, "id": "<act>"}          → confirmar baja
+#   {"mode": "select",  "purpose": "editar"|"cancelar", "options": [{n,id,label}]}
 
 
-def has_pending(from_phone: str) -> bool:
+def _get_state(from_phone: str) -> Optional[dict]:
     key = _norm_phone(from_phone)
     row = _PENDING.get(key)
     if not row:
-        return False
+        return None
     if datetime.utcnow() - row["at"] > _PENDING_TTL:
         _PENDING.pop(key, None)
-        return False
-    return True
+        return None
+    return row["state"]
 
 
-def _set_pending(from_phone: str, draft: dict) -> None:
-    _PENDING[_norm_phone(from_phone)] = {"draft": draft, "at": datetime.utcnow()}
+def has_pending(from_phone: str) -> bool:
+    return _get_state(from_phone) is not None
 
 
-def _pop_pending(from_phone: str) -> Optional[dict]:
-    row = _PENDING.pop(_norm_phone(from_phone), None)
-    return row["draft"] if row else None
+def _set_state(from_phone: str, state: dict) -> None:
+    _PENDING[_norm_phone(from_phone)] = {"state": state, "at": datetime.utcnow()}
 
 
-def _peek_pending(from_phone: str) -> Optional[dict]:
-    row = _PENDING.get(_norm_phone(from_phone))
-    return row["draft"] if row else None
+def _clear_state(from_phone: str) -> None:
+    _PENDING.pop(_norm_phone(from_phone), None)
 
 
 # --- OpenAI -----------------------------------------------------------------
@@ -171,8 +174,12 @@ Sos el asistente de la Secretaría de la Bolsa de Comercio de Rosario. Hoy es \
 {hoy} ({dia_semana}), horario de Argentina. La persona te mandó este mensaje.
 
 Decidí qué quiere y devolvé SÓLO un JSON (sin texto alrededor, sin ```):
-- "intent": "crear" si está describiendo una actividad para AGENDAR; "otro" si es \
-un saludo, una pregunta, un pedido de consulta, o cualquier otra cosa.
+- "intent": uno de:
+  "crear"    → está describiendo una actividad NUEVA para agendar.
+  "editar"   → quiere MODIFICAR una actividad ya cargada (ej. "editar la agenda",
+               "cambiar una actividad", "modificar la reunión de mañana").
+  "cancelar" → quiere CANCELAR/eliminar una actividad ya cargada.
+  "otro"     → saludo, consulta, o cualquier otra cosa.
 - Si "intent" es "crear", agregá EXACTAMENTE estas claves (y ninguna más):
   "title": título de la actividad. Incluí el evento completo tal como se dice, por \
 ejemplo "Reunión con el Ministro de Economía" va ENTERO en el título. No separes a \
@@ -182,8 +189,10 @@ que viene"); "" si no se menciona.
   "time": hora de inicio HH:MM (24h); "" si no se menciona.
   "location": lugar; "" si no se menciona.
   "description": detalle adicional si lo hay; "" si no.
+- Si "intent" es "editar" o "cancelar", agregá SOLO la clave "date" (YYYY-MM-DD del \
+día de la actividad a modificar, resolviendo relativas; "" si no se menciona un día).
 
-Importante: NO infieras participantes ni ningún otro dato. Sólo esas 5 claves.
+Importante: para "crear" NO infieras participantes ni ningún otro dato.
 
 Mensaje: {texto}
 """
@@ -198,7 +207,9 @@ def _understand(texto: str) -> Optional[dict]:
     if data is None:
         return None
     intent = (data.get("intent") or "").strip().lower()
-    out = {"intent": "crear" if intent == "crear" else "otro"}
+    if intent not in ("crear", "editar", "cancelar"):
+        intent = "otro"
+    out = {"intent": intent}
     out.update(_clean_fields(data))
     return out
 
@@ -276,6 +287,80 @@ def _create_activity(role: str, draft: dict) -> None:
         db.close()
 
 
+# --- Editar / cancelar actividades existentes -------------------------------
+def _act_to_draft(act) -> dict:
+    """Campos editables de una Activity en el formato de draft."""
+    return {
+        "title": act.title or "",
+        "date": act.date or "",
+        "time": "" if (act.time in (None, "", "A definir", "Sin horario", "00:00")) else act.time,
+        "location": act.location or "",
+        "description": act.description or "",
+    }
+
+
+def _list_me_activities(day_iso: str) -> list:
+    """Actividades de la Mesa Ejecutiva (origen=secretaria, no archivadas) de un
+    día, ordenadas por hora. Devuelve [{id, label, draft}]."""
+    db = SessionLocal()
+    try:
+        A = agenda_models.Activity
+        rows = db.query(A).filter(
+            A.origen == "secretaria", A.archived == False, A.date == day_iso,  # noqa: E712
+        ).all()
+        rows.sort(key=lambda a: (a.time or "99:99"))
+        out = []
+        for a in rows:
+            d = _act_to_draft(a)
+            hora = d["time"] or "sin horario"
+            lugar = f" · {d['location']}" if d["location"] else ""
+            out.append({"id": a.id, "label": f"{d['title']} · {hora}{lugar}", "draft": d})
+        return out
+    finally:
+        db.close()
+
+
+def _update_activity(act_id: str, draft: dict) -> bool:
+    db = SessionLocal()
+    try:
+        a = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == act_id).first()
+        if not a:
+            return False
+        a.title = draft.get("title") or a.title
+        a.date = draft.get("date") or a.date
+        a.time = draft.get("time") or "A definir"
+        a.location = draft.get("location") or ""
+        a.description = draft.get("description") or ""
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def _archive_activity(act_id: str) -> bool:
+    """Baja (soft-delete): marca la actividad como archivada. No la borra de la DB."""
+    db = SessionLocal()
+    try:
+        a = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == act_id).first()
+        if not a:
+            return False
+        a.archived = True
+        a.archived_at = datetime.utcnow().isoformat()
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def _parse_selection(text: str):
+    """De 'la 2, cambiá la hora a las 18' saca (2, 'cambiá la hora a las 18').
+    Devuelve (None, '') si no hay un número al principio."""
+    m = re.match(r"\s*(?:la\s+|el\s+|numero\s+|n[º°]?\s*)?(\d{1,2})\b[\s.,:;-]*(.*)", text or "", re.IGNORECASE)
+    if not m:
+        return None, ""
+    return int(m.group(1)), (m.group(2) or "").strip()
+
+
 # --- Confirmación (sí / no) -------------------------------------------------
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", (s or "").strip().lower())
@@ -297,8 +382,11 @@ _GREETINGS = {"hola", "holaa", "holis", "buenas", "buenass", "buen dia",
               "buenos dias", "buenas tardes", "buenas noches", "menu", "opciones",
               "inicio", "empezar", "comenzar", "hi", "hello", "ayuda", "que onda"}
 
-_WELCOME = ("Puedo cargar actividades en la agenda: mandame un audio o escribime "
-            "la actividad (qué es, cuándo y dónde).")
+_WELCOME = (
+    "Puedo ayudarte con la agenda de la Mesa Ejecutiva:\n"
+    "• Para *cargar* una actividad: mandame un audio o escribila (qué es, cuándo y dónde).\n"
+    "• Para *editar* o *cancelar* una ya cargada: decime \"editar\" o \"cancelar\"."
+)
 
 
 def _missing_required(draft: dict) -> list:
@@ -320,7 +408,7 @@ def ensure_confirm_content_sid() -> Optional[str]:
     """SID del template de botones Sí/No; lo crea y persiste la primera vez."""
     db = SessionLocal()
     try:
-        row = db.query(BotConfig).filter(BotConfig.key == "confirm_content_sid").first()
+        row = db.query(BotConfig).filter(BotConfig.key == "confirm_content_sid_v2").first()
         if row and row.value:
             return row.value
         sid = twilio_client.create_confirm_content_sid()
@@ -328,7 +416,7 @@ def ensure_confirm_content_sid() -> Optional[str]:
             row.value = sid
             row.updated_at = datetime.utcnow()
         else:
-            db.add(BotConfig(key="confirm_content_sid", value=sid))
+            db.add(BotConfig(key="confirm_content_sid_v2", value=sid))
         db.commit()
         return sid
     finally:
@@ -349,77 +437,170 @@ def _send_confirmation(from_phone: str, draft: dict, encabezado: str) -> None:
 
 
 # --- Núcleo: procesa un mensaje (texto ya transcripto si vino por audio) -----
+def _send(from_phone: str, msg: str) -> None:
+    twilio_client.send_whatsapp(from_phone, msg)
+
+
 def _core(from_phone: str, role: str, text: str, ev: dict) -> None:
     text = (text or "").strip()
     if not text:
         return
-
-    # Con un borrador pendiente: SÍ carga, NO descarta, cualquier otra cosa se
-    # interpreta como una CORRECCIÓN al borrador.
-    if has_pending(from_phone):
-        resp = _norm(text)
-        if resp in _YES:
-            draft = _pop_pending(from_phone)
-            if not draft:
-                twilio_client.send_whatsapp(from_phone, "No tengo ninguna actividad pendiente. Mandame la actividad (audio o texto).")
-                ev["outcome"] = "writer_sin_pendiente"
-                return
-            try:
-                _create_activity(role, draft)
-                twilio_client.send_whatsapp(from_phone, f"✅ Actividad cargada:\n\n{_resumen(draft)}")
-                ev["outcome"] = "writer_cargada"
-            except Exception as exc:  # noqa: BLE001
-                print(f"[agenda_writer] _create_activity error: {type(exc).__name__}: {exc}")
-                ev["error"] = f"writer_create: {type(exc).__name__}: {exc}"
-                twilio_client.send_whatsapp(from_phone, "No pude guardar la actividad. Probá de nuevo.")
-            return
-        if resp in _NO:
-            _pop_pending(from_phone)
-            twilio_client.send_whatsapp(from_phone, "Listo, la descarté. Si querés, mandame otra actividad.")
-            ev["outcome"] = "writer_descartada"
-            return
-        # Corrección al borrador
-        updated = _apply_edit(_peek_pending(from_phone), text)
-        if not updated or not updated.get("title"):
-            twilio_client.send_whatsapp(from_phone, "No pude aplicar ese cambio. ¿Me lo decís de otra forma?")
-            ev["outcome"] = "writer_edit_fallo"
-            return
-        _set_pending(from_phone, updated)
-        _send_confirmation(from_phone, updated, "Actualicé la actividad:")
-        ev["outcome"] = "writer_editada"
+    state = _get_state(from_phone)
+    if state:
+        _handle_pending(from_phone, role, text, state, ev)
         return
 
-    # Sin borrador: un saludo devuelve el mensaje de bienvenida propio.
+    # Sin estado: saludo → bienvenida; si no, entendemos la intención.
     if _norm(text) in _GREETINGS:
-        twilio_client.send_whatsapp(from_phone, _WELCOME)
+        _send(from_phone, _WELCOME)
         ev["outcome"] = "writer_bienvenida"
         return
-
-    # Entender si quiere CREAR una actividad o es otra cosa.
     u = _understand(text)
     if u is None:
-        twilio_client.send_whatsapp(from_phone, "No pude procesar el mensaje en este momento. Probá de nuevo.")
+        _send(from_phone, "No pude procesar el mensaje en este momento. Probá de nuevo.")
         ev["outcome"] = "writer_llm_off"
         return
-    if u["intent"] == "crear":
-        draft = {k: u[k] for k in _FIELDS}
-        faltan = _missing_required(draft)
-        if faltan:
-            twilio_client.send_whatsapp(
-                from_phone,
-                f"Para cargar la actividad me falta {_y_join(faltan)}. "
-                "Decime al menos el título, la fecha y la hora.",
-            )
-            ev["outcome"] = "writer_incompleto"
+    intent = u["intent"]
+    if intent == "crear":
+        _start_create(from_phone, u, ev)
+    elif intent in ("editar", "cancelar"):
+        _start_select(from_phone, intent, u.get("date", ""), ev)
+    else:
+        _send(from_phone, _WELCOME)
+        ev["outcome"] = "writer_otro"
+
+
+def _start_create(from_phone: str, u: dict, ev: dict) -> None:
+    draft = {k: u[k] for k in _FIELDS}
+    faltan = _missing_required(draft)
+    if faltan:
+        _send(from_phone, f"Para cargar la actividad me falta {_y_join(faltan)}. "
+                          "Decime al menos el título, la fecha y la hora.")
+        ev["outcome"] = "writer_incompleto"
+        return
+    _set_state(from_phone, {"mode": "crear", "draft": draft})
+    _send_confirmation(from_phone, draft, "Voy a cargar esta actividad en la Agenda de la Mesa Ejecutiva:")
+    ev["outcome"] = "writer_pendiente"
+
+
+def _start_select(from_phone: str, purpose: str, date_iso: str, ev: dict) -> None:
+    day = date_iso or _now_art().strftime("%Y-%m-%d")
+    opts = _list_me_activities(day)
+    if not opts:
+        _send(from_phone, f"No hay actividades de la Mesa Ejecutiva para el {_fmt_fecha(day)}. "
+                          "Podés decirme otro día (ej: \"editar la agenda de mañana\").")
+        ev["outcome"] = "writer_sin_actividades"
+        return
+    options = [{"n": i + 1, "id": o["id"], "label": o["label"], "draft": o["draft"]}
+               for i, o in enumerate(opts)]
+    _set_state(from_phone, {"mode": "select", "purpose": purpose, "options": options})
+    verbo = "editar" if purpose == "editar" else "cancelar"
+    lineas = [f"Actividades de la Mesa Ejecutiva — {_fmt_fecha(day)}:"]
+    lineas += [f"{o['n']}. {o['label']}" for o in options]
+    extra = " (podés incluir el cambio, ej: \"2, la hora a las 18\")" if purpose == "editar" else ""
+    lineas.append(f"\nDecime el número de la que querés {verbo}{extra}.")
+    _send(from_phone, "\n".join(lineas))
+    ev["outcome"] = f"writer_lista_{purpose}"
+
+
+def _handle_pending(from_phone: str, role: str, text: str, state: dict, ev: dict) -> None:
+    mode = state.get("mode")
+
+    # Elegir un número de la lista (para editar o cancelar).
+    if mode == "select":
+        if _norm(text) in _NO:
+            _clear_state(from_phone)
+            _send(from_phone, "Ok, no toco nada. Si querés, decime \"editar\" o \"cancelar\" de nuevo.")
+            ev["outcome"] = "writer_select_abort"
             return
-        _set_pending(from_phone, draft)
-        _send_confirmation(from_phone, draft, "Voy a cargar esta actividad en la Agenda de la Mesa Ejecutiva:")
-        ev["outcome"] = "writer_pendiente"
+        num, rest = _parse_selection(text)
+        if num is None:
+            _send(from_phone, "Decime el *número* de la actividad de la lista (por ejemplo: 2).")
+            ev["outcome"] = "writer_select_nonum"
+            return
+        opt = next((o for o in state["options"] if o["n"] == num), None)
+        if not opt:
+            _send(from_phone, f"No hay una opción {num} en la lista. Fijate los números.")
+            ev["outcome"] = "writer_select_badnum"
+            return
+        draft = dict(opt["draft"])
+        if state["purpose"] == "cancelar":
+            _set_state(from_phone, {"mode": "cancelar", "id": opt["id"], "draft": draft})
+            _send_confirmation(from_phone, draft, "Voy a CANCELAR esta actividad:")
+            ev["outcome"] = "writer_cancel_confirm"
+            return
+        # editar: si vino un cambio junto al número, lo aplico y muestro preview
+        if rest:
+            updated = _apply_edit(draft, rest)
+            if updated and updated.get("title"):
+                _set_state(from_phone, {"mode": "editar", "id": opt["id"], "draft": updated})
+                _send_confirmation(from_phone, updated, "Así quedaría la actividad:")
+                ev["outcome"] = "writer_edit_preview"
+                return
+        _set_state(from_phone, {"mode": "editar", "id": opt["id"], "draft": draft})
+        _send(from_phone, f"Seleccionaste:\n\n{_resumen(draft)}\n\n¿Qué querés cambiar? "
+                          "(ej: \"la hora a las 18\")")
+        ev["outcome"] = "writer_edit_selected"
         return
 
-    # Cualquier otra cosa → bienvenida (qué puede hacer).
-    twilio_client.send_whatsapp(from_phone, _WELCOME)
-    ev["outcome"] = "writer_otro"
+    resp = _norm(text)
+
+    # Confirmar una CANCELACIÓN.
+    if mode == "cancelar":
+        if resp in _YES:
+            ok = _archive_activity(state["id"])
+            _clear_state(from_phone)
+            if ok:
+                _send(from_phone, f"✅ Actividad cancelada:\n\n{_resumen(state['draft'])}")
+                ev["outcome"] = "writer_cancelada"
+            else:
+                _send(from_phone, "No encontré esa actividad (puede que ya no esté).")
+                ev["outcome"] = "writer_cancel_notfound"
+            return
+        if resp in _NO:
+            _clear_state(from_phone)
+            _send(from_phone, "Listo, no la cancelé.")
+            ev["outcome"] = "writer_cancel_abort"
+            return
+        _send(from_phone, "¿Cancelo la actividad? Respondé *SÍ* o *NO*.")
+        return
+
+    # Confirmar un ALTA (crear) o una EDICIÓN.
+    if resp in _YES:
+        draft = state["draft"]
+        try:
+            if mode == "crear":
+                _create_activity(role, draft)
+                msg = "✅ Actividad cargada:"
+                ev["outcome"] = "writer_cargada"
+            else:  # editar
+                _update_activity(state["id"], draft)
+                msg = "✅ Actividad actualizada:"
+                ev["outcome"] = "writer_actualizada"
+            _clear_state(from_phone)
+            _send(from_phone, f"{msg}\n\n{_resumen(draft)}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[agenda_writer] guardar ({mode}) error: {type(exc).__name__}: {exc}")
+            ev["error"] = f"writer_save: {type(exc).__name__}: {exc}"
+            _send(from_phone, "No pude guardar la actividad. Probá de nuevo.")
+        return
+    if resp in _NO:
+        _clear_state(from_phone)
+        _send(from_phone, "Listo, lo descarté. Si querés, mandame otra cosa.")
+        ev["outcome"] = "writer_descartada"
+        return
+
+    # Cualquier otra cosa: es una CORRECCIÓN al borrador.
+    updated = _apply_edit(state["draft"], text)
+    if not updated or not updated.get("title"):
+        _send(from_phone, "No pude aplicar ese cambio. ¿Me lo decís de otra forma?")
+        ev["outcome"] = "writer_edit_fallo"
+        return
+    new_state = dict(state)
+    new_state["draft"] = updated
+    _set_state(from_phone, new_state)
+    _send_confirmation(from_phone, updated, "Actualicé la actividad:")
+    ev["outcome"] = "writer_editada"
 
 
 # --- Handlers (llamados desde el webhook, en segundo plano) -----------------
