@@ -432,11 +432,17 @@ def handle_text(from_phone: str, role: str, text: str, ev: dict) -> None:
         ev["error"] = f"writer_text: {type(exc).__name__}: {exc}"
 
 
+def transcribe(media_url: str, media_type: str = "") -> Optional[str]:
+    """Descarga un audio de Twilio y devuelve su transcripción (o None). Reutilizable
+    también para las CONSULTAS por voz de los miembros de la ME (no sólo writers)."""
+    audio, ctype = twilio_client.download_media(media_url)
+    return _transcribe(audio, media_type or ctype)
+
+
 def handle_voice(from_phone: str, role: str, media_url: str, media_type: str, ev: dict) -> None:
     """Audio de un writer: se transcribe y sigue el mismo flujo que el texto."""
     try:
-        audio, ctype = twilio_client.download_media(media_url)
-        texto = _transcribe(audio, media_type or ctype)
+        texto = transcribe(media_url, media_type)
         if not texto:
             twilio_client.send_whatsapp(from_phone, "No pude entender el audio. ¿Lo probás de nuevo, más claro?")
             ev["outcome"] = "writer_audio_vacio"

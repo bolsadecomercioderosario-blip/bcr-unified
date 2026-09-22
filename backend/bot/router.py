@@ -294,6 +294,26 @@ def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None
         db.close()
 
 
+def _process_audio_read(from_phone: str, media_url: str, media_type: str, ev: dict) -> None:
+    """Transcribe un audio de un miembro de la ME y lo procesa como una consulta
+    de texto normal (menú / agenda / precios / agente)."""
+    try:
+        text = agenda_writer.transcribe(media_url, media_type)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.twilio-webhook] transcripción (consulta) falló: {type(exc).__name__}: {exc}")
+        ev["error"] = f"transcripcion: {type(exc).__name__}: {exc}"
+        text = None
+    if not text:
+        try:
+            twilio_client.send_whatsapp(from_phone, "No pude entender el audio. ¿Me lo escribís o lo probás de nuevo, más claro?")
+        except Exception:  # noqa: BLE001
+            pass
+        ev["outcome"] = "audio_vacio"
+        return
+    ev["transcripcion_len"] = len(text)
+    _process_message(from_phone, text, ev)
+
+
 @router.post("/twilio-webhook", include_in_schema=False)
 async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) -> Response:
     """Recibe un POST de Twilio cuando llega un WhatsApp. Le contesta a Twilio
@@ -342,38 +362,45 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         ev["outcome"] = "duplicado"
         return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
+    # Adjunto de audio (mensaje de voz): sirve tanto para writers (cargar) como
+    # para miembros de la ME (consultar por voz).
+    num_media = int(params.get("NumMedia", "0") or 0)
+    media_url = params.get("MediaUrl0")
+    media_type = params.get("MediaContentType0", "")
+    is_audio = bool(num_media and media_url and media_type.startswith("audio"))
+
     # Writers: cargar/editar actividades por voz o texto (única acción de
-    # ESCRITURA del bot). Un audio o un texto de actividad arranca el flujo; con
-    # un borrador pendiente, el texto confirma (SÍ/NO por botón o palabra) o
-    # corrige. Los saludos SIN borrador pendiente caen al menú normal.
+    # ESCRITURA del bot). Un audio o un texto arranca el flujo; con un borrador
+    # pendiente, el texto confirma (SÍ/NO por botón o palabra) o corrige.
     if w_role:
-        num_media = int(params.get("NumMedia", "0") or 0)
-        media_url = params.get("MediaUrl0")
-        media_type = params.get("MediaContentType0", "")
-        if num_media and media_url and media_type.startswith("audio"):
+        if is_audio:
             ev["outcome"] = "writer_voz"
             background_tasks.add_task(agenda_writer.handle_voice, from_phone, w_role, media_url, media_type, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
         # Si tocó un botón (quick-reply), el id ("si"/"no") viene en ButtonPayload;
-        # si no, usamos el texto que escribió. Al tocar botón, el Body trae el
-        # TÍTULO ("Sí, cargar") — igual lo reconocemos, pero el id es más directo.
-        # TODO el texto de un writer va a su flujo propio (incluidos los saludos,
-        # que reciben su bienvenida específica, no el menú de lectura).
+        # si no, usamos el texto. TODO el texto de un writer va a su flujo propio
+        # (incluidos los saludos, que reciben su bienvenida específica).
         eff_body = (params.get("ButtonPayload") or body or "").strip()
         if eff_body:
             ev["outcome"] = "writer_texto"
             background_tasks.add_task(agenda_writer.handle_text, from_phone, w_role, eff_body, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
-        # writer que saluda y no tiene borrador → cae al menú normal.
+
+    # Miembros de la ME (lectura): un audio se transcribe y se procesa como
+    # consulta normal (menú / agenda / precios / etc.), igual que si lo escribieran.
+    if is_audio:
+        ev["outcome"] = "audio_consulta"
+        background_tasks.add_task(_process_audio_read, from_phone, media_url, media_type, ev)
+        return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     if not from_phone or not body:
         ev["outcome"] = "sin_texto"
-        # Mensaje sin texto (media, sticker, etc.) — respondemos amable.
+        # Adjunto que no es audio (sticker, imagen, etc.) — respondemos amable.
         if from_phone and twilio_client.is_configured():
             try:
                 twilio_client.send_whatsapp(
                     to=from_phone,
-                    body="Por ahora sólo entiendo mensajes de texto. ¿Me lo escribís?",
+                    body="Por ahora entiendo mensajes de texto y de voz. ¿Me lo escribís o me mandás un audio?",
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"[bot.twilio-webhook] Falló mandar respuesta no-text: {exc}")
