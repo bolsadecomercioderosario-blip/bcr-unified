@@ -237,6 +237,27 @@ def _apply_edit(draft: dict, instruction: str) -> Optional[dict]:
     return _clean_fields(data)
 
 
+_RESOLVE_DATE_PROMPT = """\
+Hoy es {hoy} ({dia_semana}), horario de Argentina. La persona indicó un día.
+Devolvé SÓLO un JSON {{"date": "YYYY-MM-DD"}} con la fecha que corresponde,
+resolviendo expresiones como "hoy", "mañana", "el próximo lunes", "el 25 de
+octubre". Si no hay una fecha clara, devolvé {{"date": ""}}.
+
+Texto: {texto}
+"""
+
+
+def _resolve_date(text: str) -> str:
+    """Convierte una expresión de día ('mañana', 'el 25 de octubre') en YYYY-MM-DD.
+    Devuelve '' si no se puede resolver."""
+    now = _now_art()
+    data = _llm_json(_RESOLVE_DATE_PROMPT.format(
+        hoy=now.strftime("%Y-%m-%d"), dia_semana=_WEEKDAYS[now.weekday()], texto=text,
+    ))
+    date = ((data or {}).get("date") or "").strip()
+    return date if re.match(r"^\d{4}-\d{2}-\d{2}$", date) else ""
+
+
 # --- Resumen para confirmar -------------------------------------------------
 def _fmt_fecha(iso: str) -> str:
     try:
@@ -464,7 +485,16 @@ def _core(from_phone: str, role: str, text: str, ev: dict) -> None:
     if intent == "crear":
         _start_create(from_phone, u, ev)
     elif intent in ("editar", "cancelar"):
-        _start_select(from_phone, intent, u.get("date", ""), ev)
+        day = u.get("date", "")
+        if day:
+            _start_select(from_phone, intent, day, ev)
+        else:
+            # No mencionó un día puntual → NO asumimos "hoy": preguntamos cuál.
+            _set_state(from_phone, {"mode": "await_day", "purpose": intent})
+            verbo = "editar" if intent == "editar" else "cancelar"
+            _send(from_phone, f"¿De qué día es la actividad que querés {verbo}? "
+                              "Decime la fecha (por ejemplo: \"hoy\", \"mañana\" o \"el 25 de octubre\").")
+            ev["outcome"] = f"writer_pide_dia_{intent}"
     else:
         _send(from_phone, _WELCOME)
         ev["outcome"] = "writer_otro"
@@ -505,6 +535,22 @@ def _start_select(from_phone: str, purpose: str, date_iso: str, ev: dict) -> Non
 
 def _handle_pending(from_phone: str, role: str, text: str, state: dict, ev: dict) -> None:
     mode = state.get("mode")
+
+    # Esperando que diga de qué DÍA es la actividad a editar/cancelar.
+    if mode == "await_day":
+        if _norm(text) in _NO:
+            _clear_state(from_phone)
+            _send(from_phone, "Ok, dejamos ahí. Cuando quieras, decime \"editar\" o \"cancelar\".")
+            ev["outcome"] = "writer_await_day_abort"
+            return
+        day = _resolve_date(text)
+        if not day:
+            _send(from_phone, "No entendí la fecha. Decime el día de la actividad "
+                              "(por ejemplo: \"hoy\", \"mañana\" o \"el 25 de octubre\").")
+            ev["outcome"] = "writer_dia_invalido"
+            return
+        _start_select(from_phone, state["purpose"], day, ev)
+        return
 
     # Elegir un número de la lista (para editar o cancelar).
     if mode == "select":
