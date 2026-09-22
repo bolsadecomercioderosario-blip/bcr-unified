@@ -5,6 +5,17 @@ import { SEC_RESPONSABLES } from '../constants.js';
 // (no exponer la API key de OpenAI desde un endpoint público). La generación
 // IA queda sólo en el botón del bloque de Conectados.
 
+// Escapa un valor para meterlo en un atributo HTML (value="..."). Sin esto, un
+// título con comillas dobles (ej: Cena "El poder...") corta el atributo y el
+// campo aparece truncado en el formulario.
+function escAttr(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 export function renderActivityForm(container, preData = null) {
     const sourceAct = preData || state.currentActivity || {};
     const act = {
@@ -115,13 +126,13 @@ export function renderActivityForm(container, preData = null) {
         </div>
         <div class="form-group" id="sec-resp-other-group" style="margin-top: 1rem; display: ${secRespIsOther ? 'block' : 'none'};">
             <label>Nombre del responsable</label>
-            <input type="text" name="sec_responsible_other" value="${(act.sec_responsible_other || '').replace(/"/g, '&quot;')}" placeholder="Nombre y apellido">
+            <input type="text" name="sec_responsible_other" value="${escAttr(act.sec_responsible_other)}" placeholder="Nombre y apellido">
         </div>`;
     const _secNotes = `
         <div class="form-group" style="margin-top: 1rem;">
             <label>Notas internas · Secretaría</label>
             <p style="font-size: 0.78rem; color: var(--text-muted); margin: -0.35rem 0 0.5rem;">Sólo las ve Secretaría.</p>
-            <textarea name="sec_notes" rows="4" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${act.sec_notes}</textarea>
+            <textarea name="sec_notes" rows="4" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${escAttr(act.sec_notes)}</textarea>
         </div>`;
     let estadoHTML = '';
     if (isSec && !areaForeignForSec) {
@@ -157,7 +168,7 @@ export function renderActivityForm(container, preData = null) {
         participaMeHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Participa (por Mesa Ejecutiva)</label>
-                <input type="text" name="participants_me" value="${(act.participants_me || '').replace(/"/g, '&quot;')}" ${dis} placeholder="Autoridades de la Mesa que participan...">
+                <input type="text" name="participants_me" value="${escAttr(act.participants_me)}" ${dis} placeholder="Autoridades de la Mesa que participan...">
             </div>`;
     }
 
@@ -241,32 +252,32 @@ export function renderActivityForm(container, preData = null) {
                     </div>
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Título</label>
-                        <input type="text" name="title" value="${act.title}" placeholder="Ej: Lanzamiento de..." required>
+                        <input type="text" name="title" value="${escAttr(act.title)}" placeholder="Ej: Lanzamiento de..." required>
                     </div>
                     ${showGen(act.description) ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Descripción</label>
-                        <textarea name="description" rows="3">${act.description}</textarea>
+                        <textarea name="description" rows="3">${escAttr(act.description)}</textarea>
                     </div>` : ''}
                     ${esArea ? (showGen(act.location) ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Lugar</label>
-                        <input type="text" name="location" value="${act.location}">
+                        <input type="text" name="location" value="${escAttr(act.location)}">
                     </div>` : '') : ((showGen(act.location) || showGen(act.observations)) ? `
                     <div class="form-grid-2" style="margin-top: 1rem;">
                         ${showGen(act.location) ? `<div class="form-group">
                             <label>Lugar</label>
-                            <input type="text" name="location" value="${act.location}">
+                            <input type="text" name="location" value="${escAttr(act.location)}">
                         </div>` : ''}
                         ${showGen(act.observations) ? `<div class="form-group">
                             <label>Observaciones</label>
-                            <input type="text" name="observations" value="${act.observations}">
+                            <input type="text" name="observations" value="${escAttr(act.observations)}">
                         </div>` : ''}
                     </div>` : '')}
                     ${showGen(act.participants) ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>${actOrigen === 'area' ? 'Participa (por el área)' : 'Participa'}</label>
-                        <input type="text" name="participants" value="${act.participants}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
+                        <input type="text" name="participants" value="${escAttr(act.participants)}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
                     </div>` : ''}
                     </fieldset>
                     ${participaMeHTML}
@@ -282,7 +293,7 @@ export function renderActivityForm(container, preData = null) {
                 <section>
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Notas internas · Comunicación</h3>
                     <p style="font-size: 0.78rem; color: var(--text-muted); margin: -0.5rem 0 0.6rem;">Sólo las ve Comunicación. No aparecen en la landing ni para Secretaría.</p>
-                    <textarea name="comunicacion_notes" rows="5" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${act.comunicacion_notes}</textarea>
+                    <textarea name="comunicacion_notes" rows="5" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.95rem; line-height: 1.5; font-family: inherit; resize: vertical;">${escAttr(act.comunicacion_notes)}</textarea>
                 </section>
                 ` : ''}
 
@@ -303,7 +314,7 @@ export function renderActivityForm(container, preData = null) {
                         </div>
                         <div class="form-group" id="group-external" style="display: ${act.responsible === 'Externo' ? 'block' : 'none'};">
                             <label>Nombre Externo</label>
-                            <input type="text" name="external_name" value="${act.external_name || ''}">
+                            <input type="text" name="external_name" value="${escAttr(act.external_name)}">
                         </div>
                     </div>
                     
@@ -340,7 +351,7 @@ export function renderActivityForm(container, preData = null) {
                     <div class="form-group">
                         <label>Link Drive Cobertura BCR</label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="url" name="drive_bcr" id="input-drive-bcr" value="${act.drive_bcr}" placeholder="https://..." style="flex-grow: 1;">
+                            <input type="url" name="drive_bcr" id="input-drive-bcr" value="${escAttr(act.drive_bcr)}" placeholder="https://..." style="flex-grow: 1;">
                             <button type="button" id="btn-create-folder-bcr" class="btn-primary" style="background: #4285F4; border: none; padding: 0 0.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;" title="Crear carpeta en Drive">
                                 <i data-lucide="folder-plus" style="width: 18px; height: 18px;"></i>
                             </button>
@@ -349,7 +360,7 @@ export function renderActivityForm(container, preData = null) {
                     <div class="form-group" id="group-santiago" style="margin-top: 1rem; display: none;">
                         <label>Link Drive Santiago</label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="url" name="drive_santiago" id="input-drive-santiago" value="${act.drive_santiago}" placeholder="https://..." style="flex-grow: 1;">
+                            <input type="url" name="drive_santiago" id="input-drive-santiago" value="${escAttr(act.drive_santiago)}" placeholder="https://..." style="flex-grow: 1;">
                             <button type="button" id="btn-whatsapp-santiago" class="btn-primary" style="background: #25D366; border: none; padding: 0 0.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;" title="Compartir por WhatsApp">
                                 <i data-lucide="message-circle" style="width: 18px; height: 18px;"></i>
                             </button>
@@ -366,7 +377,7 @@ export function renderActivityForm(container, preData = null) {
                                     <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
                                 </button>
                             </div>
-                            <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_instagram}</textarea>
+                            <textarea name="copy_instagram" id="copy-ig" rows="4" style="font-size: 0.85rem; border-radius: 6px;">${escAttr(act.copy_instagram)}</textarea>
                         </div>
 
                         <div class="form-group" style="margin-top: 1.5rem;">
@@ -376,7 +387,7 @@ export function renderActivityForm(container, preData = null) {
                                     <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar
                                 </button>
                             </div>
-                            <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${act.copy_linkedin}</textarea>
+                            <textarea name="copy_linkedin" id="copy-li" rows="6" style="font-size: 0.85rem; border-radius: 6px;">${escAttr(act.copy_linkedin)}</textarea>
                         </div>
                     </div>
                 </section>
