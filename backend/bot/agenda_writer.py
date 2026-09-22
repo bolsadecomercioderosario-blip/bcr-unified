@@ -276,13 +276,18 @@ def _create_activity(role: str, draft: dict) -> None:
 # --- Confirmación (sí / no) -------------------------------------------------
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", (s or "").strip().lower())
-    return "".join(c for c in s if not unicodedata.combining(c))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9\s]", " ", s)   # saca puntuación (comas, etc.)
+    return " ".join(s.split())
 
 
-_YES = {"si", "s", "dale", "ok", "oka", "okay", "confirmo", "confirmar", "sip",
-        "sisi", "va", "listo", "perfecto", "de una", "correcto", "asi es"}
-_NO = {"no", "nop", "cancelar", "cancela", "cancelalo", "borrar", "descartar",
-       "nada", "negativo"}
+# Incluye los ids de los botones ("si"/"no") y sus TÍTULOS ("Sí, cargar" /
+# "No, descartar"), porque al tocar un botón WhatsApp puede mandar el título.
+_YES = {"si", "s", "si cargar", "cargar", "cargala", "dale", "ok", "oka", "okay",
+        "confirmo", "confirmar", "sip", "sisi", "va", "listo", "perfecto",
+        "de una", "correcto", "asi es"}
+_NO = {"no", "no descartar", "nop", "cancelar", "cancela", "cancelalo", "borrar",
+       "descartar", "nada", "negativo"}
 
 
 # --- Confirmación con botones (quick-reply Sí/No) ---------------------------
