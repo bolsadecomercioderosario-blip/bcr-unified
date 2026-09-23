@@ -64,6 +64,15 @@
         });
     };
 
+    const _CARD = 'background:#1e293b;padding:2rem 2.25rem;border-radius:0.75rem;'
+        + 'border:1px solid #334155;max-width:380px;width:90%;'
+        + 'box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);';
+    const _FIELD = 'width:100%;padding:0.7rem 0.85rem;border-radius:0.5rem;'
+        + 'border:1px solid #334155;background:#0f172a;color:#f1f5f9;'
+        + 'font-size:0.95rem;outline:none;margin-bottom:0.6rem;box-sizing:border-box;';
+    const _BTN = 'width:100%;padding:0.7rem;border:none;border-radius:0.5rem;'
+        + 'background:#4f46e5;color:white;font-weight:600;font-size:0.95rem;cursor:pointer;';
+
     // ---- Overlay de login -------------------------------------------------
     function buildOverlay() {
         const overlay = document.createElement('div');
@@ -73,25 +82,19 @@
             'display:flex;align-items:center;justify-content:center;' +
             'font-family:Inter,-apple-system,system-ui,sans-serif;color:#f1f5f9;';
         overlay.innerHTML = ''
-            + '<div style="background:#1e293b;padding:2rem 2.25rem;border-radius:0.75rem;'
-            +              'border:1px solid #334155;max-width:380px;width:90%;'
-            +              'box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">'
+            + '<div style="' + _CARD + '">'
             + '  <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">'
             + '    <span style="font-size:1.2rem;">🔒</span>'
             + '    <span style="font-weight:700;font-size:1.05rem;">Acceso protegido</span>'
             + '  </div>'
             + '  <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1.25rem;">'
-            + '    Ingresá la contraseña para usar las herramientas del equipo.'
+            + '    Ingresá con tu email y contraseña. (Las áreas entran solo con la contraseña del área.)'
             + '  </p>'
+            + '  <input id="bcr-auth-email" type="email" placeholder="Email"'
+            + '         autocomplete="username" style="' + _FIELD + '">'
             + '  <input id="bcr-auth-password" type="password" placeholder="Contraseña"'
-            + '         autocomplete="current-password" style="'
-            + '         width:100%;padding:0.7rem 0.85rem;border-radius:0.5rem;'
-            + '         border:1px solid #334155;background:#0f172a;color:#f1f5f9;'
-            + '         font-size:0.95rem;outline:none;margin-bottom:0.6rem;">'
-            + '  <button id="bcr-auth-submit" style="'
-            + '         width:100%;padding:0.7rem;border:none;border-radius:0.5rem;'
-            + '         background:#4f46e5;color:white;font-weight:600;font-size:0.95rem;'
-            + '         cursor:pointer;">Entrar</button>'
+            + '         autocomplete="current-password" style="' + _FIELD + '">'
+            + '  <button id="bcr-auth-submit" style="' + _BTN + '">Entrar</button>'
             + '  <p id="bcr-auth-error" style="color:#f87171;font-size:0.8rem;'
             + '         margin-top:0.85rem;display:none;text-align:center;"></p>'
             + '</div>';
@@ -104,6 +107,7 @@
         if (currentOverlay) return; // ya está visible
         currentOverlay = buildOverlay();
         document.body.appendChild(currentOverlay);
+        const emailInput = currentOverlay.querySelector('#bcr-auth-email');
         const input = currentOverlay.querySelector('#bcr-auth-password');
         const btn = currentOverlay.querySelector('#bcr-auth-submit');
         const err = currentOverlay.querySelector('#bcr-auth-error');
@@ -111,30 +115,36 @@
             err.textContent = message;
             err.style.display = 'block';
         }
-        setTimeout(function () { input.focus(); }, 50);
+        setTimeout(function () { emailInput.focus(); }, 50);
 
         async function tryLogin() {
             err.style.display = 'none';
             btn.disabled = true;
             btn.textContent = 'Verificando…';
             try {
+                const email = (emailInput.value || '').trim();
+                // Con email → login por usuario; sin email → login compartido/área.
+                const body = email
+                    ? { email: email, password: input.value }
+                    : { password: input.value };
                 const res = await ORIG_FETCH('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: input.value }),
+                    body: JSON.stringify(body),
                 });
                 if (!res.ok) {
                     const data = await res.json().catch(function () { return {}; });
-                    throw new Error(data.detail || 'Contraseña incorrecta');
+                    throw new Error(data.detail || 'Datos incorrectos');
                 }
                 const data = await res.json();
                 setToken(data.token);
                 setRole(data.role);
-                if (currentOverlay && currentOverlay.parentNode) {
-                    currentOverlay.parentNode.removeChild(currentOverlay);
+                if (data.must_change_password) {
+                    // Primer ingreso: cambiar la contraseña temporal antes de entrar.
+                    showChangePassword();
+                    return;
                 }
-                currentOverlay = null;
-                // Recargar para que cualquier llamada que falló previamente vuelva a correr
+                removeOverlay();
                 window.location.reload();
             } catch (e) {
                 err.textContent = e.message || 'Error';
@@ -147,9 +157,81 @@
         }
 
         btn.addEventListener('click', tryLogin);
-        input.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') tryLogin();
-        });
+        function onEnter(e) { if (e.key === 'Enter') tryLogin(); }
+        emailInput.addEventListener('keydown', onEnter);
+        input.addEventListener('keydown', onEnter);
+    }
+
+    function removeOverlay() {
+        if (currentOverlay && currentOverlay.parentNode) {
+            currentOverlay.parentNode.removeChild(currentOverlay);
+        }
+        currentOverlay = null;
+    }
+
+    // ---- Cambio de contraseña (primer ingreso) ---------------------------
+    function showChangePassword() {
+        removeOverlay();
+        currentOverlay = document.createElement('div');
+        currentOverlay.id = 'bcr-auth-overlay';
+        currentOverlay.style.cssText =
+            'position:fixed;inset:0;background:#0f172a;z-index:100000;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-family:Inter,-apple-system,system-ui,sans-serif;color:#f1f5f9;';
+        currentOverlay.innerHTML = ''
+            + '<div style="' + _CARD + '">'
+            + '  <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">'
+            + '    <span style="font-size:1.2rem;">🔑</span>'
+            + '    <span style="font-weight:700;font-size:1.05rem;">Elegí tu contraseña</span>'
+            + '  </div>'
+            + '  <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1.25rem;">'
+            + '    Es tu primer ingreso. Definí una contraseña propia (mínimo 8 caracteres).'
+            + '  </p>'
+            + '  <input id="bcr-cp-new" type="password" placeholder="Nueva contraseña"'
+            + '         autocomplete="new-password" style="' + _FIELD + '">'
+            + '  <input id="bcr-cp-rep" type="password" placeholder="Repetí la contraseña"'
+            + '         autocomplete="new-password" style="' + _FIELD + '">'
+            + '  <button id="bcr-cp-submit" style="' + _BTN + '">Guardar y entrar</button>'
+            + '  <p id="bcr-cp-error" style="color:#f87171;font-size:0.8rem;'
+            + '         margin-top:0.85rem;display:none;text-align:center;"></p>'
+            + '</div>';
+        document.body.appendChild(currentOverlay);
+        const nw = currentOverlay.querySelector('#bcr-cp-new');
+        const rep = currentOverlay.querySelector('#bcr-cp-rep');
+        const btn = currentOverlay.querySelector('#bcr-cp-submit');
+        const err = currentOverlay.querySelector('#bcr-cp-error');
+        setTimeout(function () { nw.focus(); }, 50);
+
+        async function submit() {
+            err.style.display = 'none';
+            if ((nw.value || '').length < 8) {
+                err.textContent = 'Mínimo 8 caracteres.'; err.style.display = 'block'; return;
+            }
+            if (nw.value !== rep.value) {
+                err.textContent = 'Las contraseñas no coinciden.'; err.style.display = 'block'; return;
+            }
+            btn.disabled = true; btn.textContent = 'Guardando…';
+            try {
+                // fetch (parcheado) agrega el Bearer del token que ya guardamos.
+                const res = await window.fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_password: nw.value }),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(function () { return {}; });
+                    throw new Error(data.detail || 'No se pudo cambiar');
+                }
+                removeOverlay();
+                window.location.reload();
+            } catch (e) {
+                err.textContent = e.message || 'Error';
+                err.style.display = 'block';
+                btn.disabled = false; btn.textContent = 'Guardar y entrar';
+            }
+        }
+        btn.addEventListener('click', submit);
+        rep.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     }
 
     // ---- Inicial: si no hay token, mostrar overlay; si hay, validarlo ----

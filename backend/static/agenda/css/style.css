@@ -3,8 +3,14 @@
    (lo setea app.js). Cada elemento marcado con .only-<rol> aparece sólo para
    ese rol. v1: separación de UI por frontend.
    --------------------------------------------------------- */
-body[data-role="secretaria"] .only-comunicacion { display: none !important; }
-body[data-role="comunicacion"] .only-secretaria { display: none !important; }
+body[data-role="secretaria"] .only-comunicacion,
+body[data-role="secretaria"] .only-audiovisual { display: none !important; }
+body[data-role="comunicacion"] .only-secretaria,
+body[data-role="comunicacion"] .only-audiovisual { display: none !important; }
+/* Audiovisual (Santiago): sólo ve su pestaña Santi; nada del resto ni acciones. */
+body[data-role="audiovisual"] .only-comunicacion,
+body[data-role="audiovisual"] .only-secretaria { display: none !important; }
+body[data-role="audiovisual"] .top-bar-right { display: none !important; }
 
 :root {
     /* Colors */

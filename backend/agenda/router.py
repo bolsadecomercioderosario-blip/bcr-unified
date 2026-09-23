@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 import agenda_models
 from auth import (
     require_auth, get_role, area_of_role, is_area_role,
-    ROLE_COMUNICACION, ROLE_SECRETARIA,
+    ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL,
 )
 from common import require_external_integrations, require_google_drive
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
@@ -276,8 +276,9 @@ def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):
 # ---------------------------------------------------------
 def _visibility_filter(query, role: str):
     A = agenda_models.Activity
-    if role == ROLE_COMUNICACION:
-        # No-área (comunicación + secretaría) + área aprobada.
+    if role in (ROLE_COMUNICACION, ROLE_AUDIOVISUAL):
+        # Comunicación (y Audiovisual, que necesita ver las tareas AV): no-área
+        # (comunicación + secretaría) + área aprobada.
         return query.filter(or_(A.origen != "area", A.me_estado == "aprobada"))
     # secretaria y área ven Mesa + áreas (no lo interno de Comunicación).
     return query.filter(A.origen.in_(["secretaria", "area"]))
@@ -355,6 +356,10 @@ _SEC_AREA = {"sec_responsible", "sec_responsible_other", "sec_notes", "participa
 def _allowed_update_fields(db_activity, role: str) -> set:
     """Qué campos puede modificar `role` en esta actividad. origen/area nunca."""
     origen = db_activity.origen or "comunicacion"
+    if role == ROLE_AUDIOVISUAL:
+        # Editor AV (Santiago): SÓLO el link de video (drive_santiago), y sólo en
+        # actividades de Comunicación (sus tareas AV). Nada más.
+        return {"drive_santiago"} if origen == "comunicacion" else set()
     if role == ROLE_COMUNICACION:
         if origen == "comunicacion":
             return _GENERALS | _ATTACHMENT | _OPERATIVE | _NEWSLETTER

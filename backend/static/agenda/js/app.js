@@ -15,14 +15,18 @@ const ROLE = getRole();
 document.body.dataset.role = ROLE;
 
 // Vistas permitidas por rol. Secretaría → Agenda de Compromisos; Área → su
-// vista propia (Mi agenda + Agenda completa); Comunicación → la app completa.
+// vista propia (Mi agenda + Agenda completa); Audiovisual (Santiago) → SOLO su
+// pestaña de tareas AV; Comunicación → la app completa (sin la pestaña Santi,
+// que ahora es exclusiva del rol Audiovisual).
 const ALLOWED_VIEWS = ROLE === 'secretaria' ? ['compromisos']
     : ROLE === 'area' ? ['area']
-    : ['list', 'conectados', 'santi'];
+    : ROLE === 'audiovisual' ? ['santi']
+    : ['list', 'conectados'];
 
 // La vista inicial depende del rol.
 state.view = ROLE === 'secretaria' ? 'compromisos'
     : ROLE === 'area' ? 'area'
+    : ROLE === 'audiovisual' ? 'santi'
     : 'list';
 
 const viewContainer = document.getElementById('view-container');

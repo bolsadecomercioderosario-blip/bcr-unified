@@ -56,6 +56,14 @@ export function renderActivityForm(container, preData = null) {
     const isSec = role === 'secretaria';
     const isArea = role === 'area';
     const areaSlug = getAreaSlug();
+
+    // --- Rol Audiovisual (Santiago): vista mínima de solo lectura + único
+    // campo editable = el link de video (drive_santiago). El backend además
+    // sólo acepta ese campo para este rol, así que es doblemente seguro. ---
+    if (role === 'audiovisual') {
+        renderAudiovisualForm(container, act);
+        return;
+    }
     // Origen de la actividad. Para nuevas, lo define el rol que la crea.
     const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : isArea ? 'area' : 'comunicacion') : 'comunicacion');
     // Secretaría viendo una actividad de un ÁREA: solo lectura (el contenido lo
@@ -790,4 +798,71 @@ export function renderActivityForm(container, preData = null) {
             }
         };
     }
+}
+
+// --- Formulario mínimo para el rol Audiovisual (Santiago) -------------------
+// Ve la actividad en solo lectura y sólo puede editar el link de video
+// (drive_santiago). Se usa desde la pestaña "Santi".
+function renderAudiovisualForm(container, act) {
+    const row = (label, value) => value && String(value).trim() !== '' ? `
+        <div class="form-group" style="margin-top: 1rem;">
+            <label style="font-size: 0.8rem; color: var(--text-muted);">${label}</label>
+            <div style="font-size: 0.95rem; color: var(--text);">${escAttr(value)}</div>
+        </div>` : '';
+
+    const fecha = act.end_date && act.end_date > act.date
+        ? `${act.date} → ${act.end_date}` : act.date;
+    const hora = act.time;
+
+    container.innerHTML = `
+        <div class="sheet-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-weight: 700;">Tarea de video</h2>
+            <button onclick="window.closeActivitySheet()" style="background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="sheet-body" style="flex-grow: 1; overflow-y: auto; padding: 1.5rem;">
+            <form id="form-av" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <div class="form-group">
+                    <label style="font-size: 0.8rem; color: var(--text-muted);">Título</label>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: var(--text);">${escAttr(act.title) || '(sin título)'}</div>
+                </div>
+                ${row('Fecha', fecha)}
+                ${row('Hora', hora)}
+                ${row('Lugar', act.location)}
+                ${row('Descripción', act.description)}
+
+                <div class="form-group" style="margin-top: 1.5rem; background: #f8fafc; padding: 1.25rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
+                    <label style="font-weight: 700; color: var(--primary);">Link del video (Drive)</label>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.25rem 0 0.6rem;">Es lo único que podés editar. Al guardar, queda cargado en la actividad.</p>
+                    <input type="url" name="drive_santiago" value="${escAttr(act.drive_santiago)}" placeholder="https://drive.google.com/..." style="width: 100%;">
+                </div>
+            </form>
+        </div>
+
+        <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
+            <button id="btn-save-av" class="btn-primary">Guardar link</button>
+            <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cerrar</button>
+        </div>
+    `;
+
+    if (window.lucide) window.lucide.createIcons();
+
+    const form = container.querySelector('#form-av');
+    const btnSave = container.querySelector('#btn-save-av');
+    if (btnSave) btnSave.onclick = async () => {
+        if (!act.id) { window.closeActivitySheet(); return; }
+        const originalText = btnSave.innerText;
+        btnSave.disabled = true;
+        btnSave.innerText = 'Guardando...';
+        try {
+            await updateActivity(act.id, { drive_santiago: form.drive_santiago.value });
+            window.closeActivitySheet();
+        } catch (error) {
+            alert('Error al guardar: ' + error.message);
+            btnSave.disabled = false;
+            btnSave.innerText = originalText;
+        }
+    };
 }
