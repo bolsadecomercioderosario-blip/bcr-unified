@@ -207,7 +207,7 @@ def ensure_menu_content_sid(db: Session, force: bool = False) -> str:
     return sid
 
 
-def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None:
+def _process_message(from_phone: str, body: str, ev: dict | None = None, ack: bool = True) -> None:
     """Corre el agente y manda la respuesta por REST. Va en SEGUNDO PLANO
     (BackgroundTask) para no colgar el webhook de Twilio, que corta a los ~15s
     — el ciclo de herramientas (varias llamadas a OpenAI + DB) puede pasarse de
@@ -257,6 +257,15 @@ def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None
 
         exchange = db_models.BotExchange(from_phone=from_phone, message=body, reply="")
         db.add(exchange)
+
+        # Acuse inmediato: el agente puede tardar (IA + varias herramientas). Un
+        # "dame un segundo" evita el silencio incómodo mientras piensa. Si el
+        # acuse falla, seguimos igual (no debe frenar la respuesta real).
+        if ack:
+            try:
+                twilio_client.send_whatsapp(from_phone, "Dame un momento que lo reviso… 🔎")
+            except Exception:  # noqa: BLE001
+                pass
 
         try:
             result = agent.run_agent(
@@ -310,6 +319,11 @@ def _process_message(from_phone: str, body: str, ev: dict | None = None) -> None
 def _process_audio_read(from_phone: str, media_url: str, media_type: str, ev: dict) -> None:
     """Transcribe un audio de un miembro de la ME y lo procesa como una consulta
     de texto normal (menú / agenda / precios / agente)."""
+    # Acuse inmediato: transcribir + responder puede tardar unos segundos.
+    try:
+        twilio_client.send_whatsapp(from_phone, "Dame un momento, escucho tu audio… 🎧")
+    except Exception:  # noqa: BLE001
+        pass
     try:
         text = agenda_writer.transcribe(media_url, media_type)
     except Exception as exc:  # noqa: BLE001
@@ -324,7 +338,8 @@ def _process_audio_read(from_phone: str, media_url: str, media_type: str, ev: di
         ev["outcome"] = "audio_vacio"
         return
     ev["transcripcion_len"] = len(text)
-    _process_message(from_phone, text, ev)
+    # Ya mandamos el acuse arriba (por el audio); no duplicar el del agente.
+    _process_message(from_phone, text, ev, ack=False)
 
 
 @router.post("/twilio-webhook", include_in_schema=False)
@@ -730,48 +745,6 @@ def coyuntura_editar(
 
     ok = coyuntura_auto.editar_borrador(db, payload.tema, payload.contenido)
     return {"status": "ok" if ok else "error", "tema": payload.tema}
-
-
-@router.post(
-    "/admin/scrape-capacita",
-    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
-)
-def trigger_scrape_capacita(
-    fetch_details: bool = True,
-    max_detail_fetches: int = 60,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Dispara manualmente el scraper del catálogo de BCR Capacita. Útil
-    para llenar la tabla la primera vez sin esperar el cron del lunes."""
-    from bot.scraper_capacita import scrape_capacita
-
-    return scrape_capacita(db, fetch_details=fetch_details, max_detail_fetches=max_detail_fetches)
-
-
-@router.post(
-    "/admin/scrape-innova-novedades",
-    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
-)
-def trigger_scrape_innova_novedades(
-    max_upload: int = 15,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Dispara manualmente el scraper de novedades de BCR Innova. Útil
-    para backfill inicial."""
-    from bot.scraper_innova_novedades import scrape_innova_novedades
-
-    return scrape_innova_novedades(db, max_upload_per_run=max_upload)
-
-
-@router.post(
-    "/admin/scrape-startups-innova",
-    dependencies=[Depends(require_roles(ROLE_COMUNICACION))],
-)
-def trigger_scrape_startups_innova(db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Dispara manualmente el scraper del Startup Network."""
-    from bot.scraper_startups import scrape_startups_innova
-
-    return scrape_startups_innova(db)
 
 
 @router.get(

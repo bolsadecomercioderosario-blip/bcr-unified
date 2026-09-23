@@ -181,58 +181,6 @@ def _run_scrape_gea_noticias() -> None:
         db.close()
 
 
-def _run_scrape_capacita() -> None:
-    """Wrapper para el job semanal del catálogo de BCR Capacita."""
-    from bot.scraper_capacita import scrape_capacita
-
-    db = SessionLocal()
-    try:
-        result = scrape_capacita(db)
-        print(f"[bot.scheduler] scrape_capacita → status={result.get('status')} "
-              f"upserted={result.get('upserted', 0)} "
-              f"detail_failed={len(result.get('detail_failed', []))}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[bot.scheduler] scrape_capacita falló: "
-              f"{type(exc).__name__}: {exc}")
-    finally:
-        db.close()
-
-
-def _run_scrape_innova_novedades() -> None:
-    """Wrapper para el job semanal de novedades de BCR Innova."""
-    from bot.scraper_innova_novedades import scrape_innova_novedades
-
-    db = SessionLocal()
-    try:
-        result = scrape_innova_novedades(db)
-        print(f"[bot.scheduler] scrape_innova_novedades → "
-              f"new_found={result.get('new_found', 0)} "
-              f"uploaded={len(result.get('uploaded', []))} "
-              f"failed={len(result.get('failed', []))}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[bot.scheduler] scrape_innova_novedades falló: "
-              f"{type(exc).__name__}: {exc}")
-    finally:
-        db.close()
-
-
-def _run_scrape_startups_innova() -> None:
-    """Wrapper para el job semanal del Startup Network."""
-    from bot.scraper_startups import scrape_startups_innova
-
-    db = SessionLocal()
-    try:
-        result = scrape_startups_innova(db)
-        print(f"[bot.scheduler] scrape_startups_innova → status={result.get('status')} "
-              f"upserted={result.get('upserted', 0)} "
-              f"sectors={result.get('sectors_seen', {})}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[bot.scheduler] scrape_startups_innova falló: "
-              f"{type(exc).__name__}: {exc}")
-    finally:
-        db.close()
-
-
 def _run_coyuntura_auto() -> None:
     """Wrapper del job cada 72 hs: genera borradores de coyuntura (búsqueda web).
     NO publica nada — deja borradores pendientes de aprobación humana."""
