@@ -102,6 +102,22 @@
                     </table>
                 </div>
             </div>
+
+            <div class="card">
+                <h2>Auditoría de actividades</h2>
+                <p class="note" style="margin:-0.5rem 0 1rem;">Interno: quién creó y quién editó por última vez cada actividad. No se ve en la app. Sólo queda registro desde que se activó (lo cargado antes no tiene autor).</p>
+                <div class="form-row">
+                    <div class="fg" style="flex:2; min-width:220px;">
+                        <label>Buscar por título</label>
+                        <input id="au-q" type="text" placeholder="Parte del título de la actividad…">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; color:var(--muted); padding-bottom:0.55rem;">
+                        <input id="au-arch" type="checkbox" checked> incluir archivadas
+                    </label>
+                    <button id="au-btn" class="primary" style="padding:0.6rem 1rem;">Buscar</button>
+                </div>
+                <div id="au-results" style="margin-top:1rem;"></div>
+            </div>
         </div>
 
         <div id="loading" class="center">Cargando…</div>
@@ -286,6 +302,56 @@
         }
 
         $('nu-btn').onclick = createUser;
+
+        // ---- Auditoría de actividades -----------------------------------
+        function origenLabel(a) {
+            if (a.origen === 'comunicacion') return 'Comunicación';
+            if (a.origen === 'secretaria') return 'Secretaría';
+            if (a.origen === 'area') return 'Área' + (a.area ? ' · ' + esc(a.area) : '');
+            return esc(a.origen || '');
+        }
+        function fmtWhen(iso) {
+            if (!iso) return '';
+            // "2026-09-23T16:30:22" -> "2026-09-23 16:30"
+            return esc(iso.replace('T', ' ').slice(0, 16));
+        }
+        async function searchAudit() {
+            const q = $('au-q').value.trim();
+            const arch = $('au-arch').checked;
+            const box = $('au-results');
+            $('au-btn').disabled = true;
+            box.innerHTML = '<p class="note">Buscando…</p>';
+            try {
+                const url = '/api/admin/activities/audit?limit=100&include_archived='
+                    + (arch ? 'true' : 'false') + (q ? '&q=' + encodeURIComponent(q) : '');
+                const data = await api(url);
+                const rows = data.activities || [];
+                if (!rows.length) { box.innerHTML = '<p class="note">Sin resultados.</p>'; return; }
+                box.innerHTML = `<div style="overflow-x:auto;"><table>
+                    <thead><tr>
+                        <th>Actividad</th><th>Origen</th>
+                        <th>Creada por</th><th>Última edición</th>
+                    </tr></thead>
+                    <tbody>${rows.map(a => `
+                        <tr>
+                            <td>
+                                <div style="font-weight:600;">${esc(a.title || '(sin título)')}${a.archived ? ' <span class="badge off">archivada</span>' : ''}</div>
+                                <div class="note">${esc(a.date || '')}</div>
+                            </td>
+                            <td class="note">${origenLabel(a)}</td>
+                            <td class="note">${esc(a.created_by || '—')}</td>
+                            <td class="note">${esc(a.updated_by || '—')}${a.updated_at ? '<br><span style="opacity:0.7;">' + fmtWhen(a.updated_at) + '</span>' : ''}</td>
+                        </tr>`).join('')}
+                    </tbody></table></div>`;
+            } catch (e) {
+                box.innerHTML = '';
+                showMsg(e.message, 'err');
+            } finally {
+                $('au-btn').disabled = false;
+            }
+        }
+        $('au-btn').onclick = searchAudit;
+        $('au-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') searchAudit(); });
 
         // Esperamos a que auth.js tenga (o pida) el token. Si no hay token, su
         // overlay se encarga; reintentamos la carga cuando el usuario ingresa.
