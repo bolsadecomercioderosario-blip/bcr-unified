@@ -814,9 +814,46 @@ function renderAudiovisualForm(container, act) {
         ? `${act.date} → ${act.end_date}` : act.date;
     const hora = act.time;
 
+    // ¿Esta actividad requiere una tarea de video? (misma lógica que la pestaña
+    // Santi: IG Story en Video —no Layout— o YouTube). Sólo en ese caso Santi
+    // edita el link; si no, la ve en solo lectura.
+    const channels = act.channels || [];
+    const needsVideo = (channels.includes('Instagram Story') && act.story_type !== 'Layout')
+        || channels.includes('YouTube');
+
+    // Link Drive Cobertura BCR (material de cobertura): solo lectura para Santi.
+    const driveBcrBlock = act.drive_bcr ? `
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label style="font-size: 0.8rem; color: var(--text-muted);">Link Drive Cobertura BCR</label>
+                    <div><a href="${escAttr(act.drive_bcr)}" target="_blank" rel="noopener" style="color: var(--primary); font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;"><i data-lucide="folder" style="width: 15px; height: 15px;"></i> Abrir carpeta de cobertura</a></div>
+                </div>` : '';
+
+    // Copy Instagram: solo lectura, con botón para copiarlo.
+    const copyIgBlock = act.copy_instagram ? `
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Copy Instagram</label>
+                        <button type="button" id="btn-copy-ig-av" style="width: auto; padding: 0.3rem 0.6rem; font-size: 0.75rem; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"><i data-lucide="copy" style="width: 13px; height: 13px;"></i> Copiar</button>
+                    </div>
+                    <textarea readonly rows="5" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.85rem; line-height: 1.5; font-family: inherit; resize: vertical; background: #f8fafc;">${escAttr(act.copy_instagram)}</textarea>
+                </div>` : '';
+
+    // Bloque del link de video: editable si requiere video; si no, sólo se
+    // muestra el link cargado (si hay) y una aclaración.
+    const videoBlock = needsVideo ? `
+                <div class="form-group" style="margin-top: 1.5rem; background: #eef2ff; padding: 1.25rem; border-radius: 0.5rem; border: 1px solid #c7d2fe;">
+                    <label style="font-weight: 700; color: var(--primary);">Link del video (Drive)</label>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.25rem 0 0.6rem;">Esta actividad requiere video. Cargá el link acá; es lo único que podés editar.</p>
+                    <input type="url" name="drive_santiago" value="${escAttr(act.drive_santiago)}" placeholder="https://drive.google.com/..." style="width: 100%;">
+                </div>` : `
+                <div class="form-group" style="margin-top: 1.5rem; background: #f8fafc; padding: 1rem 1.25rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Esta actividad no requiere video.</p>
+                    ${act.drive_santiago ? `<div style="margin-top: 0.5rem;"><a href="${escAttr(act.drive_santiago)}" target="_blank" rel="noopener" style="color: var(--primary); font-size: 0.9rem;">Ver video cargado</a></div>` : ''}
+                </div>`;
+
     container.innerHTML = `
         <div class="sheet-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="font-weight: 700;">Tarea de video</h2>
+            <h2 style="font-weight: 700;">${needsVideo ? 'Tarea de video' : 'Actividad'}</h2>
             <button onclick="window.closeActivitySheet()" style="background: none; border: none; cursor: pointer; color: var(--text-muted);">
                 <i data-lucide="x"></i>
             </button>
@@ -832,22 +869,28 @@ function renderAudiovisualForm(container, act) {
                 ${row('Hora', hora)}
                 ${row('Lugar', act.location)}
                 ${row('Descripción', act.description)}
-
-                <div class="form-group" style="margin-top: 1.5rem; background: #f8fafc; padding: 1.25rem; border-radius: 0.5rem; border: 1px dashed var(--border);">
-                    <label style="font-weight: 700; color: var(--primary);">Link del video (Drive)</label>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.25rem 0 0.6rem;">Es lo único que podés editar. Al guardar, queda cargado en la actividad.</p>
-                    <input type="url" name="drive_santiago" value="${escAttr(act.drive_santiago)}" placeholder="https://drive.google.com/..." style="width: 100%;">
-                </div>
+                ${driveBcrBlock}
+                ${videoBlock}
+                ${copyIgBlock}
             </form>
         </div>
 
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
-            <button id="btn-save-av" class="btn-primary">Guardar link</button>
+            ${needsVideo ? '<button id="btn-save-av" class="btn-primary">Guardar link</button>' : ''}
             <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cerrar</button>
         </div>
     `;
 
     if (window.lucide) window.lucide.createIcons();
+
+    // Copiar el Copy de Instagram al portapapeles.
+    const btnCopyIg = container.querySelector('#btn-copy-ig-av');
+    if (btnCopyIg) btnCopyIg.onclick = () => {
+        navigator.clipboard.writeText(act.copy_instagram || '');
+        const orig = btnCopyIg.innerHTML;
+        btnCopyIg.innerHTML = 'Copiado ✓';
+        setTimeout(() => { btnCopyIg.innerHTML = orig; if (window.lucide) window.lucide.createIcons(); }, 1500);
+    };
 
     const form = container.querySelector('#form-av');
     const btnSave = container.querySelector('#btn-save-av');
