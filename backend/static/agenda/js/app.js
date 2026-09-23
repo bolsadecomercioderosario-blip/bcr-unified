@@ -1,4 +1,4 @@
-import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities, loadEfemerides, loadNewsletterSettings } from './state.js';
+import { state, subscribe, setView, setCurrentActivity, setSearchQuery, toggleShowPast, loadActivities, loadActivitiesStamp, loadEfemerides, loadNewsletterSettings } from './state.js';
 import { renderList } from './components/List.js';
 import { renderConectados } from './components/Conectados.js';
 import { renderSanti } from './components/Santi.js';
@@ -298,10 +298,27 @@ function isUserEditing() {
     return false;
 }
 
-function pollIfSafe() {
+// Huella de la última recarga de actividades: sólo traemos la lista completa
+// cuando cambió (menos tráfico y menos re-renders con varios usuarios).
+let _lastActivitiesStamp = null;
+
+function _activitiesChanged(stamp) {
+    if (!stamp) return false;  // no se pudo leer la huella: no forzamos recarga
+    const key = `${stamp.count}|${stamp.latest}`;
+    if (_lastActivitiesStamp === key) return false;
+    _lastActivitiesStamp = key;
+    return true;
+}
+
+async function pollIfSafe() {
     if (document.hidden) return;
     if (isUserEditing()) return;
-    loadActivities({ silent: true });
+    // Actividades: consultamos la huella barata y sólo recargamos si cambió.
+    const stamp = await loadActivitiesStamp();
+    if (_activitiesChanged(stamp)) {
+        loadActivities({ silent: true });
+    }
+    // Efemérides y settings cambian poco: se refrescan con su diff silencioso.
     loadEfemerides({ silent: true });
     loadNewsletterSettings({ silent: true });
 }

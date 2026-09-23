@@ -91,6 +91,10 @@ def migrate():
         "ALTER add archived_at",
         "ALTER TABLE activities ADD COLUMN archived_at VARCHAR DEFAULT ''",
     )
+    _try_exec(
+        "ALTER add updated_at",
+        "ALTER TABLE activities ADD COLUMN updated_at VARCHAR DEFAULT ''",
+    )
 
     # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
     # Idempotente: sólo toca filas que todavía no tengan block_type seteado.

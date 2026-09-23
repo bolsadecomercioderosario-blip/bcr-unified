@@ -3,6 +3,7 @@ Módulo Agenda: CRUD de actividades + generación de copy IA + integración
 con Drive (carpetas y OAuth) + webhook Santiago + CRUD de Efemérides.
 """
 import os
+import re
 import shutil
 import uuid
 from datetime import datetime
@@ -16,7 +17,7 @@ import cloudinary.uploader
 import openai
 import requests
 from google_auth_oauthlib.flow import Flow
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 import agenda_models
@@ -292,6 +293,20 @@ def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_d
     return _visibility_filter(q, role).offset(skip).limit(limit).all()
 
 
+@router.get("/actividades/stamp")
+def actividades_stamp(db: Session = Depends(get_db)):
+    """Huella barata de la tabla de actividades: cantidad total + el último
+    updated_at. El cliente la consulta en el polling (mucho más liviano que traer
+    toda la lista) y sólo recarga la lista completa si esta huella cambió.
+    Es global (no por rol): un cambio ajeno puede disparar una recarga de más,
+    pero nunca omite un cambio propio."""
+    count, latest = db.query(
+        func.count(agenda_models.Activity.id),
+        func.max(agenda_models.Activity.updated_at),
+    ).one()
+    return {"count": int(count or 0), "latest": latest or ""}
+
+
 @router.get("/actividades/archivadas", response_model=List[agenda_models.ActivityOut])
 def read_archived_activities(db: Session = Depends(get_db), role: str = Depends(get_role)):
     """Listado de actividades archivadas (soft-deleted), para la vista Archivados."""
@@ -359,10 +374,53 @@ def _allowed_update_fields(db_activity, role: str) -> set:
     return set()
 
 
+# --- Validación de fecha/hora y timestamp de cambios --------------------------
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_TIME_SPECIALS = {"", "A definir", "Sin horario"}
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def _is_real_date(s: str) -> bool:
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def _validate_datetime_fields(data: dict) -> None:
+    """Valida SÓLO las claves de fecha/hora presentes en `data`. La fecha (date)
+    debe ser YYYY-MM-DD real; end_date igual pero puede ir vacía; time/end_time
+    deben ser HH:MM o un valor especial ('A definir'/'Sin horario') o vacío.
+    Levanta 400 si algo no cumple (evita guardar basura que rompa el orden)."""
+    if "date" in data:
+        v = (data["date"] or "").strip()
+        if not _DATE_RE.match(v) or not _is_real_date(v):
+            raise HTTPException(status_code=400, detail="La fecha debe tener formato YYYY-MM-DD válido.")
+    if "end_date" in data:
+        v = (data["end_date"] or "").strip()
+        if v and (not _DATE_RE.match(v) or not _is_real_date(v)):
+            raise HTTPException(status_code=400, detail="La fecha de fin debe tener formato YYYY-MM-DD válido.")
+    for k in ("time", "end_time"):
+        if k in data:
+            v = (data[k] or "").strip()
+            if v not in _TIME_SPECIALS and not _TIME_RE.match(v):
+                raise HTTPException(status_code=400, detail="La hora debe tener formato HH:MM (o 'A definir' / 'Sin horario').")
+
+
 @router.post("/actividades", response_model=agenda_models.ActivityOut)
 def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks,
                     db: Session = Depends(get_db), role: str = Depends(get_role)):
     data = activity.model_dump()
+    _validate_datetime_fields(data)
+    # El ID lo genera el SERVIDOR (UUID): no se confía en el que manda el cliente
+    # (evita colisiones/spoofing). El front reconcilia por el id que devolvemos.
+    data["id"] = uuid.uuid4().hex
+    data["updated_at"] = _now_iso()
     # El origen/dueño lo fija el rol (no se confía en lo que manda el cliente).
     if role == ROLE_COMUNICACION:
         data["origen"] = "comunicacion"; data["area"] = ""; data["me_estado"] = ""
@@ -407,9 +465,12 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
                 raise HTTPException(status_code=400, detail="Estado de Mesa inválido")
             update_data["me_estado"] = update_data["me_estado"] or ""
 
+    _validate_datetime_fields(update_data)
+
     for key, value in update_data.items():
         setattr(db_activity, key, value)
 
+    db_activity.updated_at = _now_iso()
     db.commit()
     db.refresh(db_activity)
     return db_activity
@@ -503,6 +564,7 @@ def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends
 
     db_activity.archived = True
     db_activity.archived_at = datetime.utcnow().isoformat()
+    db_activity.updated_at = _now_iso()
     db.commit()
     return {"ok": True}
 
@@ -524,6 +586,7 @@ def restore_activity(activity_id: str, db: Session = Depends(get_db), role: str 
 
     db_activity.archived = False
     db_activity.archived_at = ""
+    db_activity.updated_at = _now_iso()
     db.commit()
     db.refresh(db_activity)
     return db_activity

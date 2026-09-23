@@ -71,6 +71,18 @@ export async function loadActivities({ silent = false } = {}) {
     }
 }
 
+// Huella barata de la tabla de actividades (cantidad + último updated_at). El
+// polling la consulta primero y sólo recarga la lista completa si cambió.
+export async function loadActivitiesStamp() {
+    try {
+        const response = await fetch('/api/agenda/actividades/stamp');
+        if (!response.ok) return null;
+        return await response.json();  // { count, latest }
+    } catch (error) {
+        return null;  // sin conexión: no forzamos recarga
+    }
+}
+
 // Cargar efemérides desde el servidor (misma lógica de silent / diff)
 export async function loadEfemerides({ silent = false } = {}) {
     try {

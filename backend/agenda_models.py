@@ -89,6 +89,11 @@ class Activity(Base):
     archived = Column(Boolean, default=False)
     archived_at = Column(String, default="")
 
+    # Timestamp ISO UTC del último cambio (alta/edición/archivado/restore). Lo usa
+    # el endpoint /actividades/stamp para que el cliente sólo recargue la lista
+    # cuando algo cambió (en vez de traerla entera cada 20s).
+    updated_at = Column(String, default="")
+
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
     id: str
