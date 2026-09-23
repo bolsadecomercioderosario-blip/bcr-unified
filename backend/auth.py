@@ -107,8 +107,20 @@ def is_area_role(role: Optional[str]) -> bool:
     return area_of_role(role) in AREA_SLUGS
 
 
-# Lista completa de roles válidos (para derivar/validar tokens).
-ALL_ROLES = [ROLE_COMUNICACION, ROLE_SECRETARIA] + [role_area(s) for s in AREA_SLUGS]
+# --- Fase 4: baja de las claves COMPARTIDAS de Comunicación y Secretaría -----
+# Esas dos áreas migraron a login por usuario (email + contraseña individual).
+# Por defecto su clave compartida queda DESHABILITADA: no se emite su token ni se
+# aceptan los tokens viejos que la gente tenga guardada → en el próximo request
+# reciben 401 y el overlay los obliga a reloguear con su email. Las ÁREAS internas
+# (DIyEE, Innova, etc.) NO se tocan: siguen con su login compartido.
+# Escape hatch: SHARED_COMS_LOGIN=1 en Render reactiva el login compartido de
+# Comunicación/Secretaría (acceso de emergencia sin usuario individual).
+_SHARED_COMS_ENABLED = os.environ.get("SHARED_COMS_LOGIN", "").strip().lower() in ("1", "true", "yes", "on")
+
+# Lista completa de roles válidos (para derivar/validar tokens). Comunicación y
+# Secretaría sólo entran si su login compartido sigue habilitado (ver arriba).
+ALL_ROLES = ([ROLE_COMUNICACION, ROLE_SECRETARIA] if _SHARED_COMS_ENABLED else []) \
+    + [role_area(s) for s in AREA_SLUGS]
 
 
 # --- Secreto base y tokens por rol ------------------------------------------
@@ -146,10 +158,13 @@ def role_for_password(password: Optional[str]) -> Optional[str]:
     if not password:
         return None
     matched: Optional[str] = None
-    if secrets.compare_digest(password, PASSWORD_SECGRAL):
-        matched = ROLE_SECRETARIA
-    if secrets.compare_digest(password, PASSWORD_AGENDA):
-        matched = matched or ROLE_COMUNICACION
+    # Comunicación/Secretaría: sólo si su login compartido sigue habilitado
+    # (por defecto migraron a login por usuario — ver _SHARED_COMS_ENABLED).
+    if _SHARED_COMS_ENABLED:
+        if secrets.compare_digest(password, PASSWORD_SECGRAL):
+            matched = ROLE_SECRETARIA
+        if secrets.compare_digest(password, PASSWORD_AGENDA):
+            matched = matched or ROLE_COMUNICACION
     for slug in AREA_SLUGS:
         if secrets.compare_digest(password, _area_password(slug)):
             matched = matched or role_area(slug)
