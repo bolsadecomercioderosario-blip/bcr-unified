@@ -10,10 +10,12 @@ Las ÁREAS internas no se administran acá: siguen con su clave compartida
 (env AREA_<SLUG>_PASSWORD). Ver auth.py.
 """
 import re
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+import agenda_models
 import user_models
 from auth import (Actor, USER_ROLES, generate_temp_password, hash_password,
                   require_admin, revoke_user_sessions)
@@ -120,3 +122,47 @@ async def set_role(user_id: int, payload: dict, _: Actor = Depends(require_admin
     # al reloguear. (El backend ya lee el rol vivo de la DB en cada request.)
     revoke_user_sessions(db, u.id)
     return {"user": _dto(u)}
+
+
+# ---------------------------------------------------------------------------
+# Auditoría de actividades (interna, sólo-admin). NO se muestra en la app; sirve
+# para responder consultas puntuales de "quién creó / editó tal actividad".
+# ---------------------------------------------------------------------------
+def _audit_dto(a: agenda_models.Activity) -> dict:
+    return {
+        "id": a.id,
+        "title": a.title,
+        "date": a.date,
+        "origen": a.origen,
+        "area": a.area or "",
+        "archived": bool(a.archived),
+        "created_by": a.created_by or "",
+        "updated_by": a.updated_by or "",
+        "updated_at": a.updated_at or "",
+    }
+
+
+@router.get("/activities/audit")
+async def activities_audit(q: Optional[str] = None, include_archived: bool = True,
+                           limit: int = 50, _: Actor = Depends(require_admin),
+                           db: Session = Depends(get_db)):
+    """Lista de actividades con su auditoría (created_by / updated_by), ordenada
+    por último cambio. `q` filtra por texto en el título. Sólo admin."""
+    query = db.query(agenda_models.Activity)
+    if not include_archived:
+        query = query.filter(agenda_models.Activity.archived.is_(False))
+    if q:
+        query = query.filter(agenda_models.Activity.title.ilike(f"%{q}%"))
+    limit = max(1, min(limit, 200))
+    rows = query.order_by(agenda_models.Activity.updated_at.desc()).limit(limit).all()
+    return {"activities": [_audit_dto(a) for a in rows]}
+
+
+@router.get("/activities/{activity_id}/audit")
+async def activity_audit(activity_id: str, _: Actor = Depends(require_admin),
+                         db: Session = Depends(get_db)):
+    a = db.query(agenda_models.Activity).filter(
+        agenda_models.Activity.id == activity_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    return _audit_dto(a)

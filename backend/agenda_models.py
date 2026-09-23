@@ -94,6 +94,14 @@ class Activity(Base):
     # cuando algo cambió (en vez de traerla entera cada 20s).
     updated_at = Column(String, default="")
 
+    # --- Auditoría interna (NO se expone en la app) ---------------------------
+    # Quién creó y quién modificó por última vez la actividad. Guardamos el email
+    # del usuario (login individual) o el rol (ej. "area:diyee") si no hay usuario.
+    # A propósito NO están en ActivityBase/ActivityOut: el frontend nunca los
+    # recibe. Sólo se consultan por un endpoint sólo-admin cuando hace falta.
+    created_by = Column(String, default="")
+    updated_by = Column(String, default="")
+
 # Pydantic Models (API Validation)
 class ActivityBase(BaseModel):
     id: str

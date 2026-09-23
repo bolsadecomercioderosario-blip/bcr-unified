@@ -95,6 +95,15 @@ def migrate():
         "ALTER add updated_at",
         "ALTER TABLE activities ADD COLUMN updated_at VARCHAR DEFAULT ''",
     )
+    # Auditoría interna (no expuesta en la app): quién creó / editó cada actividad.
+    _try_exec(
+        "ALTER add created_by",
+        "ALTER TABLE activities ADD COLUMN created_by VARCHAR DEFAULT ''",
+    )
+    _try_exec(
+        "ALTER add updated_by",
+        "ALTER TABLE activities ADD COLUMN updated_by VARCHAR DEFAULT ''",
+    )
 
     # --- Backfill de block_type desde el viejo flag observations='FIXED_BLOCK' ---
     # Idempotente: sólo toca filas que todavía no tengan block_type seteado.

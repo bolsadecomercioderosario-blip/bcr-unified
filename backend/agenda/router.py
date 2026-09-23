@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 import agenda_models
 from auth import (
-    require_auth, get_role, area_of_role, is_area_role,
+    require_auth, get_role, get_actor, Actor, area_of_role, is_area_role,
     ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL,
 )
 from common import require_external_integrations, require_google_drive
@@ -389,6 +389,13 @@ def _now_iso() -> str:
     return datetime.utcnow().isoformat()
 
 
+def _actor_label(actor: Actor) -> str:
+    """Etiqueta de auditoría de quién hace el cambio: email del usuario (login
+    individual) o, si no hay usuario, el rol crudo (ej. 'area:diyee'). Sólo se
+    guarda en la DB; nunca se expone en la app."""
+    return (actor.email or actor.role or "") if actor else ""
+
+
 def _is_real_date(s: str) -> bool:
     try:
         datetime.strptime(s, "%Y-%m-%d")
@@ -419,13 +426,17 @@ def _validate_datetime_fields(data: dict) -> None:
 
 @router.post("/actividades", response_model=agenda_models.ActivityOut)
 def create_activity(activity: agenda_models.ActivityCreate, background_tasks: BackgroundTasks,
-                    db: Session = Depends(get_db), role: str = Depends(get_role)):
+                    db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
+    role = actor.role
     data = activity.model_dump()
     _validate_datetime_fields(data)
     # El ID lo genera el SERVIDOR (UUID): no se confía en el que manda el cliente
     # (evita colisiones/spoofing). El front reconcilia por el id que devolvemos.
     data["id"] = uuid.uuid4().hex
     data["updated_at"] = _now_iso()
+    # Auditoría interna (no se expone): quién la creó y editó por última vez.
+    data["created_by"] = _actor_label(actor)
+    data["updated_by"] = data["created_by"]
     # El origen/dueño lo fija el rol (no se confía en lo que manda el cliente).
     if role == ROLE_COMUNICACION:
         data["origen"] = "comunicacion"; data["area"] = ""; data["me_estado"] = ""
@@ -447,7 +458,8 @@ def create_activity(activity: agenda_models.ActivityCreate, background_tasks: Ba
 
 @router.put("/actividades/{activity_id}", response_model=agenda_models.ActivityOut)
 def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, background_tasks: BackgroundTasks,
-                    db: Session = Depends(get_db), role: str = Depends(get_role)):
+                    db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
+    role = actor.role
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -476,6 +488,7 @@ def update_activity(activity_id: str, activity: agenda_models.ActivityUpdate, ba
         setattr(db_activity, key, value)
 
     db_activity.updated_at = _now_iso()
+    db_activity.updated_by = _actor_label(actor)  # auditoría interna
     db.commit()
     db.refresh(db_activity)
     return db_activity
@@ -539,7 +552,8 @@ def manual_create_folder(activity_id: str, db: Session = Depends(get_db), role: 
 
 @router.delete("/actividades/{activity_id}")
 def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends(get_db),
-                     role: str = Depends(get_role)):
+                     actor: Actor = Depends(get_actor)):
+    role = actor.role
     """Archiva la actividad (soft-delete): NO borra el registro, lo marca como
     archivado y sale de todas las vistas activas. La carpeta de Drive va a la
     PAPELERA (recuperable). Todo se puede restaurar desde la vista Archivados.
@@ -570,14 +584,16 @@ def archive_activity(activity_id: str, hard: bool = False, db: Session = Depends
     db_activity.archived = True
     db_activity.archived_at = datetime.utcnow().isoformat()
     db_activity.updated_at = _now_iso()
+    db_activity.updated_by = _actor_label(actor)  # auditoría interna
     db.commit()
     return {"ok": True}
 
 
 @router.post("/actividades/{activity_id}/restore", response_model=agenda_models.ActivityOut)
-def restore_activity(activity_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+def restore_activity(activity_id: str, db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
     """Restaura una actividad archivada: vuelve a las vistas activas y saca su
     carpeta de Drive de la papelera."""
+    role = actor.role
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -592,6 +608,7 @@ def restore_activity(activity_id: str, db: Session = Depends(get_db), role: str 
     db_activity.archived = False
     db_activity.archived_at = ""
     db_activity.updated_at = _now_iso()
+    db_activity.updated_by = _actor_label(actor)  # auditoría interna
     db.commit()
     db.refresh(db_activity)
     return db_activity
