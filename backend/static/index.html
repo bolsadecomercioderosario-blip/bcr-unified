@@ -304,11 +304,35 @@
                 <div class="tool-icon">🌐</div>
                 <h3>Web</h3>
             </a>
+
+            <!-- Sólo visible para administradores (se revela vía /api/auth/me). -->
+            <a href="/admin" class="tool-card" id="tool-admin" style="display:none;">
+                <div class="tool-icon">⚙️</div>
+                <h3>Usuarios</h3>
+                <span class="tool-badge">Admin</span>
+            </a>
         </div>
 
         <div class="footer-text">
             Área de Comunicación BCR — Herramientas internas
         </div>
     </div>
+
+    <script>
+        // La tarjeta de Administración de usuarios sólo se muestra al admin.
+        // fetch está parcheado por auth.js (agrega el Bearer). Si no es admin o
+        // no hay sesión, la tarjeta queda oculta.
+        (function () {
+            fetch('/api/auth/me')
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (me) {
+                    if (me && me.is_admin) {
+                        var c = document.getElementById('tool-admin');
+                        if (c) c.style.display = '';
+                    }
+                })
+                .catch(function () {});
+        })();
+    </script>
 </body>
 </html>

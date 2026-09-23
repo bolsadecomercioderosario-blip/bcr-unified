@@ -240,6 +240,24 @@ def resolve_user_token(db: Session, token: str) -> Optional[AppUser]:
     return db.query(AppUser).filter(AppUser.id == sess.user_id, AppUser.active.is_(True)).first()
 
 
+def revoke_user_sessions(db: Session, user_id: int) -> int:
+    """Borra todas las sesiones abiertas de un usuario (lo obliga a reloguear).
+    Se usa al resetear su contraseña, desactivarlo o cambiarle el rol."""
+    n = db.query(UserSession).filter(UserSession.user_id == user_id).delete()
+    db.commit()
+    return n
+
+
+# Alfabeto sin caracteres ambiguos (0/O, 1/l/I) para dictar/pegar la temporal.
+_TEMP_ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def generate_temp_password(length: int = 10) -> str:
+    """Contraseña temporal legible (para que el admin se la pase a la persona,
+    que la cambia en el primer ingreso)."""
+    return "".join(secrets.choice(_TEMP_ALPHABET) for _ in range(length))
+
+
 # Set inicial de usuarios (emails/roles NO son secretos, como la lista de AREAS).
 # El admin es Juan. Santiago es Audiovisual (Gmail, no @bcr.com.ar).
 _SEED_USERS = [
@@ -319,6 +337,14 @@ def get_actor(authorization: Optional[str] = Header(None),
     actor = _resolve_actor(authorization, db)
     if actor is None:
         raise HTTPException(status_code=401, detail="Auth requerida")
+    return actor
+
+
+def require_admin(actor: Actor = Depends(get_actor)) -> Actor:
+    """403 si el actor no es un usuario administrador (hoy: sólo Juan). Protege
+    el panel de administración de usuarios (/api/admin/*)."""
+    if not actor.is_admin:
+        raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
     return actor
 
 

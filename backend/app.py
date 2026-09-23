@@ -49,6 +49,7 @@ from noticias.router import (
     kit_api as noticias_kit_api, videos_api as noticias_videos_api,
 )
 from abuela.router import router as abuela_api
+from admin.router import router as admin_api  # panel de usuarios (sólo admin)
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -201,6 +202,7 @@ app.include_router(noticias_kit_api)     # API del Kit Multimedia (/api/kit)
 app.include_router(noticias_videos_api)  # API de Videos (/api/videos)
 app.include_router(noticias_site)        # sitio público server-rendered (/noticias/...)
 app.include_router(abuela_api)
+app.include_router(admin_api)            # panel de usuarios (/api/admin/*, sólo admin)
 
 
 # ---------------------------------------------------------
@@ -277,6 +279,26 @@ async def _noticias_videos_admin():
     with open(os.path.join(STATIC_DIR, "noticias", "videos-admin.html"), encoding="utf-8") as f:
         html = f.read().replace("__VERSION__", APP_VERSION)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+# Panel de administración de usuarios (login por email). Protegido por auth.js +
+# require_admin en el backend: aunque alguien abra la página, /api/admin/* le
+# devuelve 403 si no es admin. La página misma verifica /api/auth/me y muestra
+# "sin permisos" si no corresponde.
+def _admin_users_page():
+    with open(os.path.join(STATIC_DIR, "admin", "index.html"), encoding="utf-8") as f:
+        html = f.read().replace("__VERSION__", APP_VERSION)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+@app.get("/admin")
+async def _admin_index():
+    return _admin_users_page()
+
+
+@app.get("/admin/")
+async def _admin_index_slash():
+    return _admin_users_page()
 
 
 # ---------------------------------------------------------

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración de usuarios · BCR</title>
+    <!-- Login centralizado del hub (agrega el Bearer a /api/* y muestra el overlay). -->
+    <script src="/static/auth.js?v=__VERSION__"></script>
+    <style>
+        :root {
+            --primary: #4f46e5; --primary-hover: #4338ca; --border: #e2e8f0;
+            --text: #0f172a; --muted: #64748b; --bg: #f7f8fb; --ok: #16a34a; --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Inter, -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        .wrap { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        h1 { font-size: 1.3rem; margin: 0; }
+        .hub-link { color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+        .hub-link:hover { color: var(--primary); }
+        .card { background: white; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card h2 { font-size: 0.95rem; margin: 0 0 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+        .badge { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; display: inline-block; }
+        .badge.on { background: #dcfce7; color: #166534; }
+        .badge.off { background: #fee2e2; color: #991b1b; }
+        .badge.temp { background: #fef3c7; color: #92400e; margin-left: 0.35rem; }
+        .badge.admin { background: #e0e7ff; color: #3730a3; margin-left: 0.35rem; }
+        select, input { padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.9rem; font-family: inherit; background: white; }
+        button { cursor: pointer; font-family: inherit; border-radius: 0.5rem; font-weight: 600; border: 1px solid var(--border); background: white; padding: 0.45rem 0.7rem; font-size: 0.82rem; }
+        button.primary { background: var(--primary); color: white; border-color: var(--primary); }
+        button.primary:hover { background: var(--primary-hover); }
+        button.link { border: none; background: none; color: var(--primary); padding: 0.3rem 0.4rem; }
+        button.danger { color: var(--danger); }
+        button:disabled { opacity: 0.5; cursor: default; }
+        .actions { display: flex; gap: 0.25rem; align-items: center; flex-wrap: wrap; }
+        .form-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; }
+        .form-row .fg { display: flex; flex-direction: column; gap: 0.3rem; }
+        .form-row label { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+        .msg { padding: 0.8rem 1rem; border-radius: 0.5rem; font-size: 0.88rem; margin-bottom: 1rem; display: none; }
+        .msg.err { background: #fee2e2; color: #991b1b; }
+        .msg.ok { background: #dcfce7; color: #166534; }
+        .center { text-align: center; color: var(--muted); padding: 2rem; }
+        /* Modal de contraseña temporal */
+        .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+        .modal { background: white; border-radius: 0.75rem; padding: 1.5rem; max-width: 420px; width: 100%; }
+        .modal h3 { margin: 0 0 0.5rem; }
+        .pw-box { display: flex; gap: 0.5rem; margin: 1rem 0; }
+        .pw-box input { flex: 1; font-family: ui-monospace, monospace; font-size: 1.05rem; letter-spacing: 0.03em; }
+        .note { font-size: 0.8rem; color: var(--muted); }
+        @media (max-width: 640px) {
+            .hide-sm { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <h1>Administración de usuarios</h1>
+            <a class="hub-link" href="/">← Volver al Hub</a>
+        </header>
+
+        <div id="msg" class="msg"></div>
+
+        <div id="content" style="display:none;">
+            <div class="card">
+                <h2>Nuevo usuario</h2>
+                <div class="form-row">
+                    <div class="fg" style="flex:2; min-width:200px;">
+                        <label>Email</label>
+                        <input id="nu-email" type="email" placeholder="persona@bcr.com.ar">
+                    </div>
+                    <div class="fg" style="flex:2; min-width:160px;">
+                        <label>Nombre y apellido</label>
+                        <input id="nu-name" type="text" placeholder="Nombre Apellido">
+                    </div>
+                    <div class="fg" style="min-width:150px;">
+                        <label>Rol</label>
+                        <select id="nu-role"></select>
+                    </div>
+                    <button id="nu-btn" class="primary" style="padding:0.6rem 1rem;">Crear</button>
+                </div>
+                <p class="note" style="margin:0.8rem 0 0;">Se genera una contraseña temporal; la persona la cambia en su primer ingreso. Las áreas (DIyEE, Innova, etc.) no se administran acá.</p>
+            </div>
+
+            <div class="card">
+                <h2>Usuarios</h2>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Rol</th>
+                                <th>Estado</th>
+                                <th class="hide-sm">Alta</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="center">Cargando…</div>
+        <div id="denied" class="center" style="display:none;">
+            No tenés permisos para ver esta sección.<br>
+            <a class="hub-link" href="/">Volver al Hub</a>
+        </div>
+    </div>
+
+    <!-- Modal contraseña temporal -->
+    <div id="modal-bg" class="modal-bg">
+        <div class="modal">
+            <h3 id="modal-title">Contraseña temporal</h3>
+            <p class="note" id="modal-sub"></p>
+            <div class="pw-box">
+                <input id="modal-pw" type="text" readonly>
+                <button id="modal-copy">Copiar</button>
+            </div>
+            <p class="note">Pasásela a la persona por un canal privado. No se vuelve a mostrar. Cuando ingrese, se le pedirá cambiarla.</p>
+            <div style="text-align:right; margin-top:1rem;">
+                <button class="primary" id="modal-close">Listo</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const ROLE_LABELS = { comunicacion: 'Comunicación', secretaria: 'Secretaría', audiovisual: 'Audiovisual' };
+        const $ = (id) => document.getElementById(id);
+        let ROLES = [];
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function roleLabel(r) { return ROLE_LABELS[r] || r; }
+
+        function showMsg(text, kind) {
+            const m = $('msg');
+            m.textContent = text;
+            m.className = 'msg ' + (kind || 'ok');
+            m.style.display = 'block';
+            if (kind === 'ok') setTimeout(() => { m.style.display = 'none'; }, 4000);
+        }
+
+        async function api(url, opts) {
+            const res = await fetch(url, opts);
+            let data = null;
+            try { data = await res.json(); } catch (e) { data = {}; }
+            if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
+            return data;
+        }
+
+        function showTempPassword(email, temp) {
+            $('modal-sub').textContent = email;
+            $('modal-pw').value = temp;
+            $('modal-bg').style.display = 'flex';
+        }
+        $('modal-close').onclick = () => { $('modal-bg').style.display = 'none'; };
+        $('modal-copy').onclick = () => {
+            const inp = $('modal-pw');
+            navigator.clipboard.writeText(inp.value);
+            $('modal-copy').textContent = 'Copiado ✓';
+            setTimeout(() => { $('modal-copy').textContent = 'Copiar'; }, 1500);
+        };
+
+        function renderRoleOptions(selectEl, current) {
+            selectEl.innerHTML = ROLES.map(r =>
+                `<option value="${esc(r)}" ${r === current ? 'selected' : ''}>${esc(roleLabel(r))}</option>`
+            ).join('');
+        }
+
+        function renderRow(u) {
+            const tr = document.createElement('tr');
+            const estado = u.active
+                ? '<span class="badge on">Activo</span>'
+                : '<span class="badge off">Inactivo</span>';
+            const flags = (u.must_change_password ? '<span class="badge temp">contraseña temporal</span>' : '')
+                + (u.is_admin ? '<span class="badge admin">admin</span>' : '');
+            const alta = u.created_at ? esc(u.created_at.slice(0, 10)) : '';
+            tr.innerHTML = `
+                <td>
+                    <div style="font-weight:600;">${esc(u.name || '(sin nombre)')}</div>
+                    <div class="note">${esc(u.email)}</div>
+                </td>
+                <td><select data-role-for="${u.id}"></select></td>
+                <td>${estado}${flags}</td>
+                <td class="hide-sm note">${alta}</td>
+                <td>
+                    <div class="actions">
+                        <button class="link" data-reset="${u.id}">Resetear clave</button>
+                        <button class="link ${u.active ? 'danger' : ''}" data-active="${u.id}" data-to="${u.active ? '0' : '1'}">${u.active ? 'Desactivar' : 'Activar'}</button>
+                    </div>
+                </td>`;
+            const sel = tr.querySelector(`select[data-role-for="${u.id}"]`);
+            renderRoleOptions(sel, u.role);
+            sel.onchange = () => changeRole(u, sel);
+            tr.querySelector(`[data-reset="${u.id}"]`).onclick = () => resetPassword(u);
+            tr.querySelector(`[data-active="${u.id}"]`).onclick = (e) => setActive(u, e.currentTarget.dataset.to === '1');
+            return tr;
+        }
+
+        async function load() {
+            try {
+                const data = await api('/api/admin/users');
+                ROLES = data.roles || ['comunicacion', 'secretaria', 'audiovisual'];
+                renderRoleOptions($('nu-role'), 'comunicacion');
+                const tbody = $('tbody');
+                tbody.innerHTML = '';
+                data.users.forEach(u => tbody.appendChild(renderRow(u)));
+                $('loading').style.display = 'none';
+                $('content').style.display = 'block';
+            } catch (e) {
+                $('loading').style.display = 'none';
+                if (/403/.test(e.message) || /administrador/i.test(e.message)) {
+                    $('denied').style.display = 'block';
+                } else {
+                    showMsg(e.message, 'err');
+                    $('loading').style.display = 'none';
+                }
+            }
+        }
+
+        async function createUser() {
+            const email = $('nu-email').value.trim();
+            const name = $('nu-name').value.trim();
+            const role = $('nu-role').value;
+            if (!email || !name) { showMsg('Completá email y nombre.', 'err'); return; }
+            $('nu-btn').disabled = true;
+            try {
+                const data = await api('/api/admin/users', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, name, role }),
+                });
+                $('nu-email').value = ''; $('nu-name').value = '';
+                showTempPassword(data.user.email, data.temp_password);
+                await load();
+            } catch (e) {
+                showMsg(e.message, 'err');
+            } finally {
+                $('nu-btn').disabled = false;
+            }
+        }
+
+        async function resetPassword(u) {
+            if (!confirm(`¿Resetear la contraseña de ${u.email}? Se cerrará su sesión y tendrá que entrar con una nueva contraseña temporal.`)) return;
+            try {
+                const data = await api(`/api/admin/users/${u.id}/reset-password`, { method: 'POST' });
+                showTempPassword(u.email, data.temp_password);
+                await load();
+            } catch (e) { showMsg(e.message, 'err'); }
+        }
+
+        async function setActive(u, active) {
+            if (!active && !confirm(`¿Desactivar a ${u.email}? No podrá ingresar hasta que lo reactives.`)) return;
+            try {
+                await api(`/api/admin/users/${u.id}/active`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active }),
+                });
+                showMsg(active ? 'Usuario activado.' : 'Usuario desactivado.', 'ok');
+                await load();
+            } catch (e) { showMsg(e.message, 'err'); }
+        }
+
+        async function changeRole(u, selectEl) {
+            const role = selectEl.value;
+            if (role === u.role) return;
+            if (!confirm(`¿Cambiar el rol de ${u.email} a "${roleLabel(role)}"? Se cerrará su sesión para que tome el nuevo rol.`)) {
+                selectEl.value = u.role;
+                return;
+            }
+            try {
+                await api(`/api/admin/users/${u.id}/role`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role }),
+                });
+                showMsg('Rol actualizado.', 'ok');
+                await load();
+            } catch (e) { showMsg(e.message, 'err'); selectEl.value = u.role; }
+        }
+
+        $('nu-btn').onclick = createUser;
+
+        // Esperamos a que auth.js tenga (o pida) el token. Si no hay token, su
+        // overlay se encarga; reintentamos la carga cuando el usuario ingresa.
+        function boot() {
+            const hasToken = window.BCRAuth && window.BCRAuth.getToken && window.BCRAuth.getToken();
+            if (!hasToken) {
+                // El overlay de auth.js está visible; reintentamos en breve.
+                setTimeout(boot, 600);
+                return;
+            }
+            load();
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            boot();
+        }
+    })();
+    </script>
+</body>
+</html>
