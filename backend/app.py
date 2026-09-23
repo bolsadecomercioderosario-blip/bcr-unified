@@ -14,15 +14,21 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
 
-from auth import require_auth, role_for_password, token_for_role
+from auth import (
+    require_auth, role_for_password, token_for_role,
+    authenticate_user, create_session, get_actor, hash_password,
+    verify_password_hash, seed_users_if_empty, Actor,
+)
 from config import STATIC_DIR, NoCacheStaticFiles, get_module_html, APP_VERSION
-from database import Base, engine
+from database import Base, engine, get_db, SessionLocal
 from migrate import migrate
 
 # Importamos los módulos de modelos para que SQLAlchemy registre las tablas
 # antes de create_all (side effect del import).
 import agenda_models  # noqa: F401
+import user_models  # noqa: F401  — registra AppUser + UserSession (login por usuario)
 import bot.db_models  # noqa: F401  — registra BotExchange + BotSession
 import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
@@ -50,6 +56,15 @@ from abuela.router import router as abuela_api
 Base.metadata.create_all(bind=engine)
 migrate()
 
+# Seed de usuarios individuales (login por email). Sólo actúa la 1ra vez y si
+# está seteada USERS_BOOTSTRAP_PASSWORD; si no, no hace nada (el login compartido
+# sigue funcionando). No rompe nada existente.
+_seed_db = SessionLocal()
+try:
+    seed_users_if_empty(_seed_db)
+finally:
+    _seed_db.close()
+
 
 app = FastAPI(title="BCR Servicios Unificados")
 
@@ -63,8 +78,26 @@ async def health_check():
 # Autenticación (público — POST /api/auth/login; GET /api/auth/check requiere token)
 # ---------------------------------------------------------
 @app.post("/api/auth/login")
-async def auth_login(payload: dict):
-    role = role_for_password(payload.get("password"))
+async def auth_login(payload: dict, db: Session = Depends(get_db)):
+    # Si viene "email" → login por usuario individual (contraseña propia en DB).
+    # Si no → login compartido/área (contraseña por rol, como siempre). Así conviven
+    # los dos durante la transición: nadie pierde acceso.
+    email = (payload.get("email") or "").strip()
+    password = payload.get("password") or ""
+    if email:
+        user = authenticate_user(db, email, password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+        token = create_session(db, user)
+        return {
+            "token": token,
+            "role": user.role,
+            "email": user.email,
+            "name": user.name,
+            "is_admin": user.is_admin,
+            "must_change_password": user.must_change_password,
+        }
+    role = role_for_password(password)
     if role:
         # Token propio del rol: el backend lo usa para saber quién sos y aplicar
         # permisos; el frontend usa `role` para ajustar la UI.
@@ -72,9 +105,46 @@ async def auth_login(payload: dict):
     raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
 
+@app.post("/api/auth/change-password")
+async def auth_change_password(payload: dict, actor: Actor = Depends(get_actor),
+                               db: Session = Depends(get_db)):
+    """Cambio de contraseña del usuario logueado (login por email). En el primer
+    ingreso (must_change_password) no pide la actual; después sí."""
+    if actor.user is None:
+        raise HTTPException(status_code=400, detail="El cambio de contraseña es sólo para usuarios individuales.")
+    new_password = payload.get("new_password") or ""
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
+    user = db.query(user_models.AppUser).filter(user_models.AppUser.id == actor.user.id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if not user.must_change_password:
+        # Cambio voluntario (no forzado): exige la contraseña actual.
+        if not verify_password_hash(payload.get("current_password") or "", user.password_hash):
+            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+    user.password_hash = hash_password(new_password)
+    user.must_change_password = False
+    db.commit()
+    return {"ok": True}
+
+
 @app.get("/api/auth/check")
 async def auth_check(_: bool = Depends(require_auth)):
     return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def auth_me(actor: Actor = Depends(get_actor)):
+    """Info del actor logueado (para que el front ajuste la UI: rol, si es usuario,
+    admin, si debe cambiar contraseña)."""
+    return {
+        "role": actor.role,
+        "email": actor.email,
+        "name": actor.user.name if actor.user else None,
+        "is_user": actor.user is not None,
+        "is_admin": actor.is_admin,
+        "must_change_password": bool(actor.user and actor.user.must_change_password),
+    }
 
 
 # CORS restringido a los dominios propios (antes era "*"). Los frontends de la

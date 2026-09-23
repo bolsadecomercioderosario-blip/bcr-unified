@@ -22,9 +22,14 @@ import hashlib
 import hmac
 import os
 import secrets
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
+from sqlalchemy.orm import Session
+
+from database import get_db, SessionLocal
+from user_models import AppUser, UserSession
 
 
 # --- Fail-closed de secretos ------------------------------------------------
@@ -78,6 +83,13 @@ def _area_password(slug: str) -> str:
 # --- Roles ------------------------------------------------------------------
 ROLE_COMUNICACION = "comunicacion"
 ROLE_SECRETARIA = "secretaria"
+# Rol restringido (Santiago, Editor AV): ve sólo su pestaña y edita sólo el link
+# de video. Sólo existe como usuario individual (no hay clave compartida AV).
+ROLE_AUDIOVISUAL = "audiovisual"
+
+# Roles válidos para un USUARIO individual (login por email). Las áreas NO son
+# usuarios: usan la clave compartida del área (role_area).
+USER_ROLES = {ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL}
 
 
 def role_area(slug: str) -> str:
@@ -149,28 +161,168 @@ def verify_password(password: Optional[str]) -> bool:
     return role_for_password(password) is not None
 
 
+# ===========================================================================
+# Usuarios individuales (login por email + contraseña propia) — DB-backed.
+# Coexiste con lo de arriba: las áreas y las claves compartidas siguen igual.
+# ===========================================================================
+_PBKDF2_ITERS = 200_000
+_SESSION_TTL = timedelta(days=30)
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _PBKDF2_ITERS)
+    return f"pbkdf2_sha256${_PBKDF2_ITERS}${salt.hex()}${dk.hex()}"
+
+
+def verify_password_hash(password: str, stored: str) -> bool:
+    try:
+        algo, iters, salt_hex, hash_hex = (stored or "").split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iters))
+        return hmac.compare_digest(dk.hex(), hash_hex)
+    except Exception:  # noqa: BLE001 — hash malformado = no matchea
+        return False
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[AppUser]:
+    """Devuelve el usuario si el email existe, está activo y la contraseña matchea."""
+    email = (email or "").strip().lower()
+    if not email or not password:
+        return None
+    user = db.query(AppUser).filter(AppUser.email == email, AppUser.active.is_(True)).first()
+    if not user or not verify_password_hash(password, user.password_hash):
+        return None
+    return user
+
+
+def create_session(db: Session, user: AppUser) -> str:
+    """Crea una sesión y devuelve el token opaco (se guarda sólo su hash)."""
+    raw = secrets.token_urlsafe(32)
+    now = datetime.utcnow()
+    db.add(UserSession(token_hash=_hash_token(raw), user_id=user.id,
+                       created_at=now, expires_at=now + _SESSION_TTL))
+    db.commit()
+    return raw
+
+
+def resolve_user_token(db: Session, token: str) -> Optional[AppUser]:
+    """Usuario detrás de un token de sesión, o None (vencido/ inexistente/inactivo)."""
+    if not token:
+        return None
+    sess = db.query(UserSession).filter(UserSession.token_hash == _hash_token(token)).first()
+    if not sess:
+        return None
+    if sess.expires_at < datetime.utcnow():
+        db.delete(sess)
+        db.commit()
+        return None
+    return db.query(AppUser).filter(AppUser.id == sess.user_id, AppUser.active.is_(True)).first()
+
+
+# Set inicial de usuarios (emails/roles NO son secretos, como la lista de AREAS).
+# El admin es Juan. Santiago es Audiovisual (Gmail, no @bcr.com.ar).
+_SEED_USERS = [
+    ("adallavalle@bcr.com.ar", "Anaclara Dalla Valle", ROLE_COMUNICACION, False),
+    ("jchiummiento@bcr.com.ar", "Juan Chiummiento", ROLE_COMUNICACION, True),
+    ("gdurando@bcr.com.ar", "Guillermina Durando", ROLE_COMUNICACION, False),
+    ("arodriguez@bcr.com.ar", "Agustín Rodríguez", ROLE_COMUNICACION, False),
+    ("npawlusiak@bcr.com.ar", "Nicolás Pawlusiak", ROLE_COMUNICACION, False),
+    ("santiagoivangarcia95@gmail.com", "Santiago García", ROLE_AUDIOVISUAL, False),
+    ("jmagarinos@bcr.com.ar", "Jorge Magariños", ROLE_SECRETARIA, False),
+    ("dvicente@bcr.com.ar", "Daniel Vicente", ROLE_SECRETARIA, False),
+]
+
+
+def seed_users_if_empty(db: Session) -> None:
+    """Crea los 8 usuarios la primera vez, con una contraseña TEMPORAL común
+    (env USERS_BOOTSTRAP_PASSWORD) y must_change_password=True → cada uno la
+    cambia en su primer ingreso. Si no hay tabla vacía o falta el env, no hace
+    nada (login compartido sigue funcionando; no se rompe nada)."""
+    boot = os.environ.get("USERS_BOOTSTRAP_PASSWORD")
+    if not boot:
+        return
+    if db.query(AppUser).first() is not None:
+        return
+    pwd = hash_password(boot)
+    for email, name, role, is_admin in _SEED_USERS:
+        db.add(AppUser(email=email.lower(), name=name, role=role, is_admin=is_admin,
+                       active=True, must_change_password=True, password_hash=pwd))
+    db.commit()
+    print(f"[auth] Seed de usuarios: creados {len(_SEED_USERS)} usuarios (contraseña temporal, deben cambiarla).")
+
+
 # --- Dependencies de FastAPI ------------------------------------------------
-def _role_from_header(authorization: Optional[str]) -> Optional[str]:
+class Actor:
+    """Quién hace el request. `role` siempre; `user` sólo si es un usuario
+    individual (login por email) — None para áreas/claves compartidas."""
+    __slots__ = ("role", "user")
+
+    def __init__(self, role: str, user: Optional[AppUser] = None):
+        self.role = role
+        self.user = user
+
+    @property
+    def email(self) -> Optional[str]:
+        return self.user.email if self.user else None
+
+    @property
+    def is_admin(self) -> bool:
+        return bool(self.user and self.user.is_admin)
+
+
+def _extract_token(authorization: Optional[str]) -> Optional[str]:
     if not authorization or not authorization.startswith("Bearer "):
         return None
-    token = authorization[len("Bearer "):].strip()
-    return role_for_token(token)
+    return authorization[len("Bearer "):].strip()
 
 
-def require_auth(authorization: Optional[str] = Header(None)) -> bool:
-    """401 si falta el header o el token no corresponde a ningún rol."""
-    if _role_from_header(authorization) is None:
+def _resolve_actor(authorization: Optional[str], db: Session) -> Optional[Actor]:
+    """Resuelve el token a un Actor. Primero prueba el token stateless de rol
+    (áreas + claves compartidas de Comunicación/Secretaría); si no, un token de
+    sesión de usuario (DB). None si no es válido."""
+    token = _extract_token(authorization)
+    if not token:
+        return None
+    role = role_for_token(token)  # stateless (áreas + compartidas)
+    if role is not None:
+        return Actor(role=role, user=None)
+    user = resolve_user_token(db, token)  # sesión de usuario
+    if user is not None:
+        return Actor(role=user.role, user=user)
+    return None
+
+
+def get_actor(authorization: Optional[str] = Header(None),
+              db: Session = Depends(get_db)) -> Actor:
+    """Actor del request (rol + identidad si es usuario). 401 si el token no vale."""
+    actor = _resolve_actor(authorization, db)
+    if actor is None:
+        raise HTTPException(status_code=401, detail="Auth requerida")
+    return actor
+
+
+def require_auth(authorization: Optional[str] = Header(None),
+                 db: Session = Depends(get_db)) -> bool:
+    """401 si falta el header o el token no corresponde a ningún rol/usuario."""
+    if _resolve_actor(authorization, db) is None:
         raise HTTPException(status_code=401, detail="Auth requerida")
     return True
 
 
-def get_role(authorization: Optional[str] = Header(None)) -> str:
-    """Devuelve el rol del token (401 si inválido). Para endpoints que necesitan
-    saber quién es (enforcement de permisos)."""
-    role = _role_from_header(authorization)
-    if role is None:
+def get_role(authorization: Optional[str] = Header(None),
+             db: Session = Depends(get_db)) -> str:
+    """Devuelve el rol del token (401 si inválido). Sirve para áreas/compartidas
+    (stateless) y para usuarios individuales (sesión en DB)."""
+    actor = _resolve_actor(authorization, db)
+    if actor is None:
         raise HTTPException(status_code=401, detail="Auth requerida")
-    return role
+    return actor.role
 
 
 def require_roles(*allowed_roles: str):
