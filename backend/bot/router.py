@@ -33,7 +33,7 @@ from auth import require_roles, ROLE_COMUNICACION
 from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
-from bot import agent, agenda_writer, db_models, menu_handlers, models, twilio_client
+from bot import agent, agenda_writer, db_models, menu_handlers, twilio_client
 
 
 # ---------------------------------------------------------------------------

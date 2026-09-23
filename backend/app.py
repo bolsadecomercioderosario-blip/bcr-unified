@@ -36,7 +36,6 @@ from buscador.router import router as buscador_api
 from compromisos.router import router as compromisos_api
 from capacita.router import router as capacita_api
 from lluvias.router import router as lluvias_api
-from metricas.router import router as metricas_api
 from social.router import router as social_api
 from semana_datos.router import router as semana_datos_api
 from noticias.router import (
@@ -125,7 +124,7 @@ app.include_router(semana_datos_api)
 app.include_router(bot_api)
 app.include_router(buscador_api)
 app.include_router(capacita_api)
-app.include_router(metricas_api)
+# metricas_api en stand-by (no se monta la API; ver _metricas_standby).
 app.include_router(compromisos_api)
 app.include_router(noticias_api)      # API del admin (/api/noticias)
 app.include_router(noticias_kit_api)     # API del Kit Multimedia (/api/kit)
@@ -169,7 +168,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "bot", "abuela"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "abuela"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -258,30 +257,29 @@ async def _capacita_admin():
     )
 
 
-# Métricas FBCR — dashboard público (/metricas/) + admin de carga
-# (/metricas/admin). CSS/JS inline en cada HTML, así que FileResponse directo.
-_METRICAS_DIR = os.path.join(STATIC_DIR, "metricas")
+# Métricas FBCR — EN STAND-BY (2026-09). El dashboard y su API se dieron de baja
+# a pedido; el código y los datos quedan intactos para reactivarlo cuando pidan.
+# Mientras tanto, /metricas y /metricas/admin muestran una pantalla de "no
+# disponible" (en vez de 404). Para reactivar: descomentar el include_router y
+# el mount, y restaurar los handlers index/admin con FileResponse.
+_METRICAS_STANDBY_HTML = (
+    "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+    "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    "<title>Sección no disponible</title>"
+    "<style>body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e2e8f0;"
+    "display:flex;min-height:100vh;margin:0;align-items:center;justify-content:center;text-align:center;padding:2rem}"
+    ".box{max-width:32rem}h1{font-size:1.4rem;margin:0 0 .5rem}p{color:#94a3b8;line-height:1.5}</style></head>"
+    "<body><div class='box'><h1>Sección no disponible por el momento</h1>"
+    "<p>El tablero de métricas está temporalmente fuera de servicio.</p></div></body></html>"
+)
 
 
 @app.get("/metricas")
-async def _metricas_redirect():
-    return RedirectResponse(url="/metricas/", status_code=307)
-
-
 @app.get("/metricas/")
-async def _metricas_index():
-    return FileResponse(
-        os.path.join(_METRICAS_DIR, "index.html"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
-
-
 @app.get("/metricas/admin")
-async def _metricas_admin():
-    return FileResponse(
-        os.path.join(_METRICAS_DIR, "admin.html"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
+async def _metricas_standby():
+    return HTMLResponse(content=_METRICAS_STANDBY_HTML, status_code=503,
+                        headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------
@@ -295,7 +293,7 @@ app.mount("/agenda", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "agen
 app.mount("/semana-datos", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "semana-datos"), html=False), name="semana_datos_ui")
 app.mount("/bot", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "bot"), html=False), name="bot_ui")
 app.mount("/capacita", NoCacheStaticFiles(directory=_CAPACITA_DIR, html=False), name="capacita_ui")
-app.mount("/metricas", NoCacheStaticFiles(directory=_METRICAS_DIR, html=False), name="metricas_ui")
+# /metricas en stand-by: no se monta (ver handler _metricas_standby arriba).
 app.mount("/abuela", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "abuela"), html=False), name="abuela_ui")
 
 # Prototipo de la nueva web institucional (HTML estáticos autocontenidos). El hub

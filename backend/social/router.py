@@ -3,11 +3,16 @@ Módulo Social (Comunicados): procesa un PDF y genera texto + imagen para X
 y un mockup vertical para Instagram Stories. También publica el tweet.
 """
 import os
+import re
 import shutil
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
+
+# session_id seguro: sólo lo que genera pre-procesar (uuid) — evita que el
+# cliente mande un path/`..` para que el server abra un archivo arbitrario.
+_SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 from auth import require_roles, ROLE_COMUNICACION
 from config import UPLOADS_DIR, ASSETS_DIR
@@ -33,7 +38,6 @@ async def pre_procesar(file: UploadFile = File(...)):
         return {
             "session_id": session_id,
             "title": data["title"],
-            "pdf_path": pdf_path,
             "preview_url": f"/static/uploads/{thumb_filename}",
         }
     except Exception as e:
@@ -43,9 +47,16 @@ async def pre_procesar(file: UploadFile = File(...)):
 @router.post("/generar")
 async def generar_social(
     session_id: str = Form(...),
-    pdf_path: str = Form(...),
     title: str = Form(...),
 ):
+    # El path del PDF NO se recibe del cliente: se reconstruye server-side desde
+    # el session_id (que pre-procesar generó). Antes venía como Form y se abría
+    # tal cual → un cliente podía apuntar a cualquier archivo del server.
+    if not _SAFE_ID.match(session_id or ""):
+        raise HTTPException(status_code=400, detail="session_id inválido")
+    pdf_path = os.path.join(UPLOADS_DIR, f"{session_id}_pre.pdf")
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Sesión no encontrada. Volvé a subir el PDF.")
     try:
         data = extract_pdf_data(pdf_path)
         data["title"] = title
@@ -73,6 +84,7 @@ async def generar_social(
 
 @router.get("/descargar/{filename}")
 async def descargar(filename: str, name: str):
+    filename = os.path.basename(filename)  # nunca salir de UPLOADS_DIR
     file_path = os.path.join(UPLOADS_DIR, filename)
     if os.path.exists(file_path):
         return FileResponse(path=file_path, filename=name, media_type='image/jpeg')
