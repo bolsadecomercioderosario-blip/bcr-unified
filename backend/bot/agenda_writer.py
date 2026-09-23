@@ -26,7 +26,7 @@ import agenda_models
 from database import SessionLocal
 from config import BOT_AGENDA_WRITERS, BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
 from bot import twilio_client
-from bot.db_models import BotConfig
+from bot.db_models import BotConfig, BotPendingWrite
 
 
 _ARG = timedelta(hours=3)  # ART = UTC-3 (sin DST)
@@ -71,24 +71,34 @@ def writer_role(from_phone: str) -> Optional[str]:
 
 # --- Borradores pendientes de confirmación (en memoria, acotado) ------------
 # {phone_norm: {"draft": {...}, "at": datetime}}. Se descartan a los 30 min.
-_PENDING: dict = {}
 _PENDING_TTL = timedelta(minutes=30)
-# El "state" guarda en qué punto de la conversación está el writer:
+# El "state" (JSON en la tabla bot_pending_write) guarda en qué punto de la
+# conversación está el writer:
 #   {"mode": "crear",   "draft": {...}}                         → confirmar alta
 #   {"mode": "editar",  "draft": {...}, "id": "<act>"}          → confirmar edición
 #   {"mode": "cancelar","draft": {...}, "id": "<act>"}          → confirmar baja
 #   {"mode": "select",  "purpose": "editar"|"cancelar", "options": [{n,id,label}]}
+# Persiste en DB (no en memoria) para sobrevivir reinicios de Render y no
+# depender de un único worker.
 
 
 def _get_state(from_phone: str) -> Optional[dict]:
     key = _norm_phone(from_phone)
-    row = _PENDING.get(key)
-    if not row:
-        return None
-    if datetime.utcnow() - row["at"] > _PENDING_TTL:
-        _PENDING.pop(key, None)
-        return None
-    return row["state"]
+    db = SessionLocal()
+    try:
+        row = db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).first()
+        if not row:
+            return None
+        if datetime.utcnow() - row.updated_at > _PENDING_TTL:
+            db.delete(row)
+            db.commit()
+            return None
+        try:
+            return json.loads(row.state)
+        except Exception:  # noqa: BLE001 — state corrupto: lo tratamos como inexistente
+            return None
+    finally:
+        db.close()
 
 
 def has_pending(from_phone: str) -> bool:
@@ -96,11 +106,29 @@ def has_pending(from_phone: str) -> bool:
 
 
 def _set_state(from_phone: str, state: dict) -> None:
-    _PENDING[_norm_phone(from_phone)] = {"state": state, "at": datetime.utcnow()}
+    key = _norm_phone(from_phone)
+    db = SessionLocal()
+    try:
+        payload = json.dumps(state, ensure_ascii=False)
+        row = db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).first()
+        if row:
+            row.state = payload
+            row.updated_at = datetime.utcnow()
+        else:
+            db.add(BotPendingWrite(from_phone=key, state=payload, updated_at=datetime.utcnow()))
+        db.commit()
+    finally:
+        db.close()
 
 
 def _clear_state(from_phone: str) -> None:
-    _PENDING.pop(_norm_phone(from_phone), None)
+    key = _norm_phone(from_phone)
+    db = SessionLocal()
+    try:
+        db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).delete()
+        db.commit()
+    finally:
+        db.close()
 
 
 # --- OpenAI -----------------------------------------------------------------

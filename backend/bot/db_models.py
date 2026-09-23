@@ -269,6 +269,29 @@ class CoyunturaAuto(Base):
     borrador_pendiente = Column(Boolean, nullable=False, default=False)
 
 
+class BotPendingWrite(Base):
+    """Borrador de carga/edición de agenda por WhatsApp, EN CURSO (esperando
+    confirmación). Antes vivía en memoria del proceso y se perdía en cada
+    reinicio de Render (rompía la carga por voz si el restart caía entre el
+    resumen y el 'Sí'). Ahora persiste: una fila por número (PK). El `state` es
+    el JSON del flujo (mode/draft/id/options). Se vence por TTL en código."""
+    __tablename__ = "bot_pending_write"
+
+    from_phone = Column(String, primary_key=True)  # normalizado (solo dígitos)
+    state = Column(Text, nullable=False)  # JSON del state del writer
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class BotSeenSid(Base):
+    """MessageSid de Twilio ya procesados (anti-replay). Antes en memoria (se
+    reseteaba en cada deploy); ahora persiste, con PK única para deduplicar aun
+    con reintentos/concurrencia. Se purgan los viejos periódicamente."""
+    __tablename__ = "bot_seen_sids"
+
+    message_sid = Column(String, primary_key=True)
+    seen_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
 class IngestedConectado(Base):
     """Tracking de cada newsletter "Conectados" archivado para el bot.
 

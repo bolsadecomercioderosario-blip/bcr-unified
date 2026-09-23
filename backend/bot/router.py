@@ -27,6 +27,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import require_roles, ROLE_COMUNICACION
@@ -67,26 +68,38 @@ def _phone_allowed(from_phone: str) -> bool:
 # ---------------------------------------------------------------------------
 _LAST_WEBHOOKS: deque = deque(maxlen=25)
 
-# Anti-replay: MessageSid ya procesados (en memoria, acotado). Twilio reintenta
-# el webhook si no contestamos a tiempo, y un request firmado capturado podría
-# reenviarse → deduplicamos para no correr el agente (ni gastar OpenAI) dos veces
-# por el mismo mensaje. Se resetea en cada reinicio (aceptable: cubre la ventana
-# de reintentos, que es de minutos).
-_SEEN_SIDS: deque = deque(maxlen=500)
-_SEEN_SIDS_SET: set = set()
+# Anti-replay: MessageSid ya procesados, PERSISTIDOS en DB (tabla bot_seen_sids).
+# Twilio reintenta el webhook si no contestamos a tiempo, y un request firmado
+# capturado podría reenviarse → deduplicamos para no correr el agente (ni gastar
+# OpenAI) dos veces. Persistir en DB (antes en memoria) sobrevive reinicios y es
+# correcto con >1 worker (la PK única resuelve la carrera). Purga los viejos.
+_SEEN_SID_RETENTION = timedelta(days=2)
 
 
 def _already_processed(message_sid: str) -> bool:
     """True si este MessageSid ya se procesó (y lo registra si es nuevo)."""
     if not message_sid:
         return False
-    if message_sid in _SEEN_SIDS_SET:
+    db = SessionLocal()
+    try:
+        exists = db.query(db_models.BotSeenSid).filter(
+            db_models.BotSeenSid.message_sid == message_sid
+        ).first()
+        if exists:
+            return True
+        db.add(db_models.BotSeenSid(message_sid=message_sid, seen_at=datetime.utcnow()))
+        # Purga de viejos para no crecer sin fin (tabla chica, con índice).
+        db.query(db_models.BotSeenSid).filter(
+            db_models.BotSeenSid.seen_at < datetime.utcnow() - _SEEN_SID_RETENTION
+        ).delete()
+        db.commit()
+        return False
+    except IntegrityError:
+        # Carrera: otro request insertó el mismo SID primero → ya procesado.
+        db.rollback()
         return True
-    if len(_SEEN_SIDS) >= _SEEN_SIDS.maxlen:
-        _SEEN_SIDS_SET.discard(_SEEN_SIDS.popleft())
-    _SEEN_SIDS.append(message_sid)
-    _SEEN_SIDS_SET.add(message_sid)
-    return False
+    finally:
+        db.close()
 
 
 def _candidate_urls(request: Request) -> list[str]:
