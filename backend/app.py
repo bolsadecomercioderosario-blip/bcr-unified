@@ -349,6 +349,24 @@ async def _capacita_admin():
     )
 
 
+# Informe de ejemplo — infografía interactiva estática (público, sin login).
+# Es un HTML autocontenido (sólo usa Google Fonts); no tiene assets locales.
+_INFORMEEJEMPLO_DIR = os.path.join(STATIC_DIR, "informeejemplo")
+
+
+@app.get("/informeejemplo")
+async def _informeejemplo_redirect():
+    return RedirectResponse(url="/informeejemplo/", status_code=307)
+
+
+@app.get("/informeejemplo/")
+async def _informeejemplo_index():
+    return FileResponse(
+        os.path.join(_INFORMEEJEMPLO_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 # Métricas FBCR — EN STAND-BY (2026-09). El dashboard y su API se dieron de baja
 # a pedido; el código y los datos quedan intactos para reactivarlo cuando pidan.
 # Mientras tanto, /metricas y /metricas/admin muestran una pantalla de "no
