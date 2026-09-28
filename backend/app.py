@@ -9,6 +9,7 @@ semana_datos/) y expone un APIRouter. Este archivo solo:
   - Sirve los frontends estáticos (con cache-busting).
 """
 import os
+import re
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -349,22 +350,38 @@ async def _capacita_admin():
     )
 
 
-# Informe de ejemplo — infografía interactiva estática (público, sin login).
-# Es un HTML autocontenido (sólo usa Google Fonts); no tiene assets locales.
-_INFORMEEJEMPLO_DIR = os.path.join(STATIC_DIR, "informeejemplo")
+# Infografías estáticas (públicas, sin login). Cada una es un HTML autocontenido
+# en static/infografias/<slug>/index.html. Para publicar una nueva: crear la
+# carpeta con su index.html — no hace falta tocar código.
+_INFOGRAFIAS_DIR = os.path.join(STATIC_DIR, "infografias")
+# Slug seguro: sólo minúsculas, dígitos y guiones (evita path traversal).
+_INFOGRAFIA_SLUG_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 
 
+def _infografia_response(slug: str):
+    if not _INFOGRAFIA_SLUG_RE.match(slug):
+        raise HTTPException(status_code=404, detail="Infografía no encontrada")
+    path = os.path.join(_INFOGRAFIAS_DIR, slug, "index.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Infografía no encontrada")
+    return FileResponse(path, headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+@app.get("/infografias/{slug}")
+async def _infografia_redirect(slug: str):
+    return RedirectResponse(url=f"/infografias/{slug}/", status_code=307)
+
+
+@app.get("/infografias/{slug}/")
+async def _infografia_index(slug: str):
+    return _infografia_response(slug)
+
+
+# Compatibilidad: la URL vieja /informeejemplo redirige a la nueva ubicación.
 @app.get("/informeejemplo")
-async def _informeejemplo_redirect():
-    return RedirectResponse(url="/informeejemplo/", status_code=307)
-
-
 @app.get("/informeejemplo/")
-async def _informeejemplo_index():
-    return FileResponse(
-        os.path.join(_INFORMEEJEMPLO_DIR, "index.html"),
-        headers={"Cache-Control": "no-cache, must-revalidate"},
-    )
+async def _informeejemplo_moved():
+    return RedirectResponse(url="/infografias/inversion-siembra/", status_code=301)
 
 
 # Métricas FBCR — EN STAND-BY (2026-09). El dashboard y su API se dieron de baja
