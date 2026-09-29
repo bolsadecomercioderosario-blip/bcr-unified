@@ -181,8 +181,17 @@ async def _security_headers(request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+    # Excepción: las infografías (/infografias/*) son públicas y están pensadas
+    # para embeberse en sitios de terceros (ej. la web de un colega/medio), así
+    # que ahí permitimos framing desde cualquier origen. El resto de la app sigue
+    # bloqueada contra clickjacking (sólo mismo origen).
+    if request.url.path.startswith("/infografias/"):
+        response.headers["Content-Security-Policy"] = "frame-ancestors *"
+        if "x-frame-options" in response.headers:
+            del response.headers["x-frame-options"]
+    else:
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
     return response
 
 
