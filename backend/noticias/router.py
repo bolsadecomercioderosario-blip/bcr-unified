@@ -381,7 +381,9 @@ videos_api = APIRouter(prefix="/api/videos", dependencies=[Depends(require_roles
 
 @videos_api.get("")
 def videos_listar(db: Session = Depends(get_db)) -> dict[str, Any]:
-    rows = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).all()
+    # Más NUEVO primero: el destacado (primero de la lista) es siempre el último
+    # cargado, para mantener la novedad. Al subir uno nuevo, pasa a ser el destacado.
+    rows = db.query(Video).order_by(Video.created_at.desc(), Video.id.desc()).all()
     return {"videos": [{"id": v.id, "youtube_id": v.youtube_id, "titulo": v.titulo} for v in rows]}
 
 
@@ -510,7 +512,8 @@ async def home(request: Request, db: Session = Depends(get_db)):
         db.query(Noticia).filter(*_live_conds())
         .order_by(Noticia.fecha_pub.desc()).limit(60).all()
     )
-    videos = db.query(Video).order_by(Video.orden.asc(), Video.created_at.desc()).limit(6).all()
+    # Más nuevo primero: el hero de Videos es siempre el último cargado.
+    videos = db.query(Video).order_by(Video.created_at.desc(), Video.id.desc()).limit(6).all()
     title, body = render.render_home(rows, videos)
     html = render.base_page(
         title=title,
