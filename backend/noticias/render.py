@@ -145,6 +145,13 @@ def _fmt_fecha_corta(iso: str | None) -> str:
 
 def _hpcell(p: dict) -> str:
     nombre, color = _crop(p["producto"])
+    # Sin cotización ese día: mostramos el cultivo igual, con "s/c" (sin precio,
+    # sin US$ ni flecha).
+    if p.get("precio") is None:
+        return (f'<div class="hpcell">'
+                f'<span class="hpbar" style="background:{color}"></span>'
+                f'<span class="hpname" style="color:{color}">{_esc(nombre)}</span>'
+                f'<span class="hpval" style="opacity:.55">s/c</span></div>')
     usd = _fmt_usd(p["usd"]) if p.get("usd") else ""
     usd_html = f'<span class="hpusd">{usd}</span>' if usd else ""
     return (f'<div class="hpcell">'
@@ -157,6 +164,11 @@ def _hpcell(p: dict) -> str:
 
 def _pcell(p: dict) -> str:
     nombre, color = _crop(p["producto"])
+    if p.get("precio") is None:
+        return (f'<div class="pcell">'
+                f'<span class="pbar" style="background:{color}"></span>'
+                f'<span class="pname" style="color:{color}">{_esc(nombre)}</span>'
+                f'<span class="pprice" style="opacity:.55">s/c</span></div>')
     usd = _fmt_usd(p["usd"]) if p.get("usd") else ""
     usd_html = f'<span class="pusd">{usd}</span>' if usd else ""
     return (f'<div class="pcell">'

@@ -127,6 +127,27 @@ def listar_admin(db: Session = Depends(get_db)) -> dict[str, Any]:
             "noticias": [_to_dict(n) for n in rows]}
 
 
+@router.get("/biblioteca-imagenes")
+def biblioteca_imagenes(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Portadas ya usadas en otras notas (URLs distintas, más recientes primero),
+    para poder reutilizarlas al elegir la portada sin volver a subir. Se declara
+    ANTES de /{nid} para que "biblioteca-imagenes" no matchee como un id."""
+    rows = (db.query(Noticia.imagen_portada, Noticia.titulo)
+            .filter(Noticia.imagen_portada.isnot(None), Noticia.imagen_portada != "")
+            .order_by(Noticia.created_at.desc())
+            .all())
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for url, titulo in rows:
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append({"url": url, "titulo": titulo or ""})
+        if len(out) >= 80:
+            break
+    return {"imagenes": out}
+
+
 @router.get("/{nid}")
 def obtener(nid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     n = db.query(Noticia).filter(Noticia.id == nid).first()
@@ -401,6 +422,11 @@ def _canonical(request: Request, path: str) -> str:
 # Orden fijo de cultivos para la marquesina (como la home institucional).
 _PRECIO_ORDEN = {"trigo": 0, "maiz": 1, "maíz": 1, "girasol": 2, "soja": 3, "sorgo": 4, "cebada": 5}
 
+# Los 5 cultivos que SIEMPRE se muestran en la marquesina (mismo set y orden que
+# la home institucional), aunque ese día alguno no tenga cotización (→ "s/c").
+# Claves normalizadas como las guarda el scraper (lowercase, sin acentos).
+_PRECIO_CULTIVOS = ["trigo", "maiz", "girasol", "soja", "sorgo"]
+
 # TC BNA (billete comprador) para el US$ informativo de la marquesina.
 # Se cachea en memoria ~6h para no pegarle a la API en cada request.
 _TC_CACHE: dict[str, Any] = {"valor": None, "ts": 0.0}
@@ -443,17 +469,25 @@ def _latest_precios(db: Session) -> list[dict[str, Any]]:
         if not fechas:
             return []
         rows = db.query(PrecioPizarra).filter(PrecioPizarra.fecha == fechas[0]).all()
+        latest = {(r.producto or "").lower(): r for r in rows}
         prev = {}
         if len(fechas) > 1:
             prev = {
                 (r.producto or "").lower(): r.precio_ars_tn
                 for r in db.query(PrecioPizarra).filter(PrecioPizarra.fecha == fechas[1]).all()
             }
-        rows.sort(key=lambda r: _PRECIO_ORDEN.get((r.producto or "").lower(), 9))
         tc = _tc_bna_comprador()
+        # Recorremos SIEMPRE los 5 cultivos fijos (en orden). Si alguno no tiene
+        # fila para la última fecha, va con precio=None → la marquesina lo muestra
+        # como "s/c" (sin cotización), pero el cultivo nunca desaparece.
         out = []
-        for r in rows:
-            pv = prev.get((r.producto or "").lower())
+        for key in _PRECIO_CULTIVOS:
+            r = latest.get(key)
+            if r is None:
+                out.append({"producto": key, "precio": None, "fecha": fechas[0],
+                            "trend": None, "usd": None})
+                continue
+            pv = prev.get(key)
             trend = "eq"
             if pv is not None:
                 trend = "up" if r.precio_ars_tn > pv else ("down" if r.precio_ars_tn < pv else "eq")
