@@ -14,6 +14,7 @@ export const AREA_NOMBRE = {
     fundacion: 'Fundación BCR',
     legales: 'Legales',
     bcrlabs: 'BCRlabs',
+    asociados: 'Asociados',
 };
 
 // Etiqueta del "dueño" de una actividad para las tarjetas de la agenda completa.

@@ -69,6 +69,7 @@ AREAS = [
     {"slug": "fundacion", "nombre": "Fundación BCR"},
     {"slug": "legales", "nombre": "Legales"},
     {"slug": "bcrlabs", "nombre": "BCRlabs"},
+    {"slug": "asociados", "nombre": "Asociados"},
 ]
 AREA_SLUGS = {a["slug"] for a in AREAS}
 AREA_NOMBRE = {a["slug"]: a["nombre"] for a in AREAS}
