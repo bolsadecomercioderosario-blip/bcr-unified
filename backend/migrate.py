@@ -147,6 +147,16 @@ def migrate():
     _try_exec("ALTER activities add sec_notes",
               "ALTER TABLE activities ADD COLUMN sec_notes VARCHAR DEFAULT ''")
 
+    # --- Limpieza: dropear tablas huérfanas de apps eliminadas (Aapresid, murga,
+    # corte, canciones). Sus modelos ya no existen en el código, así que create_all
+    # no las recrea; esto sólo libera lo que quedó en la DB de prod. Idempotente
+    # (DROP ... IF EXISTS: no falla si ya no están). CASCADE en Postgres por las
+    # foreign keys entre las aap_* (en SQLite no hace falta y no se soporta). ---
+    _cascade = " CASCADE" if engine.dialect.name == "postgresql" else ""
+    for _t in ("aap_attendance", "aap_shifts", "aap_people", "aap_areas", "aap_events",
+               "murga_participantes", "corte_respuestas", "canciones_respuestas"):
+        _try_exec(f"DROP tabla huérfana {_t}", f"DROP TABLE IF EXISTS {_t}{_cascade}")
+
     # Panel interno de la murga: importa los datos de los Excels (caja, ensayos,
     # toques) la primera vez que las tablas ab_ están vacías.
     from abuela.seed import seed_abuela_if_empty
