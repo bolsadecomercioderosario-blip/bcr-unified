@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cámara Arbitral de Cereales | Bolsa de Comercio de Rosario</title>
+<meta name="description" content="Cámara Arbitral de Cereales de la Bolsa de Comercio de Rosario: arbitraje, calidad y precios de pizarra de referencia para la cadena de granos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#193363; --navy-deep:#102249; --azure:#2E6FB0; --azure-bright:#5B9BDB;
+    /* Acento propio de la CAC: dorado cereal (distinto del magenta de Capacita
+       y el teal de BCR Data). */
+    --cac:#B5852A; --cac-deep:#8C661F; --cac-soft:#F7F0DF;
+    --ink:#1E2A44; --muted:#6B7B92; --line:#E4EAF2; --paper:#FFFFFF; --wash:#F6F8FC;
+    --serif:"Spectral",Georgia,serif; --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    /* cultivos (misma paleta del ecosistema) */
+    --trigo:#9A7B39; --maiz:#E08A1E; --girasol:#E0AE00; --soja:#2E9E41; --sorgo:#B23A2E;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased;line-height:1.55}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1090px;margin:0 auto;padding:0 18px}
+  h1,h2,h3{font-family:var(--serif);font-weight:700;letter-spacing:-.01em;color:var(--navy);margin:0}
+
+  /* ===== SHELL: header navy (mismo esqueleto que el resto del ecosistema) ===== */
+  header{position:sticky;top:0;z-index:60;background:var(--navy);border-bottom:1px solid rgba(255,255,255,.08)}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;height:72px}
+  .brand{display:flex;align-items:center;gap:12px;color:#fff}
+  .crest{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;font-size:15px;flex:none}
+  .brand .bt{line-height:1.1}
+  .brand .bt b{font-size:14.5px;font-weight:700;display:block}
+  .brand .bt span{font-size:11px;color:#AEC2E0;letter-spacing:.04em}
+  nav.menu{display:none;align-items:center;gap:4px}
+  nav.menu a{color:#DCE7F5;font-size:14px;font-weight:600;padding:9px 13px;border-radius:999px;transition:background .15s,color .15s}
+  nav.menu a:hover{background:rgba(255,255,255,.10);color:#fff}
+  nav.menu a.active{background:var(--cac);color:#fff}
+  .lang{display:flex;gap:2px;margin-left:8px;border:1px solid rgba(255,255,255,.22);border-radius:999px;overflow:hidden}
+  .lang a{padding:6px 10px;font-size:12px;font-weight:700;color:#AEC2E0}
+  .lang a.on{background:rgba(255,255,255,.16);color:#fff}
+  .hamb{border:0;background:none;cursor:pointer;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+  @media(min-width:900px){ nav.menu{display:flex} .hamb{display:none} }
+  /* menú mobile */
+  .mmenu{display:none;background:var(--navy-deep);border-bottom:1px solid rgba(255,255,255,.08)}
+  .mmenu.open{display:block}
+  .mmenu a{display:block;color:#DCE7F5;font-weight:600;padding:13px 18px;border-top:1px solid rgba(255,255,255,.06)}
+  .mmenu a.active{color:#fff;background:rgba(181,133,42,.25)}
+
+  /* ===== HERO ===== */
+  .hero{padding:52px 0 44px}
+  .hero .wrap{display:grid;grid-template-columns:1.02fr .98fr;gap:40px;align-items:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cac);font-weight:800}
+  .eyebrow::before{content:"";width:22px;height:2px;background:var(--cac);display:inline-block}
+  .hero h1{font-size:clamp(30px,4.6vw,46px);line-height:1.06;margin:14px 0 16px}
+  .hero p{font-size:clamp(16px,1.9vw,18px);color:#40506B;margin:0 0 24px;max-width:520px}
+  .btns{display:flex;flex-wrap:wrap;gap:12px}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding:13px 24px;border-radius:999px;transition:transform .15s,background .15s,color .15s,border-color .15s;cursor:pointer;border:1.5px solid transparent}
+  .btn-cac{background:var(--cac);color:#fff} .btn-cac:hover{background:var(--cac-deep);transform:translateY(-2px)}
+  .btn-ghost{border-color:var(--line);color:var(--navy);background:#fff} .btn-ghost:hover{border-color:var(--cac);color:var(--cac)}
+
+  /* ===== Pizarra (card del hero) ===== */
+  .pizarra{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 26px 60px rgba(16,30,60,.14);overflow:hidden}
+  .pz-head{background:var(--navy);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .pz-head b{font-family:var(--serif);font-size:16px}
+  .pz-head span{font-size:12px;color:#AEC2E0}
+  .pz-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-top:1px solid var(--line)}
+  .pz-row:first-of-type{border-top:0}
+  .pz-bar{width:5px;height:30px;border-radius:3px;flex:none}
+  .pz-name{font-weight:700;color:var(--navy);width:84px;flex:none}
+  .pz-price{font-weight:700;margin-left:auto;text-align:right}
+  .pz-price small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
+  .pz-arr{width:26px;text-align:center;font-weight:700}
+  .pz-arr.up{color:var(--soja)} .pz-arr.eq{color:var(--muted)}
+  .pz-foot{padding:11px 18px;background:var(--wash);border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+
+  /* ===== secciones ===== */
+  section.blk{padding:52px 0}
+  .blk.alt{background:var(--wash);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .sechead{max-width:680px;margin:0 0 28px}
+  .sechead .eyebrow{margin-bottom:10px}
+  .sechead h2{font-size:clamp(24px,3.4vw,34px);line-height:1.12}
+  .sechead p{color:var(--muted);margin:10px 0 0;font-size:15.5px}
+
+  /* pilares (3 funciones) */
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .pill{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 22px;transition:box-shadow .15s,transform .15s,border-color .15s}
+  .pill:hover{box-shadow:0 16px 40px rgba(16,30,60,.10);transform:translateY(-3px);border-color:#E4D8BC}
+  .pill .ic{width:46px;height:46px;border-radius:12px;background:var(--cac-soft);color:var(--cac-deep);display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:22px}
+  .pill h3{font-size:18px;margin-bottom:7px}
+  .pill p{margin:0;color:var(--muted);font-size:14.5px}
+  @media(max-width:820px){ .pillars{grid-template-columns:1fr} .hero .wrap{grid-template-columns:1fr} .pizarra{order:-1} }
+
+  /* grid de recursos (arbitraje y calidad) */
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .rc{display:block;background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;transition:box-shadow .15s,transform .15s,border-color .15s}
+  .rc:hover{box-shadow:0 16px 40px rgba(16,30,60,.10);transform:translateY(-3px);border-color:var(--cac)}
+  .rc .k{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--cac-deep)}
+  .rc h3{font-size:19px;margin:8px 0 6px}
+  .rc p{margin:0;color:var(--muted);font-size:14.5px}
+  .rc .go{display:inline-block;margin-top:12px;color:var(--cac-deep);font-weight:700;font-size:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip{font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:999px;background:var(--wash);border:1px solid var(--line);color:var(--navy)}
+  @media(max-width:720px){ .cards{grid-template-columns:1fr} }
+
+  /* composición */
+  .comp{display:grid;grid-template-columns:1.1fr 1fr;gap:34px;align-items:center}
+  .comp .big{font-family:var(--serif);font-size:54px;color:var(--cac-deep);line-height:1}
+  .seats{display:flex;flex-direction:column;gap:9px}
+  .seat{display:flex;align-items:center;gap:12px}
+  .seat .n{width:30px;height:30px;border-radius:8px;background:var(--cac-soft);color:var(--cac-deep);font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px}
+  .seat .l{font-size:14.5px}
+  @media(max-width:720px){ .comp{grid-template-columns:1fr} }
+
+  /* CTA chatbot */
+  .cta{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:20px;padding:40px;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center}
+  .cta h2{color:#fff;font-size:26px}
+  .cta p{margin:8px 0 0;color:#C6D6EC;max-width:520px}
+  .cta .btn-cac{box-shadow:0 10px 30px rgba(181,133,42,.35)}
+  @media(max-width:720px){ .cta{grid-template-columns:1fr;padding:28px;text-align:center} .cta .btns{justify-content:center} }
+
+  footer{background:var(--navy-deep);color:#AEC2E0;padding:34px 0;margin-top:8px;font-size:13.5px}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center}
+  footer a{color:#DCE7F5}
+  .demo{background:var(--cac-soft);color:var(--cac-deep);text-align:center;font-size:12.5px;font-weight:600;padding:7px}
+</style>
+</head>
+<body>
+
+<div class="demo">Maqueta de prototipo · Cámara Arbitral de Cereales integrada al ecosistema digital BCR · datos de referencia</div>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="bcr_home_mvp_34.html" aria-label="Bolsa de Comercio de Rosario">
+      <span class="crest">BCR</span>
+      <span class="bt"><b>Bolsa de Comercio de Rosario</b><span>Cámara Arbitral de Cereales</span></span>
+    </a>
+    <nav class="menu">
+      <a href="bcr_cotizaciones_mvp_4.html">Cotizaciones</a>
+      <a href="bcr_data_mvp_1.html">BCR Data</a>
+      <a href="bcr_capacita_mvp_5.html">Capacita</a>
+      <a class="active" href="bcr_cac_mvp_1.html">Cámara Arbitral</a>
+      <span class="lang"><a class="on" href="#">ES</a><a href="#">EN</a></span>
+    </nav>
+    <button class="hamb" id="hamb" aria-label="Menú">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="mmenu" id="mmenu">
+    <a href="bcr_cotizaciones_mvp_4.html">Cotizaciones</a>
+    <a href="bcr_data_mvp_1.html">BCR Data</a>
+    <a href="bcr_capacita_mvp_5.html">Capacita</a>
+    <a class="active" href="bcr_cac_mvp_1.html">Cámara Arbitral</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">Cámara Arbitral de Cereales · Rosario</span>
+      <h1>Calidad, arbitraje y precios de referencia para la cadena de granos</h1>
+      <p>La CAC se sitúa en forma equidistante entre la oferta y la demanda: resuelve conflictos de calidad, determina la calidad final de los granos y establece los <b>precios de pizarra</b> del mercado disponible.</p>
+      <div class="btns">
+        <a class="btn btn-cac" href="#pizarra">Consultar precios de pizarra</a>
+        <a class="btn btn-ghost" href="#chatbot">Ir al chatbot</a>
+      </div>
+    </div>
+
+    <div class="pizarra" id="pizarra">
+      <div class="pz-head"><b>Precios Pizarra</b><span>01/10/2026</span></div>
+      <div class="pz-row"><span class="pz-bar" style="background:var(--trigo)"></span><span class="pz-name">Trigo</span><span class="pz-arr eq">=</span><span class="pz-price">$333.000<small>US$ 219,73</small></span></div>
+      <div class="pz-row"><span class="pz-bar" style="background:var(--maiz)"></span><span class="pz-name">Maíz</span><span class="pz-arr eq">=</span><span class="pz-price">$287.900<small>US$ 189,97</small></span></div>
+      <div class="pz-row"><span class="pz-bar" style="background:var(--girasol)"></span><span class="pz-name">Girasol</span><span class="pz-arr eq"></span><span class="pz-price" style="opacity:.75">S/C (E)<small>US$ (E) 505,00</small></span></div>
+      <div class="pz-row"><span class="pz-bar" style="background:var(--soja)"></span><span class="pz-name">Soja</span><span class="pz-arr up">▲</span><span class="pz-price">$552.500<small>US$ 364,57</small></span></div>
+      <div class="pz-row"><span class="pz-bar" style="background:var(--sorgo)"></span><span class="pz-name">Sorgo</span><span class="pz-arr up">▲</span><span class="pz-price">$295.523<small>US$ 195,00</small></span></div>
+      <div class="pz-foot">$/Tn · entrega enseguida, pago contado, zona Rosario. US$ a título informativo (TC BNA divisa comprador 01/10/2026: $1.515,50).</div>
+    </div>
+  </div>
+</section>
+
+<!-- QUÉ ES / 3 FUNCIONES -->
+<section class="blk alt">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">Qué hace la CAC</span>
+      <h2>Tres funciones, un mismo fin: buenas prácticas comerciales</h2>
+      <p>Un "amortiguador" entre la oferta y la demanda que subsana conflictos y da referencias confiables a toda la cadena agrocomercial.</p>
+    </div>
+    <div class="pillars">
+      <div class="pill">
+        <div class="ic">⚖️</div>
+        <h3>Arbitraje</h3>
+        <p>Resuelve los conflictos derivados de incumplimientos de calidad y condición de la mercadería.</p>
+      </div>
+      <div class="pill">
+        <div class="ic">🌾</div>
+        <h3>Calidad</h3>
+        <p>Determina la calidad final de los granos que se comercializan, con criterios técnicos uniformes.</p>
+      </div>
+      <div class="pill">
+        <div class="ic">📊</div>
+        <h3>Precios de pizarra</h3>
+        <p>Establece los precios del mercado disponible de granos, referencia diaria para la plaza de Rosario.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARBITRAJE Y CALIDAD -->
+<section class="blk">
+  <div class="wrap">
+    <div class="sechead">
+      <span class="eyebrow">Arbitraje y calidad</span>
+      <h2>Informes, laudos y normativa</h2>
+      <p>Documentación técnica y resoluciones que ordenan la comercialización de granos.</p>
+    </div>
+    <div class="cards">
+      <a class="rc" href="#">
+        <div class="k">Informes de calidad</div>
+        <h3>Calidad de cosecha</h3>
+        <p>Informes por cultivo y campaña, en español e inglés, con los parámetros de calidad de cada cosecha.</p>
+        <div class="chips"><span class="chip">Trigo</span><span class="chip">Maíz</span><span class="chip">Girasol</span><span class="chip">Soja</span><span class="chip">Sorgo</span></div>
+      </a>
+      <a class="rc" href="#">
+        <div class="k">Resoluciones</div>
+        <h3>Arbitrajes y laudos</h3>
+        <p>Resolución de diferencias de calidad y condición entre partes, con laudos que sientan criterio.</p>
+        <span class="go">Ver proceso →</span>
+      </a>
+      <a class="rc" href="#">
+        <div class="k">Marco</div>
+        <h3>Normativa y reglamentos</h3>
+        <p>Estándares de comercialización, bases de contratación y reglamentos vigentes de la Cámara.</p>
+        <span class="go">Ver normativa →</span>
+      </a>
+      <a class="rc" href="#pizarra">
+        <div class="k">Mercado</div>
+        <h3>Histórico de pizarra</h3>
+        <p>Serie de precios de pizarra por cultivo para seguimiento y análisis de la plaza local.</p>
+        <span class="go">Consultar precios →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- COMPOSICIÓN -->
+<section class="blk alt">
+  <div class="wrap comp">
+    <div>
+      <span class="eyebrow">Composición</span>
+      <h2 style="margin:10px 0 14px">Un equilibrio representativo de la cadena</h2>
+      <p style="color:var(--muted);margin:0 0 10px">La Cámara se rige por el Estatuto de la BCR: <b>22 miembros titulares</b> e igual número de suplentes, con Presidente, Vicepresidente y Secretario. El ejercicio va del 1 de diciembre al 30 de noviembre.</p>
+      <p style="color:var(--muted);margin:0"><span class="big">22</span> miembros titulares, distribuidos entre los sectores de la actividad para alcanzar un justo equilibrio entre oferta y demanda.</p>
+    </div>
+    <div class="seats">
+      <div class="seat"><span class="n">4</span><span class="l">Exportadores</span></div>
+      <div class="seat"><span class="n">4</span><span class="l">Fabricantes de aceites vegetales</span></div>
+      <div class="seat"><span class="n">3</span><span class="l">Industriales molineros</span></div>
+      <div class="seat"><span class="n">3</span><span class="l">Comisionistas o consignatarios de cereales</span></div>
+      <div class="seat"><span class="n">3</span><span class="l">Acopiadores de granos</span></div>
+      <div class="seat"><span class="n">3</span><span class="l">Cooperativas agrarias de 2.º grado</span></div>
+      <div class="seat"><span class="n">2</span><span class="l">Productores agropecuarios</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA CHATBOT / ACCESOS -->
+<section class="blk">
+  <div class="wrap">
+    <div class="cta" id="chatbot">
+      <div>
+        <h2>¿Consultás precios o calidad seguido?</h2>
+        <p>El chatbot de la CAC te da los precios de pizarra del día y te orienta en arbitrajes, calidad y normativa — por WhatsApp, cuando lo necesites.</p>
+      </div>
+      <div class="btns">
+        <a class="btn btn-cac" href="#">Ir al chatbot</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>Cámara Arbitral de Cereales · Bolsa de Comercio de Rosario</div>
+    <div><a href="bcr_home_mvp_34.html">← Volver al ecosistema BCR</a></div>
+  </div>
+</footer>
+
+<script>
+  // Menú mobile
+  var hamb=document.getElementById('hamb'), mm=document.getElementById('mmenu');
+  if(hamb){ hamb.addEventListener('click',function(){ mm.classList.toggle('open'); }); }
+</script>
+</body>
+</html>
