@@ -180,24 +180,32 @@ export function renderActivityForm(container, preData = null) {
             </div>`;
     }
 
-    // --- Sección "Agenda de la Mesa" (sólo Área): sugerir a Compromisos ---
+    // --- Sección "Solicitudes" (sólo Área): sugerir a Mesa + pedir cobertura ---
+    // Cada casilla explica qué significa (a dónde se hace visible la actividad).
     let sugerirHTML = '';
     if (isArea) {
         const st = act.me_estado || '';
-        const checked = (st === 'pendiente' || st === 'aprobada') ? 'checked' : '';
-        const disabled = st === 'aprobada' ? 'disabled' : '';
-        let hint = 'Se envía como sugerencia; Secretaría la aprueba para que aparezca en la Agenda de la Mesa.';
-        if (st === 'pendiente') hint = 'Sugerida — pendiente de aprobación de Secretaría.';
-        else if (st === 'aprobada') hint = 'Aprobada — ya aparece en la Agenda de la Mesa. La seguís editando normalmente.';
-        else if (st === 'rechazada') hint = 'Secretaría no la sumó a la Mesa. Podés volver a sugerirla marcando la casilla.';
+        const mesaChecked = (st === 'pendiente' || st === 'aprobada') ? 'checked' : '';
+        const mesaDisabled = st === 'aprobada' ? 'disabled' : '';
+        let mesaHint = 'Al tildar esta opción, esta actividad se hace visible para Secretaría Privada, que evalúa si corresponde cargarla en la Agenda de Compromisos (Mesa).';
+        if (st === 'pendiente') mesaHint = 'Sugerida — pendiente de evaluación de Secretaría Privada.';
+        else if (st === 'aprobada') mesaHint = 'Aprobada — ya aparece en la Agenda de la Mesa. La seguís editando normalmente.';
+        else if (st === 'rechazada') mesaHint = 'Secretaría no la sumó a la Mesa. Podés volver a sugerirla marcando la casilla.';
+        const covChecked = act.solicita_cobertura ? 'checked' : '';
         sugerirHTML = `
             <section>
-                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Agenda de la Mesa</h3>
-                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: ${disabled ? 'default' : 'pointer'}; font-weight: 600;">
-                    <input type="checkbox" id="area-sugerir" ${checked} ${disabled} style="width: 18px; height: 18px;">
+                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Solicitudes</h3>
+                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: ${mesaDisabled ? 'default' : 'pointer'}; font-weight: 600;">
+                    <input type="checkbox" id="area-sugerir" ${mesaChecked} ${mesaDisabled} style="width: 18px; height: 18px;">
                     Sugerir esta actividad para la Agenda de Compromisos (Mesa)
                 </label>
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">${hint}</p>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">${mesaHint}</p>
+
+                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 600; margin-top: 1.1rem;">
+                    <input type="checkbox" id="area-cobertura" ${covChecked} style="width: 18px; height: 18px;">
+                    ¿Solicita cobertura?
+                </label>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">Al solicitar cobertura, esta actividad se hace visible para el área de Comunicación y Prensa, que evaluará la solicitud.</p>
             </section>`;
     }
 
@@ -719,9 +727,10 @@ export function renderActivityForm(container, preData = null) {
                 attachment_name: att.attachment_name,
             };
         } else if (isArea) {
-            // Área: Datos Generales + adjunto + estado de sugerencia a la Mesa.
+            // Área: Datos Generales + adjunto + sugerencia a la Mesa + cobertura.
             const att = getAttachment();
             const sug = container.querySelector('#area-sugerir');
+            const cob = container.querySelector('#area-cobertura');
             // No se puede "des-aprobar" desde el área: si ya está aprobada, queda.
             let me_estado = act.me_estado || '';
             if (me_estado !== 'aprobada') {
@@ -734,6 +743,7 @@ export function renderActivityForm(container, preData = null) {
                 attachment_url: att.attachment_url,
                 attachment_name: att.attachment_name,
                 me_estado,
+                solicita_cobertura: !!(cob && cob.checked),
             };
         } else {
             // Comunicación: siempre lo operativo + notas internas.

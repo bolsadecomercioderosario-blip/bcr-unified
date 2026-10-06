@@ -278,8 +278,9 @@ def _visibility_filter(query, role: str):
     A = agenda_models.Activity
     if role in (ROLE_COMUNICACION, ROLE_AUDIOVISUAL):
         # Comunicación (y Audiovisual, que necesita ver las tareas AV): no-área
-        # (comunicación + secretaría) + área aprobada.
-        return query.filter(or_(A.origen != "area", A.me_estado == "aprobada"))
+        # (comunicación + secretaría) + área aprobada a Mesa O que pidió cobertura.
+        return query.filter(or_(A.origen != "area", A.me_estado == "aprobada",
+                                A.solicita_cobertura.is_(True)))
     # secretaria y área ven Mesa + áreas (no lo interno de Comunicación).
     return query.filter(A.origen.in_(["secretaria", "area"]))
 
@@ -363,8 +364,8 @@ def _allowed_update_fields(db_activity, role: str) -> set:
     if role == ROLE_COMUNICACION:
         if origen == "comunicacion":
             return _GENERALS | _ATTACHMENT | _OPERATIVE | _NEWSLETTER
-        if origen == "secretaria" or (origen == "area" and db_activity.me_estado == "aprobada"):
-            return _OPERATIVE | _NEWSLETTER  # ajena: sus campos operativos + armado del newsletter
+        if origen == "secretaria" or (origen == "area" and (db_activity.me_estado == "aprobada" or db_activity.solicita_cobertura)):
+            return _OPERATIVE | _NEWSLETTER  # ajena (Mesa aprobada o cobertura pedida): sus campos operativos + newsletter
         return set()
     if role == ROLE_SECRETARIA:
         if origen == "secretaria":
@@ -374,7 +375,7 @@ def _allowed_update_fields(db_activity, role: str) -> set:
         return set()
     if is_area_role(role):
         if origen == "area" and (db_activity.area or "") == area_of_role(role):
-            return _GENERALS | _ATTACHMENT | {"me_estado"}
+            return _GENERALS | _ATTACHMENT | {"me_estado", "solicita_cobertura"}
         return set()
     return set()
 

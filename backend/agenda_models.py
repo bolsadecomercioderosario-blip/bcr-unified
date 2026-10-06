@@ -58,6 +58,10 @@ class Activity(Base):
     # Una actividad de área aprobada aparece en la agenda de la Mesa; el área
     # la sigue pudiendo editar (mismo registro).
     me_estado = Column(String, default="")
+    # Solicitud de cobertura a Comunicación: la marca un área al cargar su
+    # actividad. Si es True, la actividad se hace visible para Comunicación y
+    # Prensa, que evalúa/cubre la solicitud. Independiente de la sugerencia a Mesa.
+    solicita_cobertura = Column(Boolean, default=False)
     # "Participa (por Mesa Ejecutiva)": quiénes participan por la Mesa. Lo carga
     # Secretaría en las actividades de área (va debajo de `participants`, que es
     # el "Participa por el área"). Es público (aparece en la landing).
@@ -132,6 +136,7 @@ class ActivityBase(BaseModel):
     origen: Optional[str] = "comunicacion"  # "secretaria" | "comunicacion" | "area"
     area: Optional[str] = ""  # slug del área dueña cuando origen='area'
     me_estado: Optional[str] = ""  # "" | "pendiente" | "aprobada" | "rechazada"
+    solicita_cobertura: Optional[bool] = False  # el área pide cobertura a Comunicación
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
     sec_notes: Optional[str] = ""         # Notas internas · Secretaría
     comunicacion_notes: Optional[str] = ""
@@ -174,6 +179,7 @@ class ActivityUpdate(BaseModel):
     origen: Optional[str] = None
     area: Optional[str] = None
     me_estado: Optional[str] = None
+    solicita_cobertura: Optional[bool] = None
     participants_me: Optional[str] = None
     sec_notes: Optional[str] = None
     comunicacion_notes: Optional[str] = None

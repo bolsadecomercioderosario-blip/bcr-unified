@@ -123,6 +123,12 @@ def migrate():
         expect_rowcount=True,
     )
 
+    # solicita_cobertura (el área pide cobertura a Comunicación). Se agrega ACÁ,
+    # antes de backfill_origen_from_channel() —que hace un SELECT ORM con todas las
+    # columnas del modelo— para que la columna ya exista cuando esa query corre.
+    _try_exec("ALTER activities add solicita_cobertura",
+              "ALTER TABLE activities ADD COLUMN solicita_cobertura BOOLEAN DEFAULT FALSE")
+
     backfill_origen_from_channel()
 
     seed_efemerides_if_empty()
