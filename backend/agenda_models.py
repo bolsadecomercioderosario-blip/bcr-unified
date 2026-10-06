@@ -62,6 +62,14 @@ class Activity(Base):
     # actividad. Si es True, la actividad se hace visible para Comunicación y
     # Prensa, que evalúa/cubre la solicitud. Independiente de la sugerencia a Mesa.
     solicita_cobertura = Column(Boolean, default=False)
+    # --- Visita (sólo lo usa el área BCRlabs) ---
+    # Si es_visita=True, la actividad es una visita al laboratorio y se cargan
+    # los datos de abajo (cantidad de personas, si requiere varios receptores y
+    # si es en inglés / requiere traductor).
+    es_visita = Column(Boolean, default=False)
+    visita_personas = Column(String, default="")
+    visita_varios_receptores = Column(Boolean, default=False)
+    visita_ingles = Column(Boolean, default=False)
     # "Participa (por Mesa Ejecutiva)": quiénes participan por la Mesa. Lo carga
     # Secretaría en las actividades de área (va debajo de `participants`, que es
     # el "Participa por el área"). Es público (aparece en la landing).
@@ -137,6 +145,10 @@ class ActivityBase(BaseModel):
     area: Optional[str] = ""  # slug del área dueña cuando origen='area'
     me_estado: Optional[str] = ""  # "" | "pendiente" | "aprobada" | "rechazada"
     solicita_cobertura: Optional[bool] = False  # el área pide cobertura a Comunicación
+    es_visita: Optional[bool] = False            # BCRlabs: la actividad es una visita
+    visita_personas: Optional[str] = ""
+    visita_varios_receptores: Optional[bool] = False
+    visita_ingles: Optional[bool] = False
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
     sec_notes: Optional[str] = ""         # Notas internas · Secretaría
     comunicacion_notes: Optional[str] = ""
@@ -180,6 +192,10 @@ class ActivityUpdate(BaseModel):
     area: Optional[str] = None
     me_estado: Optional[str] = None
     solicita_cobertura: Optional[bool] = None
+    es_visita: Optional[bool] = None
+    visita_personas: Optional[str] = None
+    visita_varios_receptores: Optional[bool] = None
+    visita_ingles: Optional[bool] = None
     participants_me: Optional[str] = None
     sec_notes: Optional[str] = None
     comunicacion_notes: Optional[str] = None

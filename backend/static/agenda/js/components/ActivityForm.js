@@ -46,7 +46,12 @@ export function renderActivityForm(container, preData = null) {
         sec_responsible_other: sourceAct.sec_responsible_other || '',
         attachment_url: sourceAct.attachment_url || '',
         attachment_name: sourceAct.attachment_name || '',
-        me_estado: sourceAct.me_estado || ''
+        me_estado: sourceAct.me_estado || '',
+        solicita_cobertura: !!sourceAct.solicita_cobertura,
+        es_visita: !!sourceAct.es_visita,
+        visita_personas: (sourceAct.visita_personas === 'undefined' || !sourceAct.visita_personas) ? '' : sourceAct.visita_personas,
+        visita_varios_receptores: !!sourceAct.visita_varios_receptores,
+        visita_ingles: !!sourceAct.visita_ingles
     };
 
     const isNew = !state.currentActivity;
@@ -66,9 +71,11 @@ export function renderActivityForm(container, preData = null) {
     }
     // Origen de la actividad. Para nuevas, lo define el rol que la crea.
     const actOrigen = sourceAct.origen || (isNew ? (isSec ? 'secretaria' : isArea ? 'area' : 'comunicacion') : 'comunicacion');
-    // Secretaría viendo una actividad de un ÁREA: solo lectura (el contenido lo
-    // maneja el área; Secretaría sólo aprueba/rechaza desde la bandeja).
-    const areaForeignForSec = isSec && actOrigen === 'area';
+    // Secretaría sobre una actividad de ÁREA ya APROBADA a la Mesa: la edita como
+    // propia (todos los campos); el área también la sigue editando (mismo registro).
+    // Antes de aprobar, Secretaría sólo hace seguimiento (Datos Generales read-only).
+    const secEditsApprovedArea = isSec && actOrigen === 'area' && act.me_estado === 'aprobada';
+    const areaForeignForSec = isSec && actOrigen === 'area' && !secEditsApprovedArea;
     // ¿Es una actividad de área? (para etiquetas y campos propios del circuito área)
     const esArea = isArea || actOrigen === 'area';
     // Datos Generales: los edita el dueño (Secretaría en las de Mesa; Área en
@@ -119,6 +126,45 @@ export function renderActivityForm(container, preData = null) {
             </div>`;
     }
 
+    // --- Bloque "Es una visita" (SÓLO el área BCRlabs lo edita; debajo del
+    // adjunto). Para el resto de los roles se muestra en solo lectura si ya está
+    // marcada como visita (ej. Comunicación al cubrirla). ---
+    const isBcrlabs = isArea && areaSlug === 'bcrlabs';
+    let visitaHTML = '';
+    if (isBcrlabs) {
+        visitaHTML = `
+            <div class="form-group" style="margin-top: 1.1rem; border-top: 1px dashed var(--border); padding-top: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 600;">
+                    <input type="checkbox" id="es-visita" ${act.es_visita ? 'checked' : ''} style="width: 18px; height: 18px;">
+                    Es una visita
+                </label>
+                <div id="visita-fields" style="margin-top: 0.85rem; display: ${act.es_visita ? 'block' : 'none'};">
+                    <div class="form-group">
+                        <label>Cantidad de personas</label>
+                        <input type="text" id="visita-personas" value="${escAttr(act.visita_personas)}" placeholder="Ej: 20">
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin-top: 0.9rem; font-size: 0.92rem;">
+                        <input type="checkbox" id="visita-varios" ${act.visita_varios_receptores ? 'checked' : ''} style="width: 16px; height: 16px;">
+                        Requiere más de una persona para recibirlos
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin-top: 0.6rem; font-size: 0.92rem;">
+                        <input type="checkbox" id="visita-ingles" ${act.visita_ingles ? 'checked' : ''} style="width: 16px; height: 16px;">
+                        La visita es en inglés o requiere traductor
+                    </label>
+                </div>
+            </div>`;
+    } else if (act.es_visita) {
+        const vchips = [];
+        if (act.visita_personas) vchips.push(`${escAttr(act.visita_personas)} persona(s)`);
+        if (act.visita_varios_receptores) vchips.push('Requiere varios receptores');
+        if (act.visita_ingles) vchips.push('En inglés / traductor');
+        visitaHTML = `
+            <div class="form-group" style="margin-top: 1.1rem; border-top: 1px dashed var(--border); padding-top: 1rem;">
+                <label>Visita</label>
+                <div style="font-size: 0.9rem; color: var(--text);">${vchips.length ? vchips.join(' · ') : 'Es una visita'}</div>
+            </div>`;
+    }
+
     // --- Sección de Secretaría ---
     const ESTADOS = ['Pendiente', 'En Proceso', 'Avanzado', 'Finalizado'];
     const secRespIsOther = act.sec_responsible === 'Otro';
@@ -157,6 +203,7 @@ export function renderActivityForm(container, preData = null) {
                     </div>
                 </div>
                 <div style="margin-top: 1rem;">${_respSelect}</div>
+                ${actOrigen === 'area' ? _secNotes : ''}
             </section>`;
     } else if (areaForeignForSec) {
         // Actividad de área: INTERNO · Secretaría (Responsable + Notas), sin Estado de avance.
@@ -171,8 +218,8 @@ export function renderActivityForm(container, preData = null) {
     // --- "Participa (por Mesa Ejecutiva)": lo carga Secretaría en las de área,
     // va debajo de "Participa (por el área)". Área/Comunicación lo ven read-only. ---
     let participaMeHTML = '';
-    if (actOrigen === 'area' && (areaForeignForSec || act.participants_me)) {
-        const dis = areaForeignForSec ? '' : 'disabled';
+    if (actOrigen === 'area' && (areaForeignForSec || secEditsApprovedArea || act.participants_me)) {
+        const dis = (areaForeignForSec || secEditsApprovedArea) ? '' : 'disabled';
         participaMeHTML = `
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Participa (por Mesa Ejecutiva)</label>
@@ -298,6 +345,7 @@ export function renderActivityForm(container, preData = null) {
                     </fieldset>
                     ${participaMeHTML}
                     ${attachmentHTML}
+                    ${visitaHTML}
                 </section>
 
                 ${estadoHTML}
@@ -413,7 +461,7 @@ export function renderActivityForm(container, preData = null) {
 
         <div class="sheet-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
             <button id="btn-save-activity" class="btn-primary">Guardar Cambios</button>
-            ${(areaForeignForSec && act.me_estado === 'aprobada') ? '<button id="btn-revert-me" class="btn-primary" style="background:#b45309;">Quitar de la Mesa</button>' : ''}
+            ${secEditsApprovedArea ? '<button id="btn-revert-me" class="btn-primary" style="background:#b45309;">Quitar de la Mesa</button>' : ''}
             <button onclick="window.closeActivitySheet()" style="flex-grow: 1; background: white; border: 1px solid var(--border); border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancelar</button>
             ${showDelete ? `<button id="btn-delete-activity-form" style="background: none; border: 1px solid #fca5a5; color: #ef4444; border-radius: 0.5rem; padding: 0 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
@@ -480,6 +528,15 @@ export function renderActivityForm(container, preData = null) {
             if (on && endDateInput && !endDateInput.value && startDateInput) {
                 endDateInput.value = startDateInput.value;
             }
+        });
+    }
+
+    // "Es una visita" (BCRlabs): muestra/oculta los campos de la visita.
+    const esVisitaChk = container.querySelector('#es-visita');
+    if (esVisitaChk) {
+        const vf = container.querySelector('#visita-fields');
+        esVisitaChk.addEventListener('change', () => {
+            if (vf) vf.style.display = esVisitaChk.checked ? 'block' : 'none';
         });
     }
 
@@ -714,18 +771,24 @@ export function renderActivityForm(container, preData = null) {
                 sec_notes: formData.get('sec_notes') || '',
             };
         } else if (isSec) {
-            // Secretaría: Datos Generales + sección Estado + adjunto. La
-            // actividad es suya.
+            // Secretaría: Datos Generales + sección Estado + adjunto.
             const att = getAttachment();
             data = {
                 ...generalsData,
-                origen: 'secretaria',
                 estado: formData.get('estado') || 'Pendiente',
                 sec_responsible: formData.get('sec_responsible') || '',
                 sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
                 attachment_url: att.attachment_url,
                 attachment_name: att.attachment_name,
             };
+            if (secEditsApprovedArea) {
+                // Área aprobada a la Mesa: Secretaría edita todo, pero NO cambia el
+                // dueño (sigue origen='area'); suma notas internas + Participa ME.
+                data.sec_notes = formData.get('sec_notes') || '';
+                data.participants_me = formData.get('participants_me') || '';
+            } else {
+                data.origen = 'secretaria';
+            }
         } else if (isArea) {
             // Área: Datos Generales + adjunto + sugerencia a la Mesa + cobertura.
             const att = getAttachment();
@@ -745,6 +808,14 @@ export function renderActivityForm(container, preData = null) {
                 me_estado,
                 solicita_cobertura: !!(cob && cob.checked),
             };
+            // Visita (sólo BCRlabs tiene estos campos en el form).
+            const esV = container.querySelector('#es-visita');
+            if (esV) {
+                data.es_visita = esV.checked;
+                data.visita_personas = (container.querySelector('#visita-personas') || {}).value || '';
+                data.visita_varios_receptores = !!(container.querySelector('#visita-varios') || {}).checked;
+                data.visita_ingles = !!(container.querySelector('#visita-ingles') || {}).checked;
+            }
         } else {
             // Comunicación: siempre lo operativo + notas internas.
             const selectedChannels = Array.from(form.querySelectorAll('input[name="channels"]:checked'))

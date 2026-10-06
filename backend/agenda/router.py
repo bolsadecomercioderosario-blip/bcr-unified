@@ -352,6 +352,8 @@ _SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other", "sec_note
 # Lo que Secretaría edita en una actividad de ÁREA: su seguimiento SIN Estado de
 # avance, + "Participa (por Mesa Ejecutiva)" + sus notas internas.
 _SEC_AREA = {"sec_responsible", "sec_responsible_other", "sec_notes", "participants_me"}
+# Campos de "visita" — sólo los edita el área BCRlabs en sus actividades.
+_VISITA = {"es_visita", "visita_personas", "visita_varios_receptores", "visita_ingles"}
 
 
 def _allowed_update_fields(db_activity, role: str) -> set:
@@ -371,11 +373,18 @@ def _allowed_update_fields(db_activity, role: str) -> set:
         if origen == "secretaria":
             return _GENERALS | _ATTACHMENT | _SEC_WORKFLOW
         if origen == "area":
-            return _SEC_AREA | {"me_estado"}   # seguimiento (sin estado) + aprobar/rechazar
+            if db_activity.me_estado == "aprobada":
+                # Aprobada a la Mesa: Secretaría la edita como propia (TODOS los
+                # campos); el área también la sigue editando (mismo registro).
+                return _GENERALS | _ATTACHMENT | _SEC_WORKFLOW | _SEC_AREA | {"me_estado"}
+            return _SEC_AREA | {"me_estado"}   # antes de aprobar: seguimiento + aprobar/rechazar
         return set()
     if is_area_role(role):
         if origen == "area" and (db_activity.area or "") == area_of_role(role):
-            return _GENERALS | _ATTACHMENT | {"me_estado", "solicita_cobertura"}
+            allowed = _GENERALS | _ATTACHMENT | {"me_estado", "solicita_cobertura"}
+            if area_of_role(role) == "bcrlabs":
+                allowed = allowed | _VISITA  # sólo BCRlabs carga datos de visita
+            return allowed
         return set()
     return set()
 
@@ -449,6 +458,12 @@ def create_activity(activity: agenda_models.ActivityCreate, background_tasks: Ba
         data["me_estado"] = "pendiente" if (data.get("me_estado") or "") else ""
     else:
         raise HTTPException(status_code=403, detail="Rol sin permiso de carga")
+
+    # Datos de "visita": sólo los conserva el área BCRlabs; para cualquier otro
+    # rol se descartan al crear (quedan en su default).
+    if not (is_area_role(role) and area_of_role(role) == "bcrlabs"):
+        for _k in _VISITA:
+            data.pop(_k, None)
 
     db_activity = agenda_models.Activity(**data)
     db.add(db_activity)

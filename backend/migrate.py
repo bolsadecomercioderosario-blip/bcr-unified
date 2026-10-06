@@ -128,6 +128,15 @@ def migrate():
     # columnas del modelo— para que la columna ya exista cuando esa query corre.
     _try_exec("ALTER activities add solicita_cobertura",
               "ALTER TABLE activities ADD COLUMN solicita_cobertura BOOLEAN DEFAULT FALSE")
+    # Campos de "visita" (los usa el área BCRlabs).
+    _try_exec("ALTER activities add es_visita",
+              "ALTER TABLE activities ADD COLUMN es_visita BOOLEAN DEFAULT FALSE")
+    _try_exec("ALTER activities add visita_personas",
+              "ALTER TABLE activities ADD COLUMN visita_personas VARCHAR DEFAULT ''")
+    _try_exec("ALTER activities add visita_varios_receptores",
+              "ALTER TABLE activities ADD COLUMN visita_varios_receptores BOOLEAN DEFAULT FALSE")
+    _try_exec("ALTER activities add visita_ingles",
+              "ALTER TABLE activities ADD COLUMN visita_ingles BOOLEAN DEFAULT FALSE")
 
     backfill_origen_from_channel()
 
