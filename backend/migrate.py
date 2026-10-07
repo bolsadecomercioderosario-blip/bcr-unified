@@ -137,6 +137,8 @@ def migrate():
               "ALTER TABLE activities ADD COLUMN visita_varios_receptores BOOLEAN DEFAULT FALSE")
     _try_exec("ALTER activities add visita_ingles",
               "ALTER TABLE activities ADD COLUMN visita_ingles BOOLEAN DEFAULT FALSE")
+    _try_exec("ALTER activities add solicita_transporte",
+              "ALTER TABLE activities ADD COLUMN solicita_transporte BOOLEAN DEFAULT FALSE")
 
     backfill_origen_from_channel()
 

@@ -348,7 +348,7 @@ _OPERATIVE = {"responsible", "external_name", "channels", "done", "drive_bcr",
 _NEWSLETTER = {"conectados_title", "conectados_text", "image_url", "order_index", "block_type"}
 # Campos "propios de Secretaría" en SUS actividades (incluye el Estado de avance
 # que alimenta el semáforo).
-_SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other", "sec_notes"}
+_SEC_WORKFLOW = {"estado", "sec_responsible", "sec_responsible_other", "sec_notes", "solicita_transporte"}
 # Lo que Secretaría edita en una actividad de ÁREA: su seguimiento SIN Estado de
 # avance, + "Participa (por Mesa Ejecutiva)" + sus notas internas.
 _SEC_AREA = {"sec_responsible", "sec_responsible_other", "sec_notes", "participants_me"}

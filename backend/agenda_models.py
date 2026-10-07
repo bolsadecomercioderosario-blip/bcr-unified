@@ -70,6 +70,10 @@ class Activity(Base):
     visita_personas = Column(String, default="")
     visita_varios_receptores = Column(Boolean, default=False)
     visita_ingles = Column(Boolean, default=False)
+    # Solicitud de transporte/traslado (la marca Secretaría en las actividades de
+    # la Mesa). Si es True, la landing pública muestra "Traslado: Se solicita
+    # traslado a cargo de David Cardone".
+    solicita_transporte = Column(Boolean, default=False)
     # "Participa (por Mesa Ejecutiva)": quiénes participan por la Mesa. Lo carga
     # Secretaría en las actividades de área (va debajo de `participants`, que es
     # el "Participa por el área"). Es público (aparece en la landing).
@@ -149,6 +153,7 @@ class ActivityBase(BaseModel):
     visita_personas: Optional[str] = ""
     visita_varios_receptores: Optional[bool] = False
     visita_ingles: Optional[bool] = False
+    solicita_transporte: Optional[bool] = False  # Secretaría: pide traslado (público)
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
     sec_notes: Optional[str] = ""         # Notas internas · Secretaría
     comunicacion_notes: Optional[str] = ""
@@ -196,6 +201,7 @@ class ActivityUpdate(BaseModel):
     visita_personas: Optional[str] = None
     visita_varios_receptores: Optional[bool] = None
     visita_ingles: Optional[bool] = None
+    solicita_transporte: Optional[bool] = None
     participants_me: Optional[str] = None
     sec_notes: Optional[str] = None
     comunicacion_notes: Optional[str] = None
@@ -227,6 +233,7 @@ class CompromisoPublicOut(BaseModel):
     observations: Optional[str] = ""
     participants: Optional[str] = ""
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
+    solicita_transporte: Optional[bool] = False  # muestra la línea "Traslado…"
     # Dueño: para la vista "Agenda completa" (Mesa + áreas), etiquetar de quién
     # es cada actividad. origen ∈ secretaria|area; area = slug del área.
     origen: Optional[str] = ""

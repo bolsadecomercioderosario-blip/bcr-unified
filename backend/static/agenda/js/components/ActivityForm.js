@@ -51,7 +51,8 @@ export function renderActivityForm(container, preData = null) {
         es_visita: !!sourceAct.es_visita,
         visita_personas: (sourceAct.visita_personas === 'undefined' || !sourceAct.visita_personas) ? '' : sourceAct.visita_personas,
         visita_varios_receptores: !!sourceAct.visita_varios_receptores,
-        visita_ingles: !!sourceAct.visita_ingles
+        visita_ingles: !!sourceAct.visita_ingles,
+        solicita_transporte: !!sourceAct.solicita_transporte
     };
 
     const isNew = !state.currentActivity;
@@ -344,6 +345,14 @@ export function renderActivityForm(container, preData = null) {
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>${actOrigen === 'area' ? 'Participa (por el área)' : 'Participa'}</label>
                         <input type="text" name="participants" value="${escAttr(act.participants)}" placeholder="Ej: Juan Pérez, María García, Autoridades locales...">
+                    </div>` : ''}
+                    ${isSec ? `
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 600;">
+                            <input type="checkbox" name="solicita_transporte" ${act.solicita_transporte ? 'checked' : ''} style="width: 18px; height: 18px;">
+                            Se solicita transporte
+                        </label>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.4rem 0 0;">Si se activa, en la Agenda de Compromisos pública se muestra: "Traslado: Se solicita traslado a cargo de David Cardone".</p>
                     </div>` : ''}
                     </fieldset>
                     ${participaMeHTML}
@@ -783,6 +792,7 @@ export function renderActivityForm(container, preData = null) {
                 sec_responsible_other: formData.get('sec_responsible') === 'Otro' ? (formData.get('sec_responsible_other') || '') : '',
                 attachment_url: att.attachment_url,
                 attachment_name: att.attachment_name,
+                solicita_transporte: formData.get('solicita_transporte') === 'on',
             };
             if (secEditsApprovedArea) {
                 // Área aprobada a la Mesa: Secretaría edita todo, pero NO cambia el

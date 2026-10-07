@@ -158,6 +158,7 @@ function cardHTML(occ) {
     if (act.location) meta.push(`<span><strong>Lugar:</strong> ${esc(act.location)}</span>`);
     if (act.participants) meta.push(`<span><strong>${act.origen === 'area' ? 'Participa (por el área)' : 'Participa'}:</strong> ${esc(act.participants)}</span>`);
     if (act.participants_me) meta.push(`<span><strong>Participa (por Mesa Ejecutiva):</strong> ${esc(act.participants_me)}</span>`);
+    if (act.solicita_transporte) meta.push(`<span><strong>Traslado:</strong> Se solicita traslado a cargo de David Cardone</span>`);
     const metaHtml = meta.length ? `<div class="cmp-meta">${meta.join('')}</div>` : '';
     const dayBadge = occ.dayCount > 1 ? `<span class="cmp-daybadge">Día ${occ.dayIndex} de ${occ.dayCount}</span>` : '';
 
@@ -509,6 +510,7 @@ function printRange(from, to) {
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
+                if (act.solicita_transporte) meta.push(`<strong>Traslado:</strong> Se solicita traslado a cargo de David Cardone`);
                 const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
                 units.push(`<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${esc(timeLabel(act))}</div>
