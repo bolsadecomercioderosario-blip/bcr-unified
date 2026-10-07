@@ -232,13 +232,16 @@ export function renderActivityForm(container, preData = null) {
     let sugerirHTML = '';
     if (isArea) {
         const st = act.me_estado || '';
-        const mesaChecked = (st === 'pendiente' || st === 'aprobada') ? 'checked' : '';
+        // DIyEE: por defecto, en una actividad NUEVA las dos casillas vienen
+        // tildadas (igual se pueden destildar). El resto de las áreas, no.
+        const diyeeDefault = areaSlug === 'diyee' && isNew;
+        const mesaChecked = (st === 'pendiente' || st === 'aprobada' || diyeeDefault) ? 'checked' : '';
         const mesaDisabled = st === 'aprobada' ? 'disabled' : '';
         let mesaHint = 'Al tildar esta opción, esta actividad se hace visible para Secretaría Privada, que evalúa si corresponde cargarla en la Agenda de Compromisos (Mesa).';
         if (st === 'pendiente') mesaHint = 'Sugerida — pendiente de evaluación de Secretaría Privada.';
         else if (st === 'aprobada') mesaHint = 'Aprobada — ya aparece en la Agenda de la Mesa. La seguís editando normalmente.';
         else if (st === 'rechazada') mesaHint = 'Secretaría no la sumó a la Mesa. Podés volver a sugerirla marcando la casilla.';
-        const covChecked = act.solicita_cobertura ? 'checked' : '';
+        const covChecked = (act.solicita_cobertura || diyeeDefault) ? 'checked' : '';
         sugerirHTML = `
             <section>
                 <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Solicitudes</h3>
