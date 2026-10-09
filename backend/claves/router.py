@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -176,12 +176,21 @@ def worker_publish(
     return {"ok": True, "video_id": payload.video_id, "candidatos": len(cands)}
 
 
+# Un pedido en 'procesando' más viejo que esto se considera colgado (el worker se
+# reinició o crasheó a mitad del render) y se vuelve a tomar en el próximo poll.
+_STALE = timedelta(minutes=3)
+
+
 @router.get("/worker/pending")
 def worker_pending(
     db: Session = Depends(get_db),
     _: bool = Depends(require_worker),
 ) -> dict:
-    rows = (db.query(ClavesRender).filter(ClavesRender.estado == "pendiente")
+    stale_before = datetime.utcnow() - _STALE
+    rows = (db.query(ClavesRender)
+            .filter((ClavesRender.estado == "pendiente")
+                    | ((ClavesRender.estado == "procesando")
+                       & (ClavesRender.updated_at < stale_before)))
             .order_by(ClavesRender.created_at.asc()).all())
     claimed = []
     for r in rows:
