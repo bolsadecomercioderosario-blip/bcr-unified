@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claves — Recortes</title>
+<!-- Login centralizado del hub. Debe ir antes de cualquier fetch. -->
+<script src="/static/auth.js?v=__VERSION__"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--card2:#111c2e;--line:#334155;--tx:#e7eef5;
+--mut:#94a3b8;--agro:#34d399;--fin:#60a5fa;--otro:#a78bfa;--acc:#f59e0b;--accx:#b45309}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);
+font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5}
+a{color:#6cc0ff}
+header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;
+align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:5}
+header .home{font-size:20px;text-decoration:none}
+h1{font-size:18px;margin:0;font-weight:800}.sub{color:var(--mut);font-size:13px;font-weight:500}
+.wrap{max-width:1100px;margin:0 auto;padding:22px}
+.job{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+.job h2{font-size:16px;margin:0 0 2px}.state{font-size:12px;color:var(--mut);margin-bottom:14px}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;color:#06210f;text-transform:uppercase;letter-spacing:.03em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.cand{background:var(--card2);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.cand img{width:100%;display:block;background:#000;aspect-ratio:16/9;object-fit:cover}
+.cand .b{padding:12px 13px;display:flex;flex-direction:column;gap:9px}
+.meta{font-size:12px;color:var(--mut)}
+.txt{font-size:12.5px;max-height:84px;overflow:auto;color:#cdd9e3;background:#0a1118;
+border:1px solid var(--line);border-radius:7px;padding:8px 9px}
+.row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.chk{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:5px;cursor:pointer}
+button{background:var(--acc);color:#2a1a02;border:0;border-radius:8px;padding:9px 15px;
+font-weight:700;cursor:pointer;font-size:13.5px;font-family:inherit}
+button:disabled{opacity:.55;cursor:default}
+.pill{font-size:12px;font-weight:700;padding:7px 10px;border-radius:8px;text-align:center}
+.pill.proc{background:rgba(245,158,11,.15);color:#fbbf24}
+.pill.err{background:rgba(248,113,113,.15);color:#f87171}
+video{width:100%;border-radius:8px;margin-top:4px;background:#000;max-height:520px}
+.empty{color:var(--mut);padding:50px;text-align:center}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#fbbf24;margin-right:5px;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="home" title="Volver al Hub">🏠</a>
+  <h1>Claves <span class="sub">· recortes por especialista</span></h1>
+</header>
+<div class="wrap">
+  <div id="jobs"><div class="empty">Cargando…</div></div>
+</div>
+<script>
+const TOPIC={agro:'var(--agro)',finanzas:'var(--fin)',otro:'var(--otro)'};
+function badge(t){return '<span class="badge" style="background:'+(TOPIC[t]||'#889')+'">'+t+'</span>'}
+function tc(s){const m=Math.floor(s/60),x=Math.floor(s%60);return m+':'+String(x).padStart(2,'0')}
+
+async function generar(vid,cid,btn){
+  const zoom=btn.parentElement.querySelector('.zoom').checked;
+  btn.disabled=true; btn.textContent='Pidiendo…';
+  try{
+    const r=await fetch('/api/claves/render',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({video_id:vid,cid:cid,zoom:zoom})});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail||'Error');}
+  }catch(e){ btn.disabled=false; btn.textContent='Generar reel'; alert(e.message||'Error'); return; }
+  setTimeout(load,800);
+}
+
+function renderBox(vid,c){
+  const r=c.render;
+  if(r && r.estado==='listo' && r.video_url){
+    return '<video controls preload="metadata" src="'+r.video_url+'"></video>'+
+      '<div class="meta"><a href="'+r.video_url+'" target="_blank" rel="noopener" download>⬇ descargar MP4</a>'+
+      (r.zoom?' · <span>zoom-crop</span>':'')+'</div>';
+  }
+  if(r && r.estado==='procesando'){ return '<div class="pill proc"><span class="dot"></span>Generando en la PC local…</div>'; }
+  if(r && r.estado==='pendiente'){ return '<div class="pill proc"><span class="dot"></span>En cola…</div>'; }
+  let errline = (r && r.estado==='error') ? '<div class="pill err">Falló. Reintentá.</div>' : '';
+  return errline+
+    '<div class="row">'+
+    '<label class="chk"><input type="checkbox" class="zoom"> zoom-crop</label>'+
+    '<button onclick="generar(\''+vid+'\',\''+c.cid+'\',this)">Generar reel</button>'+
+    '</div>';
+}
+
+function cand(vid,c){
+  const thumb = c.thumb_url ? '<img src="'+c.thumb_url+'" loading="lazy">' : '';
+  return '<div class="cand">'+thumb+'<div class="b">'+
+    '<div class="row"><div>'+badge(c.topic)+' <span class="meta">'+tc(c.start)+'–'+tc(c.end)+' · '+Math.round(c.dur)+'s</span></div></div>'+
+    '<div class="txt">'+(c.text||'')+'</div>'+
+    renderBox(vid,c)+
+    '</div></div>';
+}
+
+async function load(){
+  let data;
+  try{ const r=await fetch('/api/claves/programas'); if(!r.ok) return; data=await r.json(); }
+  catch(e){ return; }
+  const jobs=data.programas||[];
+  const box=document.getElementById('jobs');
+  if(!jobs.length){ box.innerHTML='<div class="empty">Todavía no hay programas procesados.<br>Los lunes/martes, al rato de salir el vivo, aparecen acá los recortes propuestos.</div>'; return; }
+  box.innerHTML=jobs.map(function(j){
+    const cs=(j.candidatos||[]);
+    const body = cs.length ? '<div class="grid">'+cs.map(c=>cand(j.video_id,c)).join('')+'</div>'
+                           : '<div class="sub">Sin candidatos.</div>';
+    const fecha = j.fecha ? (' · '+j.fecha) : '';
+    return '<div class="job"><h2>'+(j.title||j.video_id)+'</h2>'+
+      '<div class="state">'+cs.length+' recortes propuestos'+fecha+'</div>'+body+'</div>';
+  }).join('');
+}
+load(); setInterval(load,4000);
+</script>
+</body>
+</html>

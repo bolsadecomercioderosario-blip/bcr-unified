@@ -35,6 +35,7 @@ import capacita.models  # noqa: F401  — registra CapacitaLead
 import metricas.models  # noqa: F401  — registra Programa + Instancia
 import noticias.models  # noqa: F401  — registra tabla noticias (sitio Más BCR)
 import abuela.models  # noqa: F401  — registra tablas ab_* (panel interno de la murga: caja, ensayos, toques)
+import claves.models  # noqa: F401  — registra claves_programas + claves_renders (recortes del programa)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -51,6 +52,7 @@ from noticias.router import (
 )
 from abuela.router import router as abuela_api
 from admin.router import router as admin_api  # panel de usuarios (sólo admin)
+from claves.router import router as claves_api  # recortes del programa (Fase C)
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -213,6 +215,7 @@ app.include_router(noticias_videos_api)  # API de Videos (/api/videos)
 app.include_router(noticias_site)        # sitio público server-rendered (/noticias/...)
 app.include_router(abuela_api)
 app.include_router(admin_api)            # panel de usuarios (/api/admin/*, sólo admin)
+app.include_router(claves_api)           # recortes del programa Claves (/api/claves/*)
 
 
 # ---------------------------------------------------------
@@ -250,7 +253,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "abuela"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "abuela", "claves"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
