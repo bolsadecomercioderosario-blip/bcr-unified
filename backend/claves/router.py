@@ -62,14 +62,14 @@ class CandidatoIn(BaseModel):
 
 
 class PublishIn(BaseModel):
-    video_id: str = Field(..., max_length=32)
+    video_id: str = Field(..., max_length=64)
     title: str = Field("", max_length=300)
     fecha: str = Field("", max_length=20)
     candidatos: List[CandidatoIn] = Field(default_factory=list)
 
 
 class RenderIn(BaseModel):
-    video_id: str = Field(..., max_length=32)
+    video_id: str = Field(..., max_length=64)
     cid: str = Field(..., max_length=16)
     zoom: bool = False
 

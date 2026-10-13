@@ -164,6 +164,14 @@ def migrate():
     _try_exec("ALTER activities add sec_notes",
               "ALTER TABLE activities ADD COLUMN sec_notes VARCHAR DEFAULT ''")
 
+    # Claves: video_id pasó a aceptar id de carpeta de Drive (33 chars) además del
+    # id de YouTube (11). Ampliamos de VARCHAR(32) a VARCHAR(64). Sólo aplica en
+    # Postgres (Render); en SQLite el tipo es flexible y el ALTER se ignora.
+    _try_exec("ALTER claves_programas widen video_id",
+              "ALTER TABLE claves_programas ALTER COLUMN video_id TYPE VARCHAR(64)")
+    _try_exec("ALTER claves_renders widen video_id",
+              "ALTER TABLE claves_renders ALTER COLUMN video_id TYPE VARCHAR(64)")
+
     # --- Limpieza: dropear tablas huérfanas de apps eliminadas (Aapresid, murga,
     # corte, canciones). Sus modelos ya no existen en el código, así que create_all
     # no las recrea; esto sólo libera lo que quedó en la DB de prod. Idempotente

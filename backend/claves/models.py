@@ -25,7 +25,7 @@ class ClavesPrograma(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    video_id = Column(String(32), unique=True, index=True, nullable=False)  # id de YouTube
+    video_id = Column(String(64), unique=True, index=True, nullable=False)  # id de YouTube o de carpeta de Drive
     title = Column(String(300), default="")
     fecha = Column(String(20), default="")  # fecha del programa (YYYY-MM-DD)
 
@@ -40,7 +40,7 @@ class ClavesRender(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    video_id = Column(String(32), index=True, nullable=False)
+    video_id = Column(String(64), index=True, nullable=False)
     cid = Column(String(16), nullable=False)       # candidato (c01..)
     zoom = Column(Boolean, default=False)           # zoom-crop de la tarjeta
 
