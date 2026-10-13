@@ -18,35 +18,34 @@ header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;
 align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:5}
 header .home{font-size:20px;text-decoration:none}
 h1{font-size:18px;margin:0;font-weight:800}.sub{color:var(--mut);font-size:13px;font-weight:500}
-.wrap{max-width:900px;margin:0 auto;padding:22px}
+.wrap{max-width:1040px;margin:0 auto;padding:22px}
 .job{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:20px}
 .job h2{font-size:17px;margin:0 0 2px}.state{font-size:12px;color:var(--mut);margin-bottom:16px}
 .badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;color:#06210f;text-transform:uppercase;letter-spacing:.03em}
-/* Lista 1-columna: cada recorte a ancho completo, miniatura a la izquierda */
-.cand{display:flex;gap:16px;background:var(--card2);border:1px solid var(--line);
-border-radius:12px;padding:14px;margin-bottom:14px}
-.cand .thumb{flex:0 0 300px}
-.cand .thumb img{width:300px;height:169px;object-fit:cover;border-radius:8px;background:#000;display:block}
-.cand .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+/* 2×2: dos recortes por fila (2 agro arriba, 2 finanzas abajo) */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.cand{background:var(--card2);border:1px solid var(--line);border-radius:12px;
+padding:15px;display:flex;flex-direction:column;gap:10px}
 .meta{font-size:12.5px;color:var(--mut)}
 .tcrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .desc{font-size:14.5px;font-weight:600;color:#eaf2f9}
-.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:700;margin-bottom:2px}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:700;margin-bottom:3px}
 .txt{font-size:13.5px;color:#cdd9e3;background:#0a1118;border:1px solid var(--line);
-border-radius:8px;padding:10px 12px;max-height:190px;overflow:auto;white-space:pre-wrap}
-.row{display:flex;align-items:center;gap:12px;justify-content:flex-start;margin-top:2px}
+border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto;white-space:pre-wrap}
+.row{display:flex;align-items:center;gap:12px;margin-top:auto}
 .chk{font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:5px;cursor:pointer}
+.hint{font-size:11px;color:var(--mut);cursor:help;border-bottom:1px dotted var(--mut)}
 button{background:var(--acc);color:#2a1a02;border:0;border-radius:8px;padding:9px 18px;
 font-weight:700;cursor:pointer;font-size:13.5px;font-family:inherit}
 button:disabled{opacity:.55;cursor:default}
 .pill{font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:8px;display:inline-block}
 .pill.proc{background:rgba(245,158,11,.15);color:#fbbf24}
 .pill.err{background:rgba(248,113,113,.15);color:#f87171}
-video{width:100%;max-width:360px;border-radius:8px;background:#000}
+video{width:100%;border-radius:8px;background:#000}
 .empty{color:var(--mut);padding:50px;text-align:center}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#fbbf24;margin-right:6px;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.3}}
-@media(max-width:680px){.cand{flex-direction:column}.cand .thumb,.cand .thumb img{flex:none;width:100%}}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -88,19 +87,18 @@ function controls(vid,c){
   const errline = (r && r.estado==='error') ? '<div class="pill err">Falló. Reintentá.</div>' : '';
   return errline+
     '<div class="row">'+
-    '<label class="chk"><input type="checkbox" class="zoom"> zoom-crop</label>'+
+    '<label class="chk"><input type="checkbox" class="zoom"> <span class="hint" title="Recorta las barras negras que algunos gráficos tienen a los costados (los agranda ~12% para que llenen la pantalla). Dejalo sin tildar para respetar la emisión tal cual.">zoom-crop ⓘ</span></label>'+
     '<button onclick="generar(\''+vid+'\',\''+c.cid+'\',this)">Generar reel</button>'+
     '</div>';
 }
 
 function cand(vid,c){
-  const thumb = c.thumb_url ? '<div class="thumb"><img src="'+c.thumb_url+'" loading="lazy"></div>' : '';
-  return '<div class="cand">'+thumb+'<div class="body">'+
+  return '<div class="cand">'+
     '<div class="tcrow">'+badge(c.topic)+'<span class="meta"><b>'+tc(c.start)+' – '+tc(c.end)+'</b> · '+Math.round(c.dur)+'s</span></div>'+
     (c.desc ? '<div class="desc">'+esc(c.desc)+'</div>' : '')+
     '<div><div class="lbl">Transcripción</div><div class="txt">'+esc(c.text||'')+'</div></div>'+
     controls(vid,c)+
-    '</div></div>';
+    '</div>';
 }
 
 async function load(){
@@ -112,7 +110,7 @@ async function load(){
   if(!jobs.length){ box.innerHTML='<div class="empty">Todavía no hay programas procesados.<br>Los lunes/martes, al rato de salir el vivo, aparecen acá los recortes propuestos.</div>'; return; }
   box.innerHTML=jobs.map(function(j){
     const cs=(j.candidatos||[]);
-    const body = cs.length ? cs.map(c=>cand(j.video_id,c)).join('') : '<div class="meta">Sin candidatos.</div>';
+    const body = cs.length ? '<div class="grid">'+cs.map(c=>cand(j.video_id,c)).join('')+'</div>' : '<div class="meta">Sin candidatos.</div>';
     const fecha = j.fecha ? (' · '+j.fecha) : '';
     return '<div class="job"><h2>'+esc(j.title||j.video_id)+'</h2>'+
       '<div class="state">'+cs.length+' recortes propuestos'+fecha+'</div>'+body+'</div>';
