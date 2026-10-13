@@ -57,6 +57,7 @@ class CandidatoIn(BaseModel):
     end: float
     dur: float
     text: str = ""
+    desc: str = ""
     thumb_url: str = ""
 
 
