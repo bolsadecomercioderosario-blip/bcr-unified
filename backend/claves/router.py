@@ -85,19 +85,25 @@ class ErrorIn(BaseModel):
 
 
 # --- Helpers ----------------------------------------------------------------
+def _cand_sig(cand: dict) -> str:
+    """Firma del corte: inicio-fin redondeados. Cambia si el corte cambia."""
+    try:
+        return f"{int(round(float(cand['start'])))}-{int(round(float(cand['end'])))}"
+    except (KeyError, ValueError, TypeError):
+        return ""
+
+
 def _programa_dict(p: ClavesPrograma, renders: List[ClavesRender]) -> dict:
     try:
         cands = json.loads(p.candidatos or "[]")
     except (ValueError, TypeError):
         cands = []
-    # índice de renders por (cid, zoom) — mostramos el más reciente por candidato
-    by_cid: dict = {}
-    for r in renders:
-        prev = by_cid.get(r.cid)
-        if prev is None or r.updated_at > prev.updated_at:
-            by_cid[r.cid] = r
     for c in cands:
-        r = by_cid.get(c.get("cid"))
+        sig = _cand_sig(c)
+        # render que corresponde a ESTE corte exacto (cid + firma). Si el corte
+        # se re-propuso distinto, el render viejo (otra firma) no matchea.
+        matching = [r for r in renders if r.cid == c.get("cid") and (r.sig or "") == sig]
+        r = max(matching, key=lambda r: r.updated_at) if matching else None
         c["render"] = None if r is None else {
             "id": r.id, "estado": r.estado, "video_url": r.video_url or "",
             "zoom": bool(r.zoom), "error": r.error or "",
@@ -137,20 +143,24 @@ def pedir_render(
         cands = json.loads(prog.candidatos or "[]")
     except (ValueError, TypeError):
         cands = []
-    if payload.cid not in {c.get("cid") for c in cands}:
+    cand = next((c for c in cands if c.get("cid") == payload.cid), None)
+    if cand is None:
         raise HTTPException(status_code=404, detail="Candidato no encontrado")
-    # Dedupe: si ya hay un pedido vivo (pendiente/procesando/listo) con el mismo
-    # candidato y zoom, lo reusamos (no encolamos de nuevo).
+    sig = _cand_sig(cand)
+    # Dedupe: si ya hay un pedido vivo (pendiente/procesando/listo) para ESTE corte
+    # exacto (mismo cid + firma + zoom), lo reusamos. Si el corte cambió (otra firma),
+    # se encola uno nuevo (permite regenerar tras re-proponer).
     existing = (db.query(ClavesRender)
                 .filter(ClavesRender.video_id == payload.video_id,
                         ClavesRender.cid == payload.cid,
+                        ClavesRender.sig == sig,
                         ClavesRender.zoom.is_(bool(payload.zoom)),
                         ClavesRender.estado.in_(["pendiente", "procesando", "listo"]))
                 .order_by(ClavesRender.updated_at.desc()).first())
     if existing:
         return {"id": existing.id, "estado": existing.estado}
     r = ClavesRender(video_id=payload.video_id, cid=payload.cid, zoom=bool(payload.zoom),
-                     estado="pendiente", requested_by=actor.email or "",
+                     sig=sig, estado="pendiente", requested_by=actor.email or "",
                      created_at=datetime.utcnow(), updated_at=datetime.utcnow())
     db.add(r)
     db.commit()

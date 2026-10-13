@@ -48,3 +48,6 @@ class ClavesRender(Base):
     video_url = Column(String(500), default="")       # URL de Cloudinary cuando está listo
     error = Column(Text, default="")
     requested_by = Column(String(200), default="")    # email del que pidió
+    # Firma del corte (inicio-fin redondeados). Si el candidato se re-propone con
+    # otro corte, el render viejo deja de matchear → se puede regenerar.
+    sig = Column(String(32), default="")

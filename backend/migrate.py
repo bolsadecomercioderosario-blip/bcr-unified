@@ -171,6 +171,8 @@ def migrate():
               "ALTER TABLE claves_programas ALTER COLUMN video_id TYPE VARCHAR(64)")
     _try_exec("ALTER claves_renders widen video_id",
               "ALTER TABLE claves_renders ALTER COLUMN video_id TYPE VARCHAR(64)")
+    _try_exec("ALTER claves_renders add sig",
+              "ALTER TABLE claves_renders ADD COLUMN sig VARCHAR(32) DEFAULT ''")
 
     # --- Limpieza: dropear tablas huérfanas de apps eliminadas (Aapresid, murga,
     # corte, canciones). Sus modelos ya no existen en el código, así que create_all
