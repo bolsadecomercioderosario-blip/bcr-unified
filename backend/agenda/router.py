@@ -286,13 +286,22 @@ def _visibility_filter(query, role: str):
 
 
 @router.get("/actividades", response_model=List[agenda_models.ActivityOut])
-def read_activities(skip: int = 0, limit: int = 500, db: Session = Depends(get_db),
+def read_activities(skip: int = 0, limit: int = 10000, db: Session = Depends(get_db),
                     role: str = Depends(get_role)):
     # Excluye archivadas: viven sólo en la vista "Archivados".
+    # El frontend trae TODO (hace su propio agrupado/filtrado), así que el límite
+    # tiene que ser alto. OJO: sin order_by, un LIMIT devuelve filas en orden
+    # arbitrario e inestable en Postgres — al editar una actividad su fila se
+    # reubica y podía caerse fuera de la ventana (desaparecía de la vista aunque
+    # existía). Con order_by el resultado es determinístico, y el tope alto evita
+    # truncar (antes era 500: con >500 actividades, algunas quedaban afuera).
     q = db.query(agenda_models.Activity).filter(
         agenda_models.Activity.archived == False,  # noqa: E712 — SQLAlchemy
     )
-    return _visibility_filter(q, role).offset(skip).limit(limit).all()
+    return (_visibility_filter(q, role)
+            .order_by(agenda_models.Activity.date.asc(),
+                      agenda_models.Activity.time.asc())
+            .offset(skip).limit(limit).all())
 
 
 @router.get("/actividades/stamp")
