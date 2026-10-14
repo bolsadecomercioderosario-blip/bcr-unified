@@ -352,7 +352,7 @@ export function renderActivityForm(container, preData = null) {
                             <input type="checkbox" name="solicita_transporte" ${act.solicita_transporte ? 'checked' : ''} style="width: 18px; height: 18px;">
                             Se solicita transporte
                         </label>
-                        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.4rem 0 0;">Si se activa, en la Agenda de Compromisos pública se muestra: "Traslado: Se solicita traslado a cargo de David Cardone".</p>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.4rem 0 0;">Si se activa, esta actividad aparece en la vista de <strong>Traslados</strong> de David Cardone (ya no se muestra en la Agenda de Compromisos pública).</p>
                     </div>` : ''}
                     </fieldset>
                     ${participaMeHTML}

@@ -87,10 +87,13 @@ ROLE_SECRETARIA = "secretaria"
 # Rol restringido (Santiago, Editor AV): ve sólo su pestaña y edita sólo el link
 # de video. Sólo existe como usuario individual (no hay clave compartida AV).
 ROLE_AUDIOVISUAL = "audiovisual"
+# Rol restringido (David Cardone, Traslados): ve SÓLO el listado de actividades
+# donde Secretaría pidió transporte. Read-only. Usuario individual (login por email).
+ROLE_TRASLADOS = "traslados"
 
 # Roles válidos para un USUARIO individual (login por email). Las áreas NO son
 # usuarios: usan la clave compartida del área (role_area).
-USER_ROLES = {ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL}
+USER_ROLES = {ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL, ROLE_TRASLADOS}
 
 
 def role_area(slug: str) -> str:

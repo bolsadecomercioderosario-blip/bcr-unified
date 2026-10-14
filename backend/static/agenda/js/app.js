@@ -5,6 +5,7 @@ import { renderSanti } from './components/Santi.js';
 import { renderActivityForm } from './components/ActivityForm.js';
 import { renderAgendaCompromisos } from './components/AgendaCompromisos.js';
 import { renderAreaAgenda } from './components/AreaAgenda.js';
+import { renderTraslados } from './components/Traslados.js';
 import { renderEfemeridesModal } from './components/EfemeridesModal.js';
 import { renderArchivedModal } from './components/ArchivedModal.js';
 import { getRole, isSecretaria } from './role.js';
@@ -21,12 +22,14 @@ document.body.dataset.role = ROLE;
 const ALLOWED_VIEWS = ROLE === 'secretaria' ? ['compromisos']
     : ROLE === 'area' ? ['area']
     : ROLE === 'audiovisual' ? ['santi']
+    : ROLE === 'traslados' ? ['traslados']
     : ['list', 'conectados'];
 
 // La vista inicial depende del rol.
 state.view = ROLE === 'secretaria' ? 'compromisos'
     : ROLE === 'area' ? 'area'
     : ROLE === 'audiovisual' ? 'santi'
+    : ROLE === 'traslados' ? 'traslados'
     : 'list';
 
 const viewContainer = document.getElementById('view-container');
@@ -105,6 +108,9 @@ function updateUI() {
             break;
         case 'area':
             renderAreaAgenda(viewContainer);
+            break;
+        case 'traslados':
+            renderTraslados(viewContainer);
             break;
     }
 
@@ -278,10 +284,16 @@ state.activities = state.activities.map(a => ({
 
 // Initial Render
 subscribe(updateUI);
-Promise.all([loadActivities(), loadEfemerides(), loadNewsletterSettings()]).then(() => {
+if (ROLE === 'traslados') {
+    // David (Traslados) no usa la lista general ni el polling global: su vista se
+    // trae su propio endpoint acotado y se auto-refresca sola.
     updateUI();
-    startPolling();
-});
+} else {
+    Promise.all([loadActivities(), loadEfemerides(), loadNewsletterSettings()]).then(() => {
+        updateUI();
+        startPolling();
+    });
+}
 
 // ---------------------------------------------------------
 // Polling para sincronización entre múltiples clientes.

@@ -19,6 +19,7 @@ export function getRole() {
     const r = getRoleRaw();
     if (r === 'secretaria') return 'secretaria';
     if (r === 'audiovisual') return 'audiovisual';
+    if (r === 'traslados') return 'traslados';
     if (r.startsWith('area:')) return 'area';
     return 'comunicacion';
 }
@@ -31,4 +32,5 @@ export function getAreaSlug() {
 export const isSecretaria = () => getRole() === 'secretaria';
 export const isComunicacion = () => getRole() === 'comunicacion';
 export const isAudiovisual = () => getRole() === 'audiovisual';
+export const isTraslados = () => getRole() === 'traslados';
 export const isArea = () => getRole() === 'area';

@@ -233,7 +233,6 @@ class CompromisoPublicOut(BaseModel):
     observations: Optional[str] = ""
     participants: Optional[str] = ""
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
-    solicita_transporte: Optional[bool] = False  # muestra la línea "Traslado…"
     # Dueño: para la vista "Agenda completa" (Mesa + áreas), etiquetar de quién
     # es cada actividad. origen ∈ secretaria|area; area = slug del área.
     origen: Optional[str] = ""
@@ -245,6 +244,24 @@ class CompromisoPublicOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Vista de "Traslados" (David Cardone). Listado read-only y ACOTADO: sólo lo que
+# David necesita para prestar el servicio de traslado (cuándo, dónde, qué). NO
+# expone campos operativos ni notas internas.
+class TrasladoOut(BaseModel):
+    id: str
+    date: str
+    time: str
+    end_date: Optional[str] = ""
+    end_time: Optional[str] = ""
+    title: str
+    location: Optional[str] = ""
+    participants: Optional[str] = ""
+    participants_me: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
 
 class GenerateCopyRequest(BaseModel):
     mode: str  # 'ig' | 'li' | 'newsletter_block'

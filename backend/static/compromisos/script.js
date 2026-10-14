@@ -166,9 +166,8 @@ function renderActivity(occ) {
     if (act.participants_me) {
         meta.push(`<span class="activity-meta-item"><strong>Participa (por Mesa Ejecutiva):</strong> ${esc(act.participants_me)}</span>`);
     }
-    if (act.solicita_transporte) {
-        meta.push(`<span class="activity-meta-item"><strong>Traslado:</strong> Se solicita traslado a cargo de David Cardone</span>`);
-    }
+    // El transporte NO se muestra en la vista pública: lo ve David Cardone en su
+    // propia vista (rol 'traslados').
     const metaHtml = meta.length ? `<div class="activity-meta">${meta.join('')}</div>` : '';
     const attachHtml = act.attachment_url
         ? `<div class="activity-attach"><a href="${esc(act.attachment_url)}" target="_blank" rel="noopener" download>${DOWNLOAD_ICON} Ver Información Adicional</a></div>`
@@ -285,7 +284,6 @@ function printRange(from, to) {
                 const meta = [];
                 if (act.location) meta.push(`<strong>Lugar:</strong> ${esc(act.location)}`);
                 if (act.participants) meta.push(`<strong>Participa:</strong> ${esc(act.participants)}`);
-                if (act.solicita_transporte) meta.push(`<strong>Traslado:</strong> Se solicita traslado a cargo de David Cardone`);
                 const dayTag = o.dayCount > 1 ? ` (Día ${o.dayIndex} de ${o.dayCount})` : '';
                 body += `<div class="cmp-pa-act">
                     <div class="cmp-pa-time">${esc(timeLabel(act))}</div>

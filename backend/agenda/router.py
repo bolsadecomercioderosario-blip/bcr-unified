@@ -17,13 +17,13 @@ import cloudinary.uploader
 import openai
 import requests
 from google_auth_oauthlib.flow import Flow
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, false
 from sqlalchemy.orm import Session
 
 import agenda_models
 from auth import (
-    require_auth, get_role, get_actor, Actor, area_of_role, is_area_role,
-    ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL,
+    require_auth, get_role, get_actor, Actor, area_of_role, is_area_role, require_roles,
+    ROLE_COMUNICACION, ROLE_SECRETARIA, ROLE_AUDIOVISUAL, ROLE_TRASLADOS,
 )
 from common import require_external_integrations, require_google_drive
 from config import CLOUDINARY_ENABLED, UPLOADS_DIR
@@ -276,6 +276,10 @@ def _trigger_santiago_webhook(activity_id, title, date, drive_santiago):
 # ---------------------------------------------------------
 def _visibility_filter(query, role: str):
     A = agenda_models.Activity
+    if role == ROLE_TRASLADOS:
+        # David (Traslados) NO accede a la lista general: usa /actividades/traslados,
+        # que devuelve una vista acotada. Acá devolvemos vacío por las dudas.
+        return query.filter(false())
     if role in (ROLE_COMUNICACION, ROLE_AUDIOVISUAL):
         # Comunicación (y Audiovisual, que necesita ver las tareas AV): no-área
         # (comunicación + secretaría) + área aprobada a Mesa O que pidió cobertura.
@@ -325,6 +329,23 @@ def read_archived_activities(db: Session = Depends(get_db), role: str = Depends(
         agenda_models.Activity.archived == True,  # noqa: E712 — SQLAlchemy
     )
     return _visibility_filter(q, role).all()
+
+
+@router.get("/actividades/traslados", response_model=List[agenda_models.TrasladoOut])
+def read_traslados(db: Session = Depends(get_db),
+                   _: str = Depends(require_roles(ROLE_TRASLADOS, ROLE_SECRETARIA, ROLE_COMUNICACION))):
+    """Vista de David Cardone (rol 'traslados'): actividades donde Secretaría pidió
+    transporte, acotadas a lo necesario (cuándo/dónde/qué). Sólo vigentes (de hoy en
+    adelante, incluidas las multi-día en curso) y no archivadas. También accesible a
+    Secretaría y Comunicación para verificar lo que ve David."""
+    today = datetime.utcnow().date().isoformat()
+    A = agenda_models.Activity
+    rows = (db.query(A)
+            .filter(A.solicita_transporte.is_(True), A.archived == False,  # noqa: E712
+                    or_(A.date >= today, A.end_date >= today))
+            .order_by(A.date.asc(), A.time.asc())
+            .all())
+    return rows
 
 
 def _owns(db_activity, role: str) -> bool:
