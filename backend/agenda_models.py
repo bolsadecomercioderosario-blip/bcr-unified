@@ -74,6 +74,10 @@ class Activity(Base):
     # la Mesa). Si es True, la landing pública muestra "Traslado: Se solicita
     # traslado a cargo de David Cardone".
     solicita_transporte = Column(Boolean, default=False)
+    # Indicaciones libres del traslado (las escribe Secretaría cuando pide
+    # transporte): horario/lugar de salida, "a confirmar", etc. Las ve David
+    # (rol 'traslados') en su vista. No es público.
+    traslado_indicaciones = Column(String, default="")
     # "Participa (por Mesa Ejecutiva)": quiénes participan por la Mesa. Lo carga
     # Secretaría en las actividades de área (va debajo de `participants`, que es
     # el "Participa por el área"). Es público (aparece en la landing).
@@ -153,7 +157,8 @@ class ActivityBase(BaseModel):
     visita_personas: Optional[str] = ""
     visita_varios_receptores: Optional[bool] = False
     visita_ingles: Optional[bool] = False
-    solicita_transporte: Optional[bool] = False  # Secretaría: pide traslado (público)
+    solicita_transporte: Optional[bool] = False  # Secretaría: pide traslado
+    traslado_indicaciones: Optional[str] = ""     # detalles del traslado (los ve David)
     participants_me: Optional[str] = ""  # "Participa (por Mesa Ejecutiva)"
     sec_notes: Optional[str] = ""         # Notas internas · Secretaría
     comunicacion_notes: Optional[str] = ""
@@ -202,6 +207,7 @@ class ActivityUpdate(BaseModel):
     visita_varios_receptores: Optional[bool] = None
     visita_ingles: Optional[bool] = None
     solicita_transporte: Optional[bool] = None
+    traslado_indicaciones: Optional[str] = None
     participants_me: Optional[str] = None
     sec_notes: Optional[str] = None
     comunicacion_notes: Optional[str] = None
@@ -258,6 +264,7 @@ class TrasladoOut(BaseModel):
     location: Optional[str] = ""
     participants: Optional[str] = ""
     participants_me: Optional[str] = ""
+    traslado_indicaciones: Optional[str] = ""
 
     class Config:
         from_attributes = True

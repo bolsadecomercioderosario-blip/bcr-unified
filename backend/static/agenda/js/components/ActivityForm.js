@@ -52,7 +52,8 @@ export function renderActivityForm(container, preData = null) {
         visita_personas: (sourceAct.visita_personas === 'undefined' || !sourceAct.visita_personas) ? '' : sourceAct.visita_personas,
         visita_varios_receptores: !!sourceAct.visita_varios_receptores,
         visita_ingles: !!sourceAct.visita_ingles,
-        solicita_transporte: !!sourceAct.solicita_transporte
+        solicita_transporte: !!sourceAct.solicita_transporte,
+        traslado_indicaciones: (sourceAct.traslado_indicaciones === 'undefined' || !sourceAct.traslado_indicaciones) ? '' : sourceAct.traslado_indicaciones
     };
 
     const isNew = !state.currentActivity;
@@ -349,10 +350,15 @@ export function renderActivityForm(container, preData = null) {
                     ${isSec ? `
                     <div class="form-group" style="margin-top: 1rem;">
                         <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 600;">
-                            <input type="checkbox" name="solicita_transporte" ${act.solicita_transporte ? 'checked' : ''} style="width: 18px; height: 18px;">
+                            <input type="checkbox" name="solicita_transporte" id="solicita-transporte" ${act.solicita_transporte ? 'checked' : ''} style="width: 18px; height: 18px;">
                             Se solicita transporte
                         </label>
                         <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.4rem 0 0;">Si se activa, esta actividad aparece en la vista de <strong>Traslados</strong> de David Cardone (ya no se muestra en la Agenda de Compromisos pública).</p>
+                        <div id="traslado-indic-group" style="margin-top: 0.85rem; display: ${act.solicita_transporte ? 'block' : 'none'};">
+                            <label style="font-weight: 600; font-size: 0.9rem;">Indicaciones para el Traslado</label>
+                            <textarea name="traslado_indicaciones" rows="3" placeholder="Ej: Horario de salida, lugar de salida, a confirmar más detalles…" style="width: 100%; margin-top: 0.4rem;">${escAttr(act.traslado_indicaciones)}</textarea>
+                            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.3rem 0 0;">Lo escribe Secretaría y lo ve David Cardone en su vista de Traslados.</p>
+                        </div>
                     </div>` : ''}
                     </fieldset>
                     ${participaMeHTML}
@@ -549,6 +555,15 @@ export function renderActivityForm(container, preData = null) {
         const vf = container.querySelector('#visita-fields');
         esVisitaChk.addEventListener('change', () => {
             if (vf) vf.style.display = esVisitaChk.checked ? 'block' : 'none';
+        });
+    }
+
+    // "Se solicita transporte" (Secretaría): muestra/oculta "Indicaciones para el Traslado".
+    const transpChk = container.querySelector('#solicita-transporte');
+    if (transpChk) {
+        const indicGroup = container.querySelector('#traslado-indic-group');
+        transpChk.addEventListener('change', () => {
+            if (indicGroup) indicGroup.style.display = transpChk.checked ? 'block' : 'none';
         });
     }
 
@@ -793,6 +808,7 @@ export function renderActivityForm(container, preData = null) {
                 attachment_url: att.attachment_url,
                 attachment_name: att.attachment_name,
                 solicita_transporte: formData.get('solicita_transporte') === 'on',
+                traslado_indicaciones: formData.get('traslado_indicaciones') || '',
             };
             if (secEditsApprovedArea) {
                 // Área aprobada a la Mesa: Secretaría edita todo, pero NO cambia el

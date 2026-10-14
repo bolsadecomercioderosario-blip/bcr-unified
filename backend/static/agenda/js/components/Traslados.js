@@ -41,6 +41,7 @@ function cardHTML(a) {
       <div style="font-weight:700;font-size:1.02rem;margin:6px 0 4px;color:#111827;">${esc(a.title)}</div>
       ${a.location ? `<div style="color:#374151;font-size:0.92rem;"><strong>Lugar:</strong> ${esc(a.location)}</div>` : ''}
       ${partes ? `<div style="color:#374151;font-size:0.92rem;"><strong>Participa:</strong> ${esc(partes)}</div>` : ''}
+      ${a.traslado_indicaciones ? `<div style="margin-top:8px;padding:10px 12px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:8px;color:#1e3a8a;font-size:0.92rem;white-space:pre-wrap;"><strong>Indicaciones:</strong> ${esc(a.traslado_indicaciones)}</div>` : ''}
     </div>`;
 }
 
