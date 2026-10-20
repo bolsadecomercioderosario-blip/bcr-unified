@@ -340,8 +340,12 @@ if (printBtn) printBtn.addEventListener('click', openPrintModal);
 const scopeBtn = document.getElementById('scope-btn');
 if (scopeBtn) scopeBtn.addEventListener('click', () => {
     scope = (scope === 'mesa') ? 'completa' : 'mesa';
-    scopeBtn.textContent = (scope === 'mesa') ? 'Ver Agenda Completa' : 'Ver sólo la Mesa';
+    scopeBtn.textContent = (scope === 'mesa') ? 'Ver Agenda Completa' : 'Ver solo Agenda de Compromisos';
     scopeBtn.classList.toggle('active', scope === 'completa');
+    const brandTitle = document.querySelector('.brand-title');
+    if (brandTitle) brandTitle.textContent = (scope === 'completa')
+        ? 'Agenda de Compromisos (incluye Agenda de Áreas)'
+        : 'Agenda de Compromisos';
     document.getElementById('content').innerHTML = '<div class="loader">Cargando agenda…</div>';
     loadAndRender();
 });
