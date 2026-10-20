@@ -365,7 +365,7 @@ function roleLabel(role) {
 
 function renderAccesoLink() {
     const slot = document.getElementById('area-access-slot');
-    if (slot) slot.innerHTML = '<a class="area-access" href="/agenda/">Acceso áreas →</a>';
+    if (slot) slot.innerHTML = '<a class="area-access" href="/agenda/">Acceso BCR →</a>';
 }
 
 function renderAccesoMenu(role) {
