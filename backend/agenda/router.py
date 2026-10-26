@@ -695,6 +695,10 @@ def hide_activity(activity_id: str, db: Session = Depends(get_db), actor: Actor 
     if (db_activity.origen or "comunicacion") != "area":
         raise HTTPException(status_code=400,
                             detail="Sólo se pueden ocultar actividades de área")
+    if db_activity.me_estado == "aprobada":
+        # Aprobada por la Mesa ⇒ ya es Compromisos (mismo rango que Secretaría): no se oculta.
+        raise HTTPException(status_code=400,
+                            detail="Está aprobada por la Mesa (Compromisos): no se puede ocultar")
 
     db_activity.oculta_comunicacion = True
     db_activity.oculta_comunicacion_at = datetime.utcnow().isoformat()

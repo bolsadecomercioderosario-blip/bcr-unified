@@ -90,11 +90,12 @@ export function renderActivityForm(container, preData = null) {
     const showOperative = !isSec && !isArea;
     // Borrar la actividad entera es acción del dueño de los Datos Generales.
     const showDelete = !isNew && generalsEditable;
-    // "Ocultar de mi vista" (Comunicación): sólo para actividades de ÁREA (nunca
-    // de Secretaría ni propias). Saca la actividad del listado de Comunicación sin
-    // archivarla ni borrarla; recuperable desde "Archivados › Ocultas".
+    // "Ocultar de mi vista" (Comunicación): sólo para actividades de ÁREA que NO
+    // estén aprobadas por la Mesa. Una vez aprobada, la actividad adquiere rango de
+    // Compromisos (igual que una de Secretaría) y ya no se puede ocultar. Nunca se
+    // oculta lo de Secretaría ni lo propio. Recuperable desde "Archivados › Ocultas".
     const canHideFromView = !isNew && role === 'comunicacion' && actOrigen === 'area'
-                            && !act.oculta_comunicacion;
+                            && act.me_estado !== 'aprobada' && !act.oculta_comunicacion;
 
     // Multi-día / rango horario (excepcional): estado inicial según los datos.
     const isMultiday = !!(act.end_date && act.end_date > act.date);

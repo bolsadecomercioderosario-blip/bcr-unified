@@ -104,8 +104,10 @@ function belongsToTab(a) {
     if (a.is_custom) return false;
     if (currentTab === 'mias') return a.origen === 'area' && a.area === mySlug();
     // completa: por default Mesa Ejecutiva + todas las áreas (no Comunicación);
-    // con el filtro rápido en 'me', sólo la Agenda de la Mesa Ejecutiva.
-    if (completaScope === 'me') return a.origen === 'secretaria';
+    // con el filtro rápido en 'me', sólo la Agenda de la Mesa Ejecutiva. "Mesa
+    // Ejecutiva" = lo de Secretaría + las de área ya APROBADAS por la Mesa (esas
+    // adquieren rango de Compromisos; igual criterio que la landing pública).
+    if (completaScope === 'me') return a.origen === 'secretaria' || (a.origen === 'area' && a.me_estado === 'aprobada');
     return a.origen === 'secretaria' || a.origen === 'area';
 }
 
