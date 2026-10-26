@@ -330,6 +330,46 @@ export async function restoreActivity(id) {
     return false;
 }
 
+// "Ocultar de mi vista" (sólo Comunicación): saca la actividad del listado activo
+// SIN archivarla ni borrarla. Sigue viva para Secretaría, las áreas, la landing
+// pública y el bot. Se usa para descartar duplicados o actividades ajenas que no
+// nos interesan. Recuperable desde "Archivados › Ocultas".
+export async function hideActivity(id) {
+    // Optimistic: la sacamos del listado al toque.
+    state.activities = state.activities.filter(a => a.id !== id);
+    notify();
+    try {
+        await trackedFetch(`/api/agenda/actividades/${id}/ocultar`, { method: 'POST' });
+    } catch (e) {
+        console.error("Failed to hide activity on server", e);
+    }
+}
+
+// Trae las actividades ocultas (pestaña "Ocultas" dentro de Archivados).
+export async function loadHidden() {
+    try {
+        const res = await fetch('/api/agenda/actividades/ocultas');
+        if (res.ok) return await res.json();
+    } catch (e) {
+        console.error("Failed to load hidden activities", e);
+    }
+    return [];
+}
+
+// Vuelve a mostrar una actividad oculta: reaparece en el listado de Comunicación.
+export async function unhideActivity(id) {
+    try {
+        const res = await trackedFetch(`/api/agenda/actividades/${id}/mostrar`, { method: 'POST' });
+        if (res.ok) {
+            await loadActivities();
+            return true;
+        }
+    } catch (e) {
+        console.error("Failed to unhide activity on server", e);
+    }
+    return false;
+}
+
 export function setCurrentActivity(activity) {
     state.currentActivity = activity;
     notify();

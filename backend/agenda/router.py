@@ -302,6 +302,12 @@ def read_activities(skip: int = 0, limit: int = 10000, db: Session = Depends(get
     q = db.query(agenda_models.Activity).filter(
         agenda_models.Activity.archived == False,  # noqa: E712 — SQLAlchemy
     )
+    # "Ocultar de mi vista": Comunicación (y Audiovisual, que comparte su vista) no
+    # ve las que Comunicación marcó como ocultas. Siguen vivas para el resto; viven
+    # sólo en la pestaña "Ocultas" (ver /actividades/ocultas). No afecta a Secretaría
+    # ni a las áreas (su filtro de visibilidad es otro).
+    if role in (ROLE_COMUNICACION, ROLE_AUDIOVISUAL):
+        q = q.filter(agenda_models.Activity.oculta_comunicacion == False)  # noqa: E712
     return (_visibility_filter(q, role)
             .order_by(agenda_models.Activity.date.asc(),
                       agenda_models.Activity.time.asc())
@@ -329,6 +335,20 @@ def read_archived_activities(db: Session = Depends(get_db), role: str = Depends(
         agenda_models.Activity.archived == True,  # noqa: E712 — SQLAlchemy
     )
     return _visibility_filter(q, role).all()
+
+
+@router.get("/actividades/ocultas", response_model=List[agenda_models.ActivityOut])
+def read_hidden_activities(db: Session = Depends(get_db),
+                           _: str = Depends(require_roles(ROLE_COMUNICACION))):
+    """Listado de actividades que Comunicación ocultó de su vista (pestaña
+    "Ocultas" dentro de Archivados). Son actividades vivas de Secretaría/áreas que
+    Comunicación decidió no ver en su listado; desde acá las puede volver a mostrar.
+    No incluye las archivadas (esas viven en 'Archivados')."""
+    A = agenda_models.Activity
+    q = db.query(A).filter(A.oculta_comunicacion == True,  # noqa: E712
+                           A.archived == False)             # noqa: E712
+    return (_visibility_filter(q, ROLE_COMUNICACION)
+            .order_by(A.date.asc(), A.time.asc()).all())
 
 
 @router.get("/actividades/traslados", response_model=List[agenda_models.TrasladoOut])
@@ -654,6 +674,47 @@ def restore_activity(activity_id: str, db: Session = Depends(get_db), actor: Act
 
     db_activity.archived = False
     db_activity.archived_at = ""
+    db_activity.updated_at = _now_iso()
+    db_activity.updated_by = _actor_label(actor)  # auditoría interna
+    db.commit()
+    db.refresh(db_activity)
+    return db_activity
+
+
+@router.post("/actividades/{activity_id}/ocultar")
+def hide_activity(activity_id: str, db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
+    """Saca la actividad de la vista de Comunicación SIN archivarla ni borrarla:
+    sigue viva para Secretaría, las áreas, la landing pública y el bot. Sólo lo
+    puede hacer Comunicación, y sólo sobre actividades que NO son suyas (las
+    propias se archivan, no se ocultan). Recuperable desde 'Ocultas'."""
+    if actor.role != ROLE_COMUNICACION:
+        raise HTTPException(status_code=403, detail="Sólo Comunicación puede ocultar actividades")
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    if (db_activity.origen or "comunicacion") == "comunicacion":
+        raise HTTPException(status_code=400,
+                            detail="Tus propias actividades se eliminan/archivan, no se ocultan")
+
+    db_activity.oculta_comunicacion = True
+    db_activity.oculta_comunicacion_at = datetime.utcnow().isoformat()
+    db_activity.updated_at = _now_iso()
+    db_activity.updated_by = _actor_label(actor)  # auditoría interna
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/actividades/{activity_id}/mostrar", response_model=agenda_models.ActivityOut)
+def unhide_activity(activity_id: str, db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
+    """Vuelve a mostrar en la vista de Comunicación una actividad que estaba oculta."""
+    if actor.role != ROLE_COMUNICACION:
+        raise HTTPException(status_code=403, detail="Sólo Comunicación puede mostrar actividades")
+    db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
+    if not db_activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    db_activity.oculta_comunicacion = False
+    db_activity.oculta_comunicacion_at = ""
     db_activity.updated_at = _now_iso()
     db_activity.updated_by = _actor_label(actor)  # auditoría interna
     db.commit()

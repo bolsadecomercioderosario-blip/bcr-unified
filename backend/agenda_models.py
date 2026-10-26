@@ -108,6 +108,16 @@ class Activity(Base):
     # excluyen de todas las vistas activas (lista, landing, newsletter, bot).
     archived = Column(Boolean, default=False)
     archived_at = Column(String, default="")
+    # "Ocultar de mi vista" — SÓLO afecta la vista de Comunicación. A diferencia de
+    # `archived` (soft-delete global que saca la actividad de TODAS las superficies),
+    # esto sólo la saca del listado activo de Comunicación: la actividad sigue viva
+    # para Secretaría, las áreas, la landing pública y el bot. Lo usa Comunicación
+    # para descartar de su listado duplicados o actividades de Secretaría/áreas que
+    # no le interesan, sin tocar el registro de nadie. Recuperable desde la pestaña
+    # "Ocultas" (dentro de Archivados). Es a nivel del rol (todo Comunicación la ve
+    # oculta), no por usuario. oculta_comunicacion_at = timestamp ISO UTC.
+    oculta_comunicacion = Column(Boolean, default=False)
+    oculta_comunicacion_at = Column(String, default="")
 
     # Timestamp ISO UTC del último cambio (alta/edición/archivado/restore). Lo usa
     # el endpoint /actividades/stamp para que el cliente sólo recargue la lista
@@ -169,6 +179,8 @@ class ActivityBase(BaseModel):
     attachment_name: Optional[str] = ""
     archived: Optional[bool] = False
     archived_at: Optional[str] = ""
+    oculta_comunicacion: Optional[bool] = False       # oculta sólo en la vista de Comunicación
+    oculta_comunicacion_at: Optional[str] = ""
 
 class ActivityCreate(ActivityBase):
     pass

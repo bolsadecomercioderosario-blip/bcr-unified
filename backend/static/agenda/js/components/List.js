@@ -1,8 +1,12 @@
-import { state, updateActivity, deleteActivity, expandPastMonths } from '../state.js';
+import { state, updateActivity, deleteActivity, hideActivity, expandPastMonths } from '../state.js';
 import { RECORDATORIOS } from '../data/recordatorios.js';
 import { ownerLabel } from '../constants.js';
+import { isComunicacion } from '../role.js';
 
 export function renderList(container) {
+    // Sólo Comunicación puede "ocultar de su vista" actividades ajenas (de
+    // Secretaría/áreas). El botón no se muestra para otros roles.
+    const canHide = isComunicacion();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString().split('T')[0];
@@ -223,7 +227,10 @@ export function renderList(container) {
                                         ${act.origen === 'comunicacion' ? `
                                         <button class="btn-delete-activity" data-id="${act.id}" title="Eliminar actividad" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem; display: inline-flex; align-items: center;">
                                             <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
-                                        </button>` : ''}
+                                        </button>` : (canHide ? `
+                                        <button class="btn-hide-activity" data-id="${act.id}" title="Sacar de mi vista (no la elimina ni la archiva)" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.2rem; display: inline-flex; align-items: center;">
+                                            <i data-lucide="eye-off" style="width: 18px; height: 18px;"></i>
+                                        </button>` : '')}
                                     </div>
                                 </td>
                             </tr>
@@ -293,6 +300,18 @@ export function renderList(container) {
             if (confirm('¿Estás seguro de que querés eliminar esta actividad?')) {
                 const id = btn.dataset.id;
                 deleteActivity(id);
+            }
+        };
+    });
+
+    // "Ocultar de mi vista": saca la actividad del listado de Comunicación sin
+    // eliminarla ni archivarla (sigue viva para el resto). Recuperable desde
+    // "Archivados › Ocultas".
+    wrapper.querySelectorAll('.btn-hide-activity').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm('¿Sacar esta actividad de tu vista?\n\nNo se elimina ni se archiva: sigue visible para Secretaría / las áreas y en la agenda pública. Podés volver a mostrarla desde Archivados › Ocultas.')) {
+                hideActivity(btn.dataset.id);
             }
         };
     });

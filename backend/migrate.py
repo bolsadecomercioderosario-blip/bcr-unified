@@ -91,6 +91,17 @@ def migrate():
         "ALTER add archived_at",
         "ALTER TABLE activities ADD COLUMN archived_at VARCHAR DEFAULT ''",
     )
+    # "Ocultar de mi vista" (sólo Comunicación). DEFAULT FALSE deja las filas
+    # existentes visibles. No afecta ninguna otra superficie (Secretaría, áreas,
+    # landing pública, bot): es un filtro exclusivo del listado de Comunicación.
+    _try_exec(
+        "ALTER add oculta_comunicacion",
+        "ALTER TABLE activities ADD COLUMN oculta_comunicacion BOOLEAN DEFAULT FALSE",
+    )
+    _try_exec(
+        "ALTER add oculta_comunicacion_at",
+        "ALTER TABLE activities ADD COLUMN oculta_comunicacion_at VARCHAR DEFAULT ''",
+    )
     _try_exec(
         "ALTER add updated_at",
         "ALTER TABLE activities ADD COLUMN updated_at VARCHAR DEFAULT ''",
