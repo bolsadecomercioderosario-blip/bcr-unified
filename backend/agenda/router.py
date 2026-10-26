@@ -684,17 +684,17 @@ def restore_activity(activity_id: str, db: Session = Depends(get_db), actor: Act
 @router.post("/actividades/{activity_id}/ocultar")
 def hide_activity(activity_id: str, db: Session = Depends(get_db), actor: Actor = Depends(get_actor)):
     """Saca la actividad de la vista de Comunicación SIN archivarla ni borrarla:
-    sigue viva para Secretaría, las áreas, la landing pública y el bot. Sólo lo
-    puede hacer Comunicación, y sólo sobre actividades que NO son suyas (las
-    propias se archivan, no se ocultan). Recuperable desde 'Ocultas'."""
+    sigue viva para el área, la landing pública y el bot. Sólo lo puede hacer
+    Comunicación, y SÓLO sobre actividades de ÁREA (las de Secretaría nunca se
+    ocultan; las propias se archivan). Recuperable desde 'Ocultas'."""
     if actor.role != ROLE_COMUNICACION:
         raise HTTPException(status_code=403, detail="Sólo Comunicación puede ocultar actividades")
     db_activity = db.query(agenda_models.Activity).filter(agenda_models.Activity.id == activity_id).first()
     if not db_activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    if (db_activity.origen or "comunicacion") == "comunicacion":
+    if (db_activity.origen or "comunicacion") != "area":
         raise HTTPException(status_code=400,
-                            detail="Tus propias actividades se eliminan/archivan, no se ocultan")
+                            detail="Sólo se pueden ocultar actividades de área")
 
     db_activity.oculta_comunicacion = True
     db_activity.oculta_comunicacion_at = datetime.utcnow().isoformat()

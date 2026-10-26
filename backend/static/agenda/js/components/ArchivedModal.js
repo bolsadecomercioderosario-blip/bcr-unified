@@ -134,7 +134,7 @@ export async function renderArchivedModal(container) {
 
     // --- Pestaña Ocultas (sólo Comunicación) ------------------------------------
     async function showHidden() {
-        helpEl.textContent = 'Actividades que sacaste de tu vista (de Secretaría o de las áreas). NO están eliminadas: siguen vivas para el resto y en la agenda pública. Volvé a mostrarlas cuando quieras.';
+        helpEl.textContent = 'Actividades de las áreas que sacaste de tu vista. NO están eliminadas: siguen vivas para el área y en la agenda pública. Volvé a mostrarlas cuando quieras.';
         listEl.innerHTML = `<div style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">Cargando…</div>`;
         const all = await loadHidden();
         const items = all

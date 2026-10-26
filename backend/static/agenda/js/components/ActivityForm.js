@@ -1,4 +1,4 @@
-import { state, addActivity, updateActivity, deleteActivity } from '../state.js';
+import { state, addActivity, updateActivity, deleteActivity, hideActivity } from '../state.js';
 import { getRole, getAreaSlug } from '../role.js';
 import { SEC_RESPONSABLES } from '../constants.js';
 // Nota: los botones de "Generar con IA" en este modal se sacaron por seguridad
@@ -90,6 +90,11 @@ export function renderActivityForm(container, preData = null) {
     const showOperative = !isSec && !isArea;
     // Borrar la actividad entera es acción del dueño de los Datos Generales.
     const showDelete = !isNew && generalsEditable;
+    // "Ocultar de mi vista" (Comunicación): sólo para actividades de ÁREA (nunca
+    // de Secretaría ni propias). Saca la actividad del listado de Comunicación sin
+    // archivarla ni borrarla; recuperable desde "Archivados › Ocultas".
+    const canHideFromView = !isNew && role === 'comunicacion' && actOrigen === 'area'
+                            && !act.oculta_comunicacion;
 
     // Multi-día / rango horario (excepcional): estado inicial según los datos.
     const isMultiday = !!(act.end_date && act.end_date > act.date);
@@ -276,6 +281,7 @@ export function renderActivityForm(container, preData = null) {
                     <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         Datos Generales
                         ${generalsReadOnly ? `<span style="text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.7rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 0.1rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> ${actOrigen === 'area' ? 'La carga el área · solo lectura' : 'Los carga Secretaría · solo lectura'}</span>` : ''}
+                        ${canHideFromView ? `<button type="button" id="btn-hide-from-view" title="Sacar esta actividad de la vista de Comunicación (no la elimina ni la archiva)" style="margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.72rem; color: var(--text-muted); background: white; border: 1px solid var(--border); padding: 0.25rem 0.6rem; border-radius: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;"><i data-lucide="eye-off" style="width: 13px; height: 13px;"></i> Ocultar de mi vista</button>` : ''}
                     </h3>
                     <fieldset ${generalsReadOnly ? 'disabled' : ''} style="border: none; padding: 0; margin: 0; min-inline-size: auto;">
                     <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0.85rem; user-select: none;">
@@ -904,6 +910,17 @@ export function renderActivityForm(container, preData = null) {
         container.querySelector('#btn-delete-activity-form').onclick = () => {
             if (confirm('¿Estás seguro de que querés eliminar esta actividad? Esta acción no se puede deshacer.')) {
                 deleteActivity(act.id);
+                window.closeActivitySheet();
+            }
+        };
+    }
+
+    // "Ocultar de mi vista" (sólo actividades de área, para Comunicación).
+    const hideBtn = container.querySelector('#btn-hide-from-view');
+    if (hideBtn) {
+        hideBtn.onclick = () => {
+            if (confirm('¿Sacar esta actividad de tu vista?\n\nNo se elimina ni se archiva: sigue visible para el área y en la agenda pública. Podés volver a mostrarla desde Archivados › Ocultas.')) {
+                hideActivity(act.id);
                 window.closeActivitySheet();
             }
         };
