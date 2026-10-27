@@ -155,7 +155,12 @@ def migrate():
 
     backfill_origen_from_channel()
 
+    # Aniversarios: flag de Consejo Directivo (se saluda en X + IG).
+    _try_exec("ALTER efemerides add consejo_directivo",
+              "ALTER TABLE efemerides ADD COLUMN consejo_directivo BOOLEAN DEFAULT FALSE")
+
     seed_efemerides_if_empty()
+    backfill_consejo_directivo()
     seed_metricas_if_empty()
 
     # Subcategorías (subtítulos) del Kit Multimedia.
@@ -398,6 +403,40 @@ def backfill_origen_from_channel():
         print(f"Backfill origen: {changed} actividad(es) marcadas como Secretaría.")
     except Exception as e:
         print(f"Error en backfill de origen: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def backfill_consejo_directivo():
+    """Marca los aniversarios de entidades del Consejo Directivo de la BCR
+    (se saludan en X + IG) sobre la tabla ya sembrada en prod. Idempotente:
+    toma como fuente de verdad `seed_efemerides.EFEMERIDES_DATA` (los que tienen
+    consejo_directivo=True) y sólo PRENDE el flag en los que matcheen por motivo
+    exacto; nunca lo apaga, así no pisa lo que se edite a mano desde el panel.
+    Además asegura el aniversario de A3 Mercados S.A. (1/3), que no estaba cargado."""
+    from agenda_models import Efemeride
+    from seed_efemerides import EFEMERIDES_DATA
+
+    db = SessionLocal()
+    try:
+        motivos_cd = {e["motivo"] for e in EFEMERIDES_DATA if e.get("consejo_directivo")}
+        rows = db.query(Efemeride).filter(Efemeride.tipo == "Aniversario").all()
+        changed = 0
+        for r in rows:
+            if (r.motivo or "") in motivos_cd and not r.consejo_directivo:
+                r.consejo_directivo = True
+                changed += 1
+        # A3 Mercados S.A.: no estaba cargado; alta el 1/3, ya como Consejo Directivo.
+        if not any((r.motivo or "").strip().lower().startswith("a3 mercados") for r in rows):
+            db.add(Efemeride(mes=3, dia=1, tipo="Aniversario",
+                             motivo="A3 Mercados S.A.", consejo_directivo=True))
+            changed += 1
+        if changed:
+            db.commit()
+        print(f"Backfill Consejo Directivo: {changed} cambio(s).")
+    except Exception as e:
+        print(f"Error en backfill de Consejo Directivo: {e}")
         db.rollback()
     finally:
         db.close()

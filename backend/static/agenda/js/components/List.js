@@ -122,7 +122,10 @@ export function renderList(container) {
     const itemsForDate = (date) => {
         const items = [];
         for (const e of efemeridesForDate(date)) {
-            items.push({ label: `${e.tipo}: ${e.motivo}` });
+            // Sólo los Aniversarios llevan etiqueta de canal: "(X + IG)" si la
+            // entidad integra el Consejo Directivo de la BCR, "(X)" si no.
+            const canal = e.tipo === 'Aniversario' ? (e.consejo_directivo ? ' (X + IG)' : ' (X)') : '';
+            items.push({ label: `${e.tipo}: ${e.motivo}${canal}` });
         }
         for (const r of recordatoriosForDate(date)) {
             items.push({ label: r.titulo });

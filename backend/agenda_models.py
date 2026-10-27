@@ -303,6 +303,10 @@ class Efemeride(Base):
     dia = Column(Integer, nullable=False)
     tipo = Column(String, default="Efeméride")  # "Efeméride" | "Aniversario"
     motivo = Column(String, nullable=False)
+    # Sólo para Aniversarios: True = la entidad integra el Consejo Directivo de la
+    # BCR, así que se la saluda en X + Instagram. False = se la saluda sólo en X.
+    # El front muestra la etiqueta "(X)" / "(X + IG)" según este flag.
+    consejo_directivo = Column(Boolean, default=False)
 
 
 class EfemerideBase(BaseModel):
@@ -310,6 +314,7 @@ class EfemerideBase(BaseModel):
     dia: int
     tipo: str = "Efeméride"
     motivo: str
+    consejo_directivo: bool = False  # Aniversario de entidad del Consejo Directivo → X + IG
 
 
 class EfemerideCreate(EfemerideBase):
@@ -321,6 +326,7 @@ class EfemerideUpdate(BaseModel):
     dia: Optional[int] = None
     tipo: Optional[str] = None
     motivo: Optional[str] = None
+    consejo_directivo: Optional[bool] = None
 
 
 class EfemerideOut(EfemerideBase):

@@ -72,6 +72,7 @@ export function renderEfemeridesModal(container) {
                     </select>
                     <input type="text" value="${(e.motivo || '').replace(/"/g, '&quot;')}" data-field="motivo" />
                     <div class="ef-actions">
+                        ${e.tipo === 'Aniversario' ? `<label title="Entidad del Consejo Directivo: se saluda en X + Instagram. Sin tildar, sólo en X." style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.72rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;user-select:none;"><input type="checkbox" data-field="consejo_directivo" ${e.consejo_directivo ? 'checked' : ''} style="margin:0;cursor:pointer;"> X + IG</label>` : ''}
                         <button class="ef-delete" title="Eliminar">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                         </button>
@@ -84,6 +85,7 @@ export function renderEfemeridesModal(container) {
                         const updates = {};
                         const f = inp.dataset.field;
                         let v = inp.value;
+                        if (inp.type === 'checkbox') v = inp.checked;
                         if (f === 'dia') {
                             v = parseInt(v, 10);
                             if (isNaN(v) || v < 1 || v > 31) {
