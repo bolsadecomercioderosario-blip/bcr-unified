@@ -261,9 +261,9 @@ export function renderActivityForm(container, preData = null) {
 
                 <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 600; margin-top: 1.1rem;">
                     <input type="checkbox" id="area-cobertura" ${covChecked} style="width: 18px; height: 18px;">
-                    ¿Solicita cobertura?
+                    Avisar a Comunicación
                 </label>
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">Al solicitar cobertura, esta actividad se hace visible para el área de Comunicación y Prensa, que evaluará la solicitud.</p>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.5rem 0 0;">Al tildar esta opción, la actividad aparece en la Agenda del área de Comunicación y Prensa.</p>
             </section>`;
     }
 
