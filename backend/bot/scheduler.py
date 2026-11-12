@@ -197,6 +197,22 @@ def _run_coyuntura_auto() -> None:
         db.close()
 
 
+def _run_antesala_vigia() -> None:
+    """Wrapper del vigía de entradas de Antesala (cada 15 min). Si no hay
+    eventos configurados, no hace nada."""
+    from bot.antesala_vigia import revisar
+
+    db = SessionLocal()
+    try:
+        result = revisar(db)
+        if result.get("status") != "apagado":
+            print(f"[bot.scheduler] antesala_vigia → {result}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bot.scheduler] antesala_vigia falló: {type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -391,6 +407,19 @@ def start() -> None:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=_DAILY_GRACE_S,
+    )
+
+    # Vigía de entradas de Antesala: cada 15 min. Barato (1 request por evento)
+    # y no-op si ANTESALA_EVENTOS está vacío. No necesita catch-up: compara
+    # contra el último total guardado en DB, así que un restart no pierde nada.
+    scheduler.add_job(
+        _run_antesala_vigia,
+        IntervalTrigger(minutes=15),
+        id="antesala_vigia_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=600,
     )
 
     scheduler.start()

@@ -747,6 +747,46 @@ def coyuntura_editar(
     return {"status": "ok" if ok else "error", "tema": payload.tema}
 
 
+# ---------------------------------------------------------------------------
+# Vigía de entradas de Antesala (bot/antesala_vigia.py)
+# ---------------------------------------------------------------------------
+class _AntesalaTokenRequest(BaseModel):
+    token: str
+
+
+@router.get("/admin/antesala/estado", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
+def antesala_estado(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Último total guardado por evento, vencimiento del token y estado de la
+    plantilla de WhatsApp."""
+    from bot import antesala_vigia
+    return antesala_vigia.estado(db)
+
+
+@router.post("/admin/antesala/revisar", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
+def antesala_revisar(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Corre una pasada del vigía ya (sin esperar los 15 min)."""
+    from bot import antesala_vigia
+    return antesala_vigia.revisar(db)
+
+
+@router.post("/admin/antesala/token", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
+def antesala_token(payload: _AntesalaTokenRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Carga/renueva el token de sesión de Antesala (localStorage "token_api"
+    del panel). Tiene prioridad sobre la env var ANTESALA_TOKEN."""
+    from bot import antesala_vigia
+    antesala_vigia.set_token(db, payload.token)
+    vence = antesala_vigia.token_vence(payload.token)
+    return {"status": "ok", "token_vence_utc": vence.isoformat() if vence else None}
+
+
+@router.post("/admin/antesala/setup-template", dependencies=[Depends(require_roles(ROLE_COMUNICACION))])
+def antesala_setup_template(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Crea la plantilla de WhatsApp de avisos de venta y la manda a aprobar
+    (Meta). Mientras no esté aprobada, los avisos van como texto libre."""
+    from bot import antesala_vigia
+    return antesala_vigia.crear_template(db)
+
+
 @router.get(
     "/admin/ingested",
     dependencies=[Depends(require_roles(ROLE_COMUNICACION))],

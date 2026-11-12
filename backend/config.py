@@ -87,6 +87,21 @@ BOT_WHATSAPP_WHITELIST = os.environ.get("BOT_WHATSAPP_WHITELIST", "")
 # confianza. La carga siempre pasa por un paso de confirmación en el chat.
 BOT_AGENDA_WRITERS = os.environ.get("BOT_AGENDA_WRITERS", "")
 
+# Vigía de entradas de Antesala (bot/antesala_vigia.py). Cada 15 min consulta
+# las ventas de los eventos y avisa por WhatsApp si cambió el total.
+#  - ANTESALA_EVENTOS: ids de evento separados por coma (el de la URL
+#    /dashboard/boleteria/<id>). Vacío = vigía apagado.
+#  - ANTESALA_AVISO_A: números a avisar (E.164, coma-separados).
+#  - ANTESALA_TOKEN: token de sesión de Antesala (localStorage "token_api").
+#    El login tiene reCAPTCHA, así que no se puede loguear solo: el token se
+#    renueva a mano (dura 72 hs). También se puede cargar sin redeploy con
+#    POST /api/bot/admin/antesala/token, que tiene prioridad sobre la env var.
+# Defaults: función de "El más acá" del 14/11/2026 (uso puntual, se borra
+# después del evento). Las env vars los sobreescriben.
+ANTESALA_EVENTOS = os.environ.get("ANTESALA_EVENTOS", "3220")
+ANTESALA_AVISO_A = os.environ.get("ANTESALA_AVISO_A", "")
+ANTESALA_TOKEN = os.environ.get("ANTESALA_TOKEN", "")
+
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")
