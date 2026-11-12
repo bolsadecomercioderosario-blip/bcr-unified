@@ -232,10 +232,15 @@ def revisar(db: Session) -> dict:
             continue
 
         previo = int(previo_raw)
-        if total != previo:
+        if total > previo:
             _enviar_aviso_venta(db, info["nombre"], total, total - previo)
             _set(db, _k_total(ev), str(total))
             resultados.append({"evento": ev, "total": total, "previo": previo, "aviso": True})
+        elif total < previo:
+            # Bajó (devolución/anulación): sólo actualizamos la base, sin avisar.
+            # Así la próxima venta se cuenta desde el número real.
+            _set(db, _k_total(ev), str(total))
+            resultados.append({"evento": ev, "total": total, "previo": previo, "aviso": False})
         else:
             resultados.append({"evento": ev, "total": total, "aviso": False})
 
