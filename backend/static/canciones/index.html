@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Armemos El Más Acá 45/50' · Y Parió La Abuela</title>
+    <meta name="theme-color" content="#FAF6EE">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+    <main class="stage">
+        <section class="view active">
+            <header class="intro">
+                <div class="kicker">Y Parió La Abuela</div>
+                <h1 class="titulo">Armemos <i>El Más Acá</i> versión 45/50'</h1>
+                <p class="bajada">Tildá los bloques del show (canciones <b>e</b> intervenciones) y mirá cuánto suma abajo en vivo. La idea es cerrar entre <b>45 y 50 minutos</b>. El show completo son ~68'.</p>
+            </header>
+
+            <div class="r-controls">
+                <button id="c-copiar" type="button" class="chip chip-line">Copiar lista armada</button>
+                <button id="c-clear" type="button" class="chip chip-line">Limpiar todo</button>
+            </div>
+
+            <div id="grupos" class="grupos"></div>
+            <div class="fondo-barra"></div>
+        </section>
+    </main>
+
+    <!-- Barra fija: duración armada -->
+    <div id="barra" class="barra">
+        <div class="barra-top">
+            <div class="barra-time"><span id="b-time">0:00</span><span class="barra-obj"> / 50:00</span></div>
+            <div id="b-estado" class="barra-estado">Elegí partes</div>
+        </div>
+        <div class="barra-track"><div id="b-fill" class="barra-fill"></div></div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>
