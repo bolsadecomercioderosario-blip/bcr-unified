@@ -52,7 +52,6 @@
                 TODOS = Array.isArray(data) ? data : [];
                 $("#estado").classList.add("hidden");
                 $("#controls").classList.remove("hidden");
-                $("#meta-count").textContent = TODOS.length + (TODOS.length === 1 ? " actividad" : " actividades");
                 render($("#buscar").value || "");
             })
             .catch(function (e) {
@@ -96,19 +95,19 @@
             });
             var fa = parseFecha(arr[0].fecha);
             var titulo = fa ? (MESES[fa.mo - 1] + " " + fa.y) : "Sin fecha";
-            html += '<section class="mes"><div class="mes-head"><span>' + esc(titulo) + '</span>' +
-                '<span class="mes-n">' + arr.length + (arr.length === 1 ? " actividad" : " actividades") + '</span></div>';
+            html += '<section class="mes"><div class="mes-head"><span>' + esc(titulo) + '</span></div>';
             arr.forEach(function (a) {
                 var f = parseFecha(a.fecha);
                 var dia = f ? f.d : "–", dow = f ? DOW[f.dow] : "";
                 var esHoy = a.fecha === hoy;
                 var tags = "";
-                if (a.hora) tags += '<span class="tag tag-hora">' + esc(a.hora) + '</span>';
                 if (a.equipo) tags += '<span class="tag tag-equipo">' + esc(a.equipo) + '</span>';
                 if (a.metricas) tags += '<span class="tag tag-metrica">' + esc(a.metricas) + '</span>';
                 html += '<article class="act' + (esHoy ? " hoy" : "") + (EDIT ? " editable" : "") + '" data-id="' + esc(a.id) + '">' +
                     '<div class="fecha-col"><div class="fecha-dia">' + dia + '</div><div class="fecha-dow">' + esc(dow) + '</div></div>' +
-                    '<div class="act-body"><div class="act-evento">' + esc(a.evento || "(sin detalle)") + '</div>' +
+                    '<div class="act-body">' +
+                        (a.hora ? '<div class="act-hora">' + esc(a.hora) + '</div>' : '') +
+                        '<div class="act-evento">' + esc(a.evento || "(sin detalle)") + '</div>' +
                         (tags ? '<div class="act-tags">' + tags + '</div>' : '') + '</div>' +
                     (EDIT ? '<button class="pencil" title="Editar">✎</button>' : '') +
                 '</article>';

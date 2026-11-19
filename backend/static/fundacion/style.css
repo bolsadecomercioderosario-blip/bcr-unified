@@ -140,3 +140,9 @@ body.modo-edit #fab-edit { background: var(--hoy); }
 .btn-cancel { background: #eef2f8; color: var(--ink-soft); }
 .btn-arch { background: transparent; color: #c0492f; border: 1.5px solid #e7c3bb; }
 .btn:disabled { opacity: .6; cursor: default; }
+
+/* Hora como encabezado de la actividad (más jerarquía que los chips de equipo) */
+.act-hora {
+    font-size: .82rem; font-weight: 700; color: var(--azure);
+    font-variant-numeric: tabular-nums; margin-bottom: 3px;
+}
