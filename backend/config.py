@@ -87,6 +87,11 @@ BOT_WHATSAPP_WHITELIST = os.environ.get("BOT_WHATSAPP_WHITELIST", "")
 # confianza. La carga siempre pasa por un paso de confirmación en el chat.
 BOT_AGENDA_WRITERS = os.environ.get("BOT_AGENDA_WRITERS", "")
 
+# Token del link privado de la Agenda de la Fundación (vista /fundacion/{token}).
+# Quien tenga el link puede VER la agenda (solo lectura). Se puede rotar sin
+# deploy con la env var FUNDACION_TOKEN.
+FUNDACION_TOKEN = os.environ.get("FUNDACION_TOKEN", "242813f9dbbf204c").strip()
+
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")

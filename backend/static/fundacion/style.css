@@ -1,0 +1,93 @@
+/* ============================================================
+   Agenda de la Fundación BCR — vista de solo lectura.
+   App independiente. Navy institucional + Inter. Mobile-first.
+   ============================================================ */
+:root {
+    --navy: #193363;
+    --navy-deep: #102249;
+    --azure: #2E6FB0;
+    --bg: #F4F6FA;
+    --card: #FFFFFF;
+    --ink: #1B2535;
+    --ink-soft: #64708a;
+    --line: #e4e8f0;
+    --hoy: #0C7D74;
+    --radio: 14px;
+    --sombra: 0 6px 20px rgba(16,34,73,.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased; min-height: 100%;
+}
+
+/* ---------- Topbar ---------- */
+.topbar { background: var(--navy-deep); color: #fff; position: sticky; top: 0; z-index: 30; }
+.topbar-inner {
+    max-width: 760px; margin: 0 auto; padding: 16px 18px calc(16px + env(safe-area-inset-bottom,0));
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.brand-kicker { font-size: .68rem; letter-spacing: .22em; text-transform: uppercase; color: #9db6dd; font-weight: 700; }
+.brand-title { font-size: 1.28rem; font-weight: 800; line-height: 1.1; margin-top: 2px; }
+.chip-count {
+    background: rgba(255,255,255,.12); color: #e9f0fb; border-radius: 999px;
+    padding: 6px 12px; font-size: .78rem; font-weight: 700; white-space: nowrap;
+}
+
+/* ---------- Layout ---------- */
+.wrap { max-width: 760px; margin: 0 auto; padding: 18px 16px 40px; }
+.hidden { display: none !important; }
+.estado, .vacio { color: var(--ink-soft); text-align: center; padding: 40px 10px; font-size: .98rem; }
+.vacio { font-style: italic; }
+
+.controls { margin-bottom: 16px; }
+.buscar {
+    width: 100%; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+    font-family: inherit; font-size: 1rem; color: var(--ink); padding: 12px 14px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.buscar:focus { outline: none; border-color: var(--azure); box-shadow: 0 0 0 3px rgba(46,111,176,.18); }
+
+/* ---------- Mes ---------- */
+.mes { margin-bottom: 26px; }
+.mes-head {
+    position: sticky; top: 68px; z-index: 10;
+    background: var(--bg); padding: 8px 2px; margin-bottom: 10px;
+    font-size: .82rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--navy); border-bottom: 2px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline;
+}
+.mes-head .mes-n { color: var(--ink-soft); font-weight: 600; letter-spacing: 0; text-transform: none; }
+
+/* ---------- Actividad ---------- */
+.act {
+    display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radio); padding: 12px 14px; margin-bottom: 9px; box-shadow: var(--sombra);
+}
+.act.hoy { border-color: var(--hoy); box-shadow: 0 0 0 1px var(--hoy); }
+.fecha-col {
+    flex: 0 0 48px; text-align: center; border-right: 1px solid var(--line); padding-right: 10px;
+    display: flex; flex-direction: column; justify-content: center;
+}
+.fecha-dia { font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--navy); }
+.fecha-dow { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-top: 3px; font-weight: 700; }
+.act.hoy .fecha-dia { color: var(--hoy); }
+
+.act-body { flex: 1; min-width: 0; }
+.act-evento { font-size: 1rem; font-weight: 600; line-height: 1.35; color: var(--ink); }
+.act-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.tag {
+    font-size: .74rem; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    background: #eef2f8; color: var(--ink-soft);
+}
+.tag-hora { background: #e7f0fa; color: var(--azure); font-variant-numeric: tabular-nums; }
+.tag-equipo { background: #eaf6ef; color: #2b8a53; }
+.tag-metrica { background: #fdf3e6; color: #a66a1e; }
+
+.pie { text-align: center; color: var(--ink-soft); font-size: .78rem; padding: 18px; }
+
+@media (min-width: 640px) {
+    .brand-title { font-size: 1.5rem; }
+    .fecha-col { flex-basis: 56px; }
+}

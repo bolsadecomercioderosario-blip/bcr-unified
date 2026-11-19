@@ -36,6 +36,7 @@ import metricas.models  # noqa: F401  — registra Programa + Instancia
 import noticias.models  # noqa: F401  — registra tabla noticias (sitio Más BCR)
 import abuela.models  # noqa: F401  — registra tablas ab_* (panel interno de la murga: caja, ensayos, toques)
 import claves.models  # noqa: F401  — registra claves_programas + claves_renders (recortes del programa)
+import fundacion.models  # noqa: F401  — registra fundacion_actividades (agenda de la Fundación)
 
 # Routers de cada módulo
 from agenda.router import router as agenda_api
@@ -54,6 +55,7 @@ from noticias.router import (
 from abuela.router import router as abuela_api
 from admin.router import router as admin_api  # panel de usuarios (sólo admin)
 from claves.router import router as claves_api  # recortes del programa (Fase C)
+from fundacion.router import router as fundacion_api  # agenda de la Fundación BCR
 
 
 # Crear tablas y ejecutar migraciones (incluido seed de efemérides si la tabla
@@ -217,6 +219,7 @@ app.include_router(noticias_site)        # sitio público server-rendered (/noti
 app.include_router(abuela_api)
 app.include_router(admin_api)            # panel de usuarios (/api/admin/*, sólo admin)
 app.include_router(claves_api)           # recortes del programa Claves (/api/claves/*)
+app.include_router(fundacion_api)        # agenda de la Fundación BCR (/api/fundacion/*)
 
 
 # ---------------------------------------------------------
@@ -333,6 +336,17 @@ async def _compromisos_page_public():
 async def _compromisos_page(token: str):  # noqa: ARG001 — compat links viejos con token
     return HTMLResponse(
         content=get_module_html("compromisos"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
+# Agenda de la Fundación BCR — vista con link privado por token.
+# URL: /fundacion/{token}. Servimos el mismo HTML para cualquier token: el JS lo
+# lee del path y pega a /api/fundacion/actividades?token=… que valida (401 si no).
+@app.get("/fundacion/{token}")
+async def _fundacion_page(token: str):  # noqa: ARG001 — el token lo valida el API
+    return HTMLResponse(
+        content=get_module_html("fundacion"),
         headers={"Cache-Control": "no-cache, must-revalidate"},
     )
 

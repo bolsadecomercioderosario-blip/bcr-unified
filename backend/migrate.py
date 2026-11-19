@@ -162,6 +162,7 @@ def migrate():
     seed_efemerides_if_empty()
     backfill_consejo_directivo()
     seed_metricas_if_empty()
+    seed_fundacion_if_empty()
 
     # Subcategorías (subtítulos) del Kit Multimedia.
     _try_exec("ALTER media_assets add subcat",
@@ -492,6 +493,46 @@ def seed_metricas_if_empty():
         print(f"Seed de métricas: {len(PROGRAMAS)} programas y {len(INSTANCIAS)} instancias insertadas.")
     except Exception as e:
         print(f"Error al sembrar métricas: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def seed_fundacion_if_empty():
+    """Importación única de la Agenda de la Fundación (planilla histórica).
+    Idempotente: sólo siembra si la tabla está vacía. Después las nuevas
+    actividades entran por la web o por WhatsApp."""
+    from fundacion.models import FundacionActividad
+    from fundacion.seed_data import ACTIVIDADES
+    import uuid
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        if db.query(FundacionActividad).count() > 0:
+            print("Seed de Fundación saltado (ya hay actividades cargadas).")
+            return
+        now = datetime.utcnow().isoformat()
+        n = 0
+        for row in ACTIVIDADES:
+            db.add(FundacionActividad(
+                id=uuid.uuid4().hex,
+                fecha=(row.get("fecha") or ""),
+                hora=(row.get("hora") or ""),
+                evento=(row.get("evento") or ""),
+                equipo=(row.get("equipo") or ""),
+                metricas=(row.get("metricas") or ""),
+                origen="import",
+                created_by="import",
+                created_at=now,
+                updated_at=now,
+                archived=False,
+            ))
+            n += 1
+        db.commit()
+        print(f"Seed de Fundación: {n} actividades importadas de la planilla.")
+    except Exception as e:
+        print(f"Error al sembrar la Agenda de Fundación: {e}")
         db.rollback()
     finally:
         db.close()

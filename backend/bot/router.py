@@ -35,6 +35,7 @@ from config import BOT_WHATSAPP_WHITELIST
 from database import get_db, SessionLocal
 
 from bot import agent, agenda_writer, db_models, menu_handlers, twilio_client
+from bot import fundacion_writer
 
 
 # ---------------------------------------------------------------------------
@@ -401,9 +402,13 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
     # ESCRITURA del bot). Un audio o un texto arranca el flujo; con un borrador
     # pendiente, el texto confirma (SÍ/NO por botón o palabra) o corrige.
     if w_role:
+        # El rol "fundacion" escribe en la Agenda de la Fundación (módulo aparte);
+        # el resto, en la Agenda de Comunicación/Secretaría. Mismo caño, handlers
+        # distintos — los datos no se cruzan.
+        _writer = fundacion_writer if w_role == "fundacion" else agenda_writer
         if is_audio:
             ev["outcome"] = "writer_voz"
-            background_tasks.add_task(agenda_writer.handle_voice, from_phone, w_role, media_url, media_type, ev)
+            background_tasks.add_task(_writer.handle_voice, from_phone, w_role, media_url, media_type, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
         # Si tocó un botón (quick-reply), el id ("si"/"no") viene en ButtonPayload;
         # si no, usamos el texto. TODO el texto de un writer va a su flujo propio
@@ -411,7 +416,7 @@ async def twilio_webhook(request: Request, background_tasks: BackgroundTasks) ->
         eff_body = (params.get("ButtonPayload") or body or "").strip()
         if eff_body:
             ev["outcome"] = "writer_texto"
-            background_tasks.add_task(agenda_writer.handle_text, from_phone, w_role, eff_body, ev)
+            background_tasks.add_task(_writer.handle_text, from_phone, w_role, eff_body, ev)
             return Response(twilio_client.EMPTY_TWIML, media_type="application/xml")
 
     # Miembros de la ME (lectura): un audio se transcribe y se procesa como

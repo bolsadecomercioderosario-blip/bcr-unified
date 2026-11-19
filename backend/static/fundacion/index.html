@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Agenda · Fundación BCR</title>
+    <meta name="theme-color" content="#102249">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/fundacion/style.css?v=__VERSION__">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <span class="brand-kicker">Fundación BCR</span>
+                <h1 class="brand-title">Agenda institucional</h1>
+            </div>
+            <div class="topbar-meta">
+                <span id="meta-count" class="chip-count">—</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="wrap">
+        <div id="estado" class="estado">Cargando agenda…</div>
+        <div id="controls" class="controls hidden">
+            <input id="buscar" class="buscar" type="search" placeholder="Buscar en la agenda…" autocomplete="off">
+        </div>
+        <div id="lista" class="lista"></div>
+        <div id="vacio" class="vacio hidden">No hay actividades para mostrar.</div>
+    </main>
+
+    <footer class="pie">
+        Agenda interna de la Fundación BCR · solo lectura
+    </footer>
+
+    <script src="/static/fundacion/app.js?v=__VERSION__"></script>
+</body>
+</html>

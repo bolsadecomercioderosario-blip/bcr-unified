@@ -1,0 +1,287 @@
+"""
+Carga de actividades en la Agenda de la Fundación por WhatsApp.
+
+App independiente de la Agenda de Comunicación/Secretaría: escribe en la tabla
+`fundacion_actividades` (vía fundacion.store), NO en `activities`. Comparte sólo
+el "caño" del bot (webhook de Twilio + mapeo de número a rol en
+BOT_AGENDA_WRITERS). El número de Anaclara se mapea al rol `fundacion`, y el
+router del bot desvía esos mensajes acá en vez de a agenda_writer.
+
+Flujo: la responsable manda texto o audio describiendo la actividad → la IA
+extrae {fecha, hora, evento, equipo, métrica} → se muestra un resumen y se pide
+CONFIRMACIÓN (botones Sí/No) → al confirmar, se guarda.
+"""
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from datetime import datetime, timedelta
+from typing import Optional
+
+from config import BOT_OPENAI_API_KEY, BOT_OPENAI_MODEL
+from database import SessionLocal
+from bot import agenda_writer, twilio_client
+from bot.db_models import BotPendingWrite
+from fundacion import store
+
+_ARG = timedelta(hours=3)          # ART = UTC-3
+_PENDING_TTL = timedelta(minutes=30)
+_STATE_KIND = "fundacion"
+
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+_WELCOME = (
+    "¡Hola! 🗓️ Soy el asistente de la *Agenda de la Fundación*.\n\n"
+    "Mandame una actividad y la cargo. Por ejemplo:\n"
+    "• _20/8 15 hs reunión con Cargill, equipo Ana_\n"
+    "• _mañana 9 a 12 Agromakers en Tostado (Nico)_\n\n"
+    "Podés escribirla o mandarla por audio. Antes de guardar te muestro cómo quedó "
+    "para que confirmes. ✅"
+)
+
+
+# --- helpers ----------------------------------------------------------------
+def _now_art() -> datetime:
+    return datetime.utcnow() - _ARG
+
+
+def _norm(s: str) -> str:
+    s = unicodedata.normalize("NFKD", (s or "")).lower()
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.strip()
+
+
+def _norm_phone(p: str) -> str:
+    return agenda_writer._norm_phone(p)  # mismo criterio que el bot
+
+
+_YES = {"si", "sii", "sisi", "dale", "ok", "oka", "okey", "confirmo", "confirmar",
+        "yes", "sip", "va", "vale", "1", "si!", "s:)", "listo"}
+_NO = {"no", "nop", "nel", "cancelar", "cancela", "descartar", "borrar", "2", "no!"}
+
+
+def _is_yes(t: str) -> bool:
+    n = _norm(t).strip(" .!¡¿?")
+    return n in _YES
+
+
+def _is_no(t: str) -> bool:
+    n = _norm(t).strip(" .!¡¿?")
+    return n in _NO
+
+
+# --- estado pendiente (reusa la tabla genérica bot_pending_write) -----------
+def _get_state(from_phone: str) -> Optional[dict]:
+    key = _norm_phone(from_phone)
+    db = SessionLocal()
+    try:
+        row = db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).first()
+        if not row or not row.state:
+            return None
+        try:
+            st = json.loads(row.state)
+        except Exception:  # noqa: BLE001
+            return None
+        if st.get("kind") != _STATE_KIND:
+            return None
+        at = st.get("at")
+        if at:
+            try:
+                if datetime.utcnow() - datetime.fromisoformat(at) > _PENDING_TTL:
+                    _clear_state(from_phone)
+                    return None
+            except Exception:  # noqa: BLE001
+                pass
+        return st
+    finally:
+        db.close()
+
+
+def _set_state(from_phone: str, draft: dict) -> None:
+    key = _norm_phone(from_phone)
+    payload = json.dumps({"kind": _STATE_KIND, "draft": draft, "at": datetime.utcnow().isoformat()})
+    db = SessionLocal()
+    try:
+        row = db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).first()
+        if row:
+            row.state = payload
+            row.updated_at = datetime.utcnow()
+        else:
+            db.add(BotPendingWrite(from_phone=key, state=payload, updated_at=datetime.utcnow()))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _clear_state(from_phone: str) -> None:
+    key = _norm_phone(from_phone)
+    db = SessionLocal()
+    try:
+        db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+# --- OpenAI -----------------------------------------------------------------
+def _client():
+    if not BOT_OPENAI_API_KEY:
+        return None
+    from openai import OpenAI
+    return OpenAI(api_key=BOT_OPENAI_API_KEY, timeout=60.0, max_retries=1)
+
+
+def _extraer(text: str) -> Optional[dict]:
+    c = _client()
+    if not c:
+        return None
+    hoy = _now_art()
+    prompt = (
+        "Sos un asistente que extrae UNA actividad de agenda a partir de un mensaje "
+        "en español rioplatense. Devolvé SOLO un JSON con estas claves:\n"
+        '{"fecha":"YYYY-MM-DD","hora":"","evento":"","equipo":"","metricas":""}\n\n'
+        f"Hoy es {hoy.strftime('%Y-%m-%d')} ({_MESES[hoy.month-1]} de {hoy.year}). "
+        "Resolvé fechas relativas (hoy, mañana, 'el viernes', '20 de agosto') a fecha "
+        "absoluta. Si no se menciona el año, asumí el más cercano a futuro. Si no hay "
+        "fecha, dejá fecha vacía.\n"
+        "- hora: tal como se diga ('15 hs', '9 a 12 hs'); vacío si no hay.\n"
+        "- evento: la descripción, SIN la fecha ni la hora adentro.\n"
+        "- equipo: quién participa si se menciona (ej. Ana, Nico, 'Ana y Nico'); vacío si no.\n"
+        "- metricas: dato cuantitativo si lo hubiera (ej. '70 estudiantes'); vacío si no.\n\n"
+        f"Mensaje: {text}"
+    )
+    try:
+        r = c.responses.create(model=BOT_OPENAI_MODEL, input=prompt)
+        raw = (getattr(r, "output_text", "") or "").strip()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[fundacion_writer] LLM falló: {type(exc).__name__}: {exc}")
+        return None
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
+    try:
+        data = json.loads(raw)
+    except Exception:  # noqa: BLE001
+        print(f"[fundacion_writer] JSON inválido: {raw!r}")
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {k: str(data.get(k) or "").strip() for k in ("fecha", "hora", "evento", "equipo", "metricas")}
+
+
+# --- presentación -----------------------------------------------------------
+def _fecha_larga(iso: str) -> str:
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", iso or "")
+    if not m:
+        return iso or "(sin fecha)"
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return f"{d} de {_MESES[mo-1]} {y}"
+    except Exception:  # noqa: BLE001
+        return iso
+
+
+def _resumen(d: dict) -> str:
+    lin = [f"📅 {_fecha_larga(d.get('fecha',''))}"]
+    if d.get("hora"):
+        lin.append(f"🕒 {d['hora']}")
+    lin.append(f"📝 {d.get('evento','') or '(sin detalle)'}")
+    if d.get("equipo"):
+        lin.append(f"👥 {d['equipo']}")
+    if d.get("metricas"):
+        lin.append(f"📊 {d['metricas']}")
+    return "\n".join(lin)
+
+
+def _send(from_phone: str, msg: str) -> None:
+    twilio_client.send_whatsapp(from_phone, msg)
+
+
+def _send_confirmacion(from_phone: str, draft: dict) -> None:
+    full = "Así quedaría la actividad:\n\n" + _resumen(draft)
+    try:
+        sid = agenda_writer.ensure_confirm_content_sid()
+        if sid:
+            twilio_client.send_whatsapp_content(from_phone, sid, {"1": full})
+            return
+    except Exception as exc:  # noqa: BLE001
+        print(f"[fundacion_writer] botones fallaron, fallback texto: {exc}")
+    _send(from_phone, full + "\n\n¿La *cargo*? Respondé *SÍ* o *NO*.")
+
+
+# --- núcleo -----------------------------------------------------------------
+def _core(from_phone: str, text: str, ev: dict) -> None:
+    text = (text or "").strip()
+    if not text:
+        return
+
+    state = _get_state(from_phone)
+    if state:
+        draft = state.get("draft", {})
+        if _is_yes(text):
+            db = SessionLocal()
+            try:
+                store.crear(db, draft, origen="whatsapp", created_by=f"whatsapp:{_norm_phone(from_phone)}")
+            finally:
+                db.close()
+            _clear_state(from_phone)
+            ev["outcome"] = "fundacion_guardada"
+            _send(from_phone, "✅ ¡Listo! La cargué en la agenda:\n\n" + _resumen(draft))
+            return
+        if _is_no(text):
+            _clear_state(from_phone)
+            ev["outcome"] = "fundacion_descartada"
+            _send(from_phone, "Dale, la descarté. Cuando quieras mandame la actividad de nuevo. 👍")
+            return
+        # Cualquier otra cosa: la tomo como una nueva/corrección → re-extraigo.
+        nuevo = _extraer(text)
+        if not nuevo or not nuevo.get("evento"):
+            _send(from_phone, "No te entendí la corrección. Mandame la actividad completa de nuevo, "
+                              "o respondé *SÍ* / *NO* a la anterior.")
+            return
+        _set_state(from_phone, nuevo)
+        ev["outcome"] = "fundacion_borrador"
+        _send_confirmacion(from_phone, nuevo)
+        return
+
+    # Sin borrador pendiente.
+    if _is_yes(text) or _is_no(text) or len(_norm(text)) <= 2:
+        _send(from_phone, _WELCOME)
+        return
+
+    draft = _extraer(text)
+    if not draft or not draft.get("evento"):
+        ev["outcome"] = "fundacion_sin_evento"
+        _send(from_phone, "Mmm, no pude sacar la actividad de ese mensaje. 🤔\n\n"
+                          "Probá algo como: _20/8 15 hs reunión con Cargill, equipo Ana_")
+        return
+    _set_state(from_phone, draft)
+    ev["outcome"] = "fundacion_borrador"
+    _send_confirmacion(from_phone, draft)
+
+
+# --- entrypoints (los llama bot/router.py) ----------------------------------
+def handle_text(from_phone: str, role: str, text: str, ev: dict) -> None:  # noqa: ARG001
+    try:
+        _core(from_phone, text, ev)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[fundacion_writer] handle_text falló: {type(exc).__name__}: {exc}")
+        try:
+            _send(from_phone, "Tuve un problema procesando el mensaje. Probá de nuevo en un momento.")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def handle_voice(from_phone: str, role: str, media_url: str, media_type: str, ev: dict) -> None:  # noqa: ARG001
+    try:
+        text = agenda_writer.transcribe(media_url, media_type)
+        if not text:
+            _send(from_phone, "No pude entender el audio. ¿Lo probás de nuevo, más claro?")
+            return
+        _core(from_phone, text, ev)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[fundacion_writer] handle_voice falló: {type(exc).__name__}: {exc}")
+        try:
+            _send(from_phone, "Tuve un problema procesando el audio. Probá de nuevo en un momento.")
+        except Exception:  # noqa: BLE001
+            pass
