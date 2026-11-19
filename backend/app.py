@@ -351,6 +351,17 @@ async def _fundacion_page(token: str):  # noqa: ARG001 — el token lo valida el
     )
 
 
+# Puerta de edición: /fundacion/{token}/admin sirve la MISMA página, pero el JS
+# detecta el sufijo "admin" y abre el login. El botón Editar sólo aparece con una
+# sesión válida (rol Comunicación); el link sin /admin nunca lo muestra.
+@app.get("/fundacion/{token}/admin")
+async def _fundacion_admin_page(token: str):  # noqa: ARG001
+    return HTMLResponse(
+        content=get_module_html("fundacion"),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
 # BCR Capacita — formulario público de campaña (/capacita/). CSS/JS en archivos
 # separados dentro de la carpeta, así que servimos el index.html con FileResponse.
 _CAPACITA_DIR = os.path.join(STATIC_DIR, "capacita")

@@ -10,8 +10,11 @@
     "use strict";
 
     var parts = location.pathname.split("/").filter(Boolean);
-    var URL_TOKEN = parts.length ? parts[parts.length - 1] : "";   // token del link (lectura)
+    // /fundacion/{token}  (lectura)  ·  /fundacion/{token}/admin  (entrada de edición)
+    var ADMIN = parts.length > 0 && parts[parts.length - 1].toLowerCase() === "admin";
+    var URL_TOKEN = ADMIN ? (parts[parts.length - 2] || "") : (parts[parts.length - 1] || "");
     var STORE_TK = "bcr_session_token", STORE_ROLE = "bcr_session_role";
+    var CAN_EDIT = false;   // sólo true con sesión válida rol Comunicación
 
     var MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
         "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -70,6 +73,27 @@
         return fetch(url, opts);
     }
 
+    // Valida la sesión contra el server. CAN_EDIT sólo si hay token válido con rol
+    // Comunicación (el que habilitan los endpoints de edición). Sin eso, el botón
+    // Editar queda oculto: para un visitante del link es solo lectura.
+    function checkSession() {
+        var tk = sessionToken();
+        if (!tk) { CAN_EDIT = false; return Promise.resolve(false); }
+        return fetch("/api/auth/me", { headers: { "Authorization": "Bearer " + tk } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (me) { CAN_EDIT = !!(me && me.role === "comunicacion"); return CAN_EDIT; })
+            .catch(function () { CAN_EDIT = false; return false; });
+    }
+
+    function syncFab() {
+        $("#fab-edit").classList.toggle("hidden", !CAN_EDIT);
+        if (!CAN_EDIT) {
+            EDIT = false;
+            document.body.classList.remove("modo-edit");
+            $("#fab-nueva").classList.add("hidden");
+        }
+    }
+
     // ---- Render ----
     function render(filtro) {
         var lista = $("#lista"), vacio = $("#vacio");
@@ -120,7 +144,7 @@
 
     // ---- Edición ----
     function toggleEdit() {
-        if (!EDIT && !sessionToken()) { pedirLogin(); return; }
+        if (!CAN_EDIT) return;   // el botón sólo existe con sesión válida
         EDIT = !EDIT;
         document.body.classList.toggle("modo-edit", EDIT);
         $("#fab-edit").textContent = EDIT ? "✓ Listo" : "✎ Editar";
@@ -229,8 +253,17 @@
                     localStorage.setItem(STORE_TK, res.d.token);
                     if (res.d.role) localStorage.setItem(STORE_ROLE, res.d.role);
                 } catch (e) {}
-                ov.remove();
-                EDIT = false; toggleEdit();   // entra en modo edición
+                return checkSession();
+            }).then(function (puede) {
+                if (puede === undefined) return;   // vino del throw de arriba
+                if (CAN_EDIT) {
+                    ov.remove();
+                    syncFab();
+                    EDIT = false; toggleEdit();   // entra en modo edición
+                } else {
+                    b.disabled = false; b.textContent = "Entrar";
+                    ov.querySelector("#l-msg").textContent = "Ese usuario no tiene permiso para editar la agenda.";
+                }
             }).catch(function (e) {
                 b.disabled = false; b.textContent = "Entrar";
                 ov.querySelector("#l-msg").textContent = e.message || "No se pudo entrar.";
@@ -251,4 +284,8 @@
     });
 
     cargar();
+    checkSession().then(function () {
+        syncFab();
+        if (ADMIN && !CAN_EDIT) pedirLogin();   // la URL /admin abre el login
+    });
 })();
