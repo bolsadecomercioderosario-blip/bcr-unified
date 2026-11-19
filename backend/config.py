@@ -90,7 +90,7 @@ BOT_AGENDA_WRITERS = os.environ.get("BOT_AGENDA_WRITERS", "")
 # Token del link privado de la Agenda de la Fundación (vista /fundacion/{token}).
 # Quien tenga el link puede VER la agenda (solo lectura). Se puede rotar sin
 # deploy con la env var FUNDACION_TOKEN.
-FUNDACION_TOKEN = os.environ.get("FUNDACION_TOKEN", "242813f9dbbf204c").strip()
+FUNDACION_TOKEN = os.environ.get("FUNDACION_TOKEN", "compromisos").strip()
 
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
