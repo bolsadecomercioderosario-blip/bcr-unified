@@ -91,3 +91,52 @@ html, body {
     .brand-title { font-size: 1.5rem; }
     .fecha-col { flex-basis: 56px; }
 }
+
+/* ============================================================
+   Modo edición (login + alta/edición). El link público no lo ve.
+   ============================================================ */
+.pencil {
+    flex: 0 0 auto; align-self: center; margin-left: 4px;
+    background: #eef2f8; border: none; color: var(--azure); cursor: pointer;
+    width: 34px; height: 34px; border-radius: 9px; font-size: 1rem;
+}
+.pencil:hover { background: #e0e9f6; }
+.act.editable { cursor: pointer; }
+.act.editable:hover { border-color: var(--azure); }
+
+/* FABs */
+.fab {
+    position: fixed; right: 16px; z-index: 50; border: none; cursor: pointer;
+    font-family: inherit; font-weight: 700; font-size: .95rem;
+    border-radius: 999px; padding: 12px 18px; box-shadow: 0 8px 22px rgba(16,34,73,.22);
+}
+#fab-edit { bottom: calc(16px + env(safe-area-inset-bottom,0)); background: var(--navy); color: #fff; }
+#fab-nueva { bottom: calc(66px + env(safe-area-inset-bottom,0)); background: var(--azure); color: #fff; }
+body.modo-edit #fab-edit { background: var(--hoy); }
+
+/* Modal */
+.modal-ov {
+    position: fixed; inset: 0; z-index: 60; background: rgba(16,34,73,.5);
+    display: flex; align-items: flex-start; justify-content: center; padding: 24px 14px; overflow-y: auto;
+}
+.modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 460px; padding: 22px;
+    box-shadow: 0 20px 50px rgba(16,34,73,.3); margin: auto;
+}
+.modal h2 { font-size: 1.25rem; color: var(--navy); margin-bottom: 14px; }
+.modal label { display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); margin: 12px 0 5px; }
+.modal label .opt { text-transform: none; letter-spacing: 0; font-weight: 500; color: #9aa4b8; }
+.modal input, .modal textarea {
+    width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 11px 12px; resize: vertical;
+}
+.modal input:focus, .modal textarea:focus { outline: none; border-color: var(--azure); box-shadow: 0 0 0 3px rgba(46,111,176,.16); }
+.login-sub { color: var(--ink-soft); font-size: .9rem; line-height: 1.4; margin-bottom: 4px; }
+.modal-msg { color: var(--err, #c0492f); font-size: .86rem; min-height: 1.1em; margin-top: 10px; font-weight: 600; }
+.modal-acc { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.modal-acc .sp { flex: 1; }
+.btn { font-family: inherit; font-weight: 700; font-size: .92rem; border: none; cursor: pointer; border-radius: 10px; padding: 10px 16px; }
+.btn-save { background: var(--navy); color: #fff; }
+.btn-cancel { background: #eef2f8; color: var(--ink-soft); }
+.btn-arch { background: transparent; color: #c0492f; border: 1.5px solid #e7c3bb; }
+.btn:disabled { opacity: .6; cursor: default; }

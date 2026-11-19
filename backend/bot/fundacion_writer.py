@@ -34,10 +34,12 @@ _MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
 
 _WELCOME = (
     "¡Hola! 🗓️ Soy el asistente de la *Agenda de la Fundación*.\n\n"
-    "Mandame una actividad y la cargo. Por ejemplo:\n"
-    "• _20/8 15 hs reunión con Cargill, equipo Ana_\n"
-    "• _mañana 9 a 12 Agromakers en Tostado (Nico)_\n\n"
-    "Podés escribirla o mandarla por audio. Antes de guardar te muestro cómo quedó "
+    "Mandame una actividad (texto o audio) con estos 4 datos:\n"
+    "📅 *fecha* · 🕒 *hora* · 📝 *qué actividad* · 👥 *quiénes van*\n\n"
+    "Por ejemplo:\n"
+    "• _20/8 15 hs reunión con Cargill, van Ana y Nico_\n"
+    "• _mañana 9 a 12 Agromakers en Tostado, Nico_\n\n"
+    "Si te falta alguno te lo pregunto, y antes de guardar te muestro cómo quedó "
     "para que confirmes. ✅"
 )
 
@@ -99,9 +101,10 @@ def _get_state(from_phone: str) -> Optional[dict]:
         db.close()
 
 
-def _set_state(from_phone: str, draft: dict) -> None:
+def _set_state(from_phone: str, draft: dict, phase: str = "confirmando") -> None:
     key = _norm_phone(from_phone)
-    payload = json.dumps({"kind": _STATE_KIND, "draft": draft, "at": datetime.utcnow().isoformat()})
+    payload = json.dumps({"kind": _STATE_KIND, "draft": draft, "phase": phase,
+                          "at": datetime.utcnow().isoformat()})
     db = SessionLocal()
     try:
         row = db.query(BotPendingWrite).filter(BotPendingWrite.from_phone == key).first()
@@ -146,9 +149,13 @@ def _extraer(text: str) -> Optional[dict]:
         "Resolvé fechas relativas (hoy, mañana, 'el viernes', '20 de agosto') a fecha "
         "absoluta. Si no se menciona el año, asumí el más cercano a futuro. Si no hay "
         "fecha, dejá fecha vacía.\n"
-        "- hora: tal como se diga ('15 hs', '9 a 12 hs'); vacío si no hay.\n"
-        "- evento: la descripción, SIN la fecha ni la hora adentro.\n"
-        "- equipo: quién participa si se menciona (ej. Ana, Nico, 'Ana y Nico'); vacío si no.\n"
+        "IMPORTANTE: completá SÓLO los campos que el mensaje menciona; dejá vacío ('') "
+        "todo lo que NO se diga explícitamente. No inventes.\n"
+        "- hora: tal como se diga ('15 hs', '9 a 12 hs'). Si dicen que es todo el día o "
+        "sin horario fijo, poné 'todo el día'. Vacío si no se menciona.\n"
+        "- evento: la descripción/título, SIN la fecha ni la hora adentro.\n"
+        "- equipo: quiénes participan. En la Fundación son Anaclara (Ana) y Nicolás (Nico); "
+        "'los dos'/'ambos' = 'Ana y Nico'. Puede haber otros nombres. Vacío si no se menciona.\n"
         "- metricas: dato cuantitativo si lo hubiera (ej. '70 estudiantes'); vacío si no.\n\n"
         f"Mensaje: {text}"
     )
@@ -209,6 +216,82 @@ def _send_confirmacion(from_phone: str, draft: dict) -> None:
     _send(from_phone, full + "\n\n¿La *cargo*? Respondé *SÍ* o *NO*.")
 
 
+# --- completitud de campos --------------------------------------------------
+# Obligatorios antes de guardar: fecha, hora, título (evento) y quiénes (equipo).
+# 'metricas' es opcional.
+_REQUIRED = [("fecha", "la fecha"), ("hora", "la hora"),
+             ("evento", "qué actividad es"), ("equipo", "quiénes participan")]
+
+
+def _faltantes(draft: dict) -> list:
+    return [(f, lbl) for f, lbl in _REQUIRED if not (draft.get(f) or "").strip()]
+
+
+def _merge(viejo: dict, nuevo: dict) -> dict:
+    """Combina: toma el dato nuevo si vino, si no conserva el anterior."""
+    out = dict(viejo or {})
+    for k in ("fecha", "hora", "evento", "equipo", "metricas"):
+        v = (nuevo or {}).get(k, "")
+        if v and str(v).strip():
+            out[k] = str(v).strip()
+        else:
+            out.setdefault(k, out.get(k, ""))
+    return out
+
+
+def _resumen_parcial(d: dict) -> str:
+    lin = []
+    if d.get("fecha"):
+        lin.append(f"📅 {_fecha_larga(d['fecha'])}")
+    if d.get("hora"):
+        lin.append(f"🕒 {d['hora']}")
+    if d.get("evento"):
+        lin.append(f"📝 {d['evento']}")
+    if d.get("equipo"):
+        lin.append(f"👥 {d['equipo']}")
+    if d.get("metricas"):
+        lin.append(f"📊 {d['metricas']}")
+    return "\n".join(lin)
+
+
+def _frase_faltantes(falt: list) -> str:
+    labels = [lbl for _, lbl in falt]
+    if len(labels) == 1:
+        return f"Me falta *{labels[0]}*."
+    return "Me faltan *" + "*, *".join(labels[:-1]) + f"* y *{labels[-1]}*."
+
+
+def _pedir_faltantes(from_phone: str, draft: dict, falt: list) -> None:
+    parcial = _resumen_parcial(draft)
+    msg = "Voy anotando:\n\n" + (parcial + "\n\n" if parcial else "")
+    msg += _frase_faltantes(falt) + " ¿Me lo pasás?"
+    _send(from_phone, msg)
+
+
+def _guardar(from_phone: str, draft: dict, ev: dict) -> None:
+    db = SessionLocal()
+    try:
+        store.crear(db, draft, origen="whatsapp", created_by=f"whatsapp:{_norm_phone(from_phone)}")
+    finally:
+        db.close()
+    _clear_state(from_phone)
+    ev["outcome"] = "fundacion_guardada"
+    _send(from_phone, "✅ ¡Listo! La cargué en la agenda:\n\n" + _resumen(draft))
+
+
+def _avanzar(from_phone: str, draft: dict, ev: dict) -> None:
+    """Pide lo que falte; si está completo, pasa a confirmación."""
+    falt = _faltantes(draft)
+    if falt:
+        _set_state(from_phone, draft, phase="completando")
+        ev["outcome"] = "fundacion_faltan"
+        _pedir_faltantes(from_phone, draft, falt)
+        return
+    _set_state(from_phone, draft, phase="confirmando")
+    ev["outcome"] = "fundacion_borrador"
+    _send_confirmacion(from_phone, draft)
+
+
 # --- núcleo -----------------------------------------------------------------
 def _core(from_phone: str, text: str, ev: dict) -> None:
     text = (text or "").strip()
@@ -218,30 +301,30 @@ def _core(from_phone: str, text: str, ev: dict) -> None:
     state = _get_state(from_phone)
     if state:
         draft = state.get("draft", {})
-        if _is_yes(text):
-            db = SessionLocal()
-            try:
-                store.crear(db, draft, origen="whatsapp", created_by=f"whatsapp:{_norm_phone(from_phone)}")
-            finally:
-                db.close()
-            _clear_state(from_phone)
-            ev["outcome"] = "fundacion_guardada"
-            _send(from_phone, "✅ ¡Listo! La cargué en la agenda:\n\n" + _resumen(draft))
+        phase = state.get("phase", "confirmando")
+
+        if phase == "confirmando":
+            if _is_yes(text):
+                _guardar(from_phone, draft, ev)
+                return
+            if _is_no(text):
+                _clear_state(from_phone)
+                ev["outcome"] = "fundacion_descartada"
+                _send(from_phone, "Dale, la descarté. Cuando quieras mandame la actividad de nuevo. 👍")
+                return
+            # Corrección: re-extraigo y combino con lo que había.
+            draft = _merge(draft, _extraer(text) or {})
+            _avanzar(from_phone, draft, ev)
             return
+
+        # phase == "completando": espero los datos que faltaban.
         if _is_no(text):
             _clear_state(from_phone)
             ev["outcome"] = "fundacion_descartada"
-            _send(from_phone, "Dale, la descarté. Cuando quieras mandame la actividad de nuevo. 👍")
+            _send(from_phone, "Listo, la descarté. Mandámela de nuevo cuando quieras. 👍")
             return
-        # Cualquier otra cosa: la tomo como una nueva/corrección → re-extraigo.
-        nuevo = _extraer(text)
-        if not nuevo or not nuevo.get("evento"):
-            _send(from_phone, "No te entendí la corrección. Mandame la actividad completa de nuevo, "
-                              "o respondé *SÍ* / *NO* a la anterior.")
-            return
-        _set_state(from_phone, nuevo)
-        ev["outcome"] = "fundacion_borrador"
-        _send_confirmacion(from_phone, nuevo)
+        draft = _merge(draft, _extraer(text) or {})
+        _avanzar(from_phone, draft, ev)
         return
 
     # Sin borrador pendiente.
@@ -250,14 +333,12 @@ def _core(from_phone: str, text: str, ev: dict) -> None:
         return
 
     draft = _extraer(text)
-    if not draft or not draft.get("evento"):
-        ev["outcome"] = "fundacion_sin_evento"
+    if not draft or not any((draft.get(k) or "").strip() for k in ("fecha", "hora", "evento", "equipo")):
+        ev["outcome"] = "fundacion_sin_datos"
         _send(from_phone, "Mmm, no pude sacar la actividad de ese mensaje. 🤔\n\n"
-                          "Probá algo como: _20/8 15 hs reunión con Cargill, equipo Ana_")
+                          "Probá algo como: _20/8 15 hs reunión con Cargill, van Ana y Nico_")
         return
-    _set_state(from_phone, draft)
-    ev["outcome"] = "fundacion_borrador"
-    _send_confirmacion(from_phone, draft)
+    _avanzar(from_phone, draft, ev)
 
 
 # --- entrypoints (los llama bot/router.py) ----------------------------------
