@@ -334,7 +334,7 @@ export function renderConectados(container) {
     if (btnCopy) {
         btnCopy.onclick = async () => {
             const text = conectadosActivities
-                .map(a => (blockTitle(a) || '').trim() || '(sin título)')
+                .map((a, i) => `${i + 1}. ${(blockTitle(a) || '').trim() || '(sin título)'}`)
                 .join('\n');
             try {
                 await navigator.clipboard.writeText(text);
