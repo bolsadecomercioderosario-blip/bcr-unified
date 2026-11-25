@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Armador de placas · BCR</title>
+    <meta name="theme-color" content="#0f2550">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+    <header class="top">
+        <div class="top-title">Armador de placas <span>· BCR</span></div>
+        <button id="btn-download" class="btn-dl">Descargar</button>
+    </header>
+
+    <main class="editor">
+        <!-- Vista previa / lienzo -->
+        <section class="stage" id="stage">
+            <div class="canvas-wrap" id="canvas-wrap">
+                <canvas id="canvas" width="1080" height="1920"></canvas>
+            </div>
+            <p class="stage-hint" id="stage-hint">Tocá un recuadro para cargar una foto. Una vez cargada, arrastrá para mover y usá el zoom.</p>
+        </section>
+
+        <!-- Controles -->
+        <section class="panel">
+            <div class="group">
+                <label class="lbl">Disposición</label>
+                <div class="seg" id="tpl-seg">
+                    <button data-tpl="1">1 foto</button>
+                    <button data-tpl="2" class="on">2 fotos</button>
+                    <button data-tpl="3">3 fotos</button>
+                </div>
+            </div>
+
+            <div class="group">
+                <label class="lbl" for="txt">Texto</label>
+                <textarea id="txt" rows="4" placeholder="Escribí el párrafo de la placa…">La Bolsa de Comercio de Rosario participó del encuentro de fin de año, una jornada que permitió fortalecer los vínculos institucionales con el sector agroindustrial.</textarea>
+            </div>
+
+            <div class="group" id="photo-controls">
+                <label class="lbl">Foto seleccionada</label>
+                <div id="no-sel" class="no-sel">Tocá una foto en la placa para ajustarla.</div>
+                <div id="sel-tools" class="sel-tools hidden">
+                    <div class="zoom-row">
+                        <span class="zoom-ico">−</span>
+                        <input type="range" id="zoom" min="1" max="4" step="0.01" value="1">
+                        <span class="zoom-ico">＋</span>
+                    </div>
+                    <div class="sel-btns">
+                        <button id="btn-replace" class="mini">Cambiar foto</button>
+                        <button id="btn-remove" class="mini danger">Quitar</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <input type="file" id="file" accept="image/*" class="hidden">
+
+    <!-- Modal de descarga (para guardar en el celu) -->
+    <div id="dl-modal" class="modal-ov hidden">
+        <div class="modal">
+            <h2>Tu placa está lista</h2>
+            <p class="modal-sub">En el celu: <b>mantené apretada</b> la imagen y elegí “Guardar”. En compu: usá el botón.</p>
+            <img id="dl-img" class="dl-img" alt="placa">
+            <div class="modal-acc">
+                <a id="dl-link" class="btn-dl" download="placa-bcr.png">Descargar imagen</a>
+                <button id="dl-close" class="btn-close">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="js/app.js?v=__VERSION__"></script>
+</body>
+</html>

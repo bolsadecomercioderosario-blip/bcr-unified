@@ -257,7 +257,7 @@ def _make_html_handlers(module: str):
     return redirect, index
 
 
-for _mod in ("lluvias", "social", "agenda", "semana-datos", "abuela", "claves", "canciones"):
+for _mod in ("lluvias", "social", "agenda", "semana-datos", "abuela", "claves", "canciones", "layout"):
     _redir, _idx = _make_html_handlers(_mod)
     app.get(f"/{_mod}")(_redir)
     app.get(f"/{_mod}/")(_idx)
@@ -464,6 +464,8 @@ app.mount("/abuela", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "abue
 # Armador de "El Más Acá" (murga): calculadora de duración de la versión 45/50'.
 # Puro front estático (sin API ni DB); los bloques viven embebidos en el JS.
 app.mount("/canciones", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "canciones"), html=False), name="canciones_ui")
+# Armador de placas de cobertura (editor de imágenes client-side para redes).
+app.mount("/layout", NoCacheStaticFiles(directory=os.path.join(STATIC_DIR, "layout"), html=False), name="layout_ui")
 
 # Prototipo de la nueva web institucional (HTML estáticos autocontenidos). El hub
 # lo abre en /portal/bcr_home_mvp_34.html; las páginas se enlazan entre sí por
