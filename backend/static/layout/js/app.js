@@ -182,7 +182,7 @@
     }
 
     canvas.addEventListener("pointerdown", function (e) {
-        canvas.setPointerCapture(e.pointerId);
+        try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         var pt = toCanvas(e);
         pointers[e.pointerId] = pt;
         var ids = Object.keys(pointers);
