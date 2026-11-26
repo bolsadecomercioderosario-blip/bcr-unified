@@ -182,7 +182,6 @@
     }
 
     canvas.addEventListener("pointerdown", function (e) {
-        try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         var pt = toCanvas(e);
         pointers[e.pointerId] = pt;
         var ids = Object.keys(pointers);
@@ -190,8 +189,10 @@
             var i = frameAt(pt);
             if (i === null) return;
             selectFrame(i);
-            if (!getPhoto(i)) { openPicker(i); return; }
-            dragging = true; lastPt = pt;
+            // Si hay foto: capturo el puntero y arranco el arrastre. Si el marco
+            // está vacío, el selector de archivos lo abre el handler 'click'
+            // (los navegadores móviles exigen que el picker salga de un click real).
+            if (getPhoto(i)) { try { canvas.setPointerCapture(e.pointerId); } catch (_) {} dragging = true; lastPt = pt; }
         } else if (ids.length === 2 && getPhoto(state.sel)) {
             var a = pointers[ids[0]], b = pointers[ids[1]];
             pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), scale: getPhoto(state.sel).scale };
@@ -227,6 +228,14 @@
     }
     canvas.addEventListener("pointerup", endPointer);
     canvas.addEventListener("pointercancel", endPointer);
+
+    // El selector de archivos SOLO se abre desde un 'click' (gesto de usuario
+    // válido en móvil). Si el marco tocado está vacío, abrimos su picker.
+    canvas.addEventListener("click", function (e) {
+        var pt = toCanvas(e);
+        var i = frameAt(pt);
+        if (i !== null && !getPhoto(i)) { selectFrame(i); openPicker(i); }
+    });
 
     // ---------- selección / tools ----------
     function selectFrame(i) {
