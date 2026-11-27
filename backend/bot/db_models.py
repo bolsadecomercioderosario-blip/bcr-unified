@@ -292,6 +292,30 @@ class BotSeenSid(Base):
     seen_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
 
 
+class EventoSimpleVigiaState(Base):
+    """Estado del vigía de ventas de EventoSimple. Una fila por evento vigilado.
+
+    Guarda:
+      - refresh_token: el token de actualización ACTUAL. EventoSimple lo rota en
+        cada renovación, así que hay que persistir el último para sobrevivir los
+        restarts de Render. No es un password: es un token de sesión de
+        solo-lectura, acotado al panel del organizador (se puede invalidar
+        re-logueándose en EventoSimple).
+      - ultimo_vendidos / ultimo_total: último conteo visto, para detectar
+        ventas nuevas y avisar solo cuando sube.
+      - desconectado: True si la cadena de tokens se cortó (otra sesión renovó o
+        venció). Evita spamear el aviso de "perdí la sesión" cada 15 min.
+    """
+    __tablename__ = "eventosimple_vigia_state"
+
+    evento_id = Column(String, primary_key=True)
+    refresh_token = Column(Text, nullable=True)
+    ultimo_vendidos = Column(Integer, nullable=True)
+    ultimo_total = Column(Integer, nullable=True)
+    desconectado = Column(Boolean, nullable=False, default=False)
+    actualizado_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class IngestedConectado(Base):
     """Tracking de cada newsletter "Conectados" archivado para el bot.
 

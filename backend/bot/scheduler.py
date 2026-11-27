@@ -197,6 +197,22 @@ def _run_coyuntura_auto() -> None:
         db.close()
 
 
+def _run_eventosimple_vigia() -> None:
+    """Wrapper del job cada 15 min: revisa ventas de EventoSimple y avisa por
+    WhatsApp si hubo ventas nuevas. Solo lectura del panel del organizador."""
+    from bot.eventosimple_vigia import revisar
+
+    db = SessionLocal()
+    try:
+        result = revisar(db)
+        print(f"[bot.scheduler] eventosimple_vigia → {result}")
+    except Exception as exc:  # noqa: BLE001 — nunca matar el scheduler
+        print(f"[bot.scheduler] eventosimple_vigia falló: "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        db.close()
+
+
 def _startup_catchup() -> None:
     """Mira en la DB cuándo fue la última ingesta de cada fuente. Si está
     stale (más vieja que el umbral correspondiente), agenda un job one-shot
@@ -392,6 +408,22 @@ def start() -> None:
         coalesce=True,
         misfire_grace_time=_DAILY_GRACE_S,
     )
+
+    # Vigía de ventas EventoSimple: cada 15 min renueva token, lee las entradas
+    # vendidas del evento y avisa por WhatsApp si subió. Solo se registra si está
+    # habilitado por env var (EVENTOSIMPLE_VIGIA_ENABLED). Evento puntual: se
+    # saca cuando termina.
+    import config
+    if config.EVENTOSIMPLE_VIGIA_ENABLED:
+        scheduler.add_job(
+            _run_eventosimple_vigia,
+            IntervalTrigger(minutes=15),
+            id="eventosimple_vigia_15min",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=600,
+        )
 
     scheduler.start()
     print(f"[bot.scheduler] arrancado en TZ={_TZ}. Jobs:")

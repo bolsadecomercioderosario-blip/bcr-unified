@@ -92,6 +92,26 @@ BOT_AGENDA_WRITERS = os.environ.get("BOT_AGENDA_WRITERS", "")
 # deploy con la env var FUNDACION_TOKEN.
 FUNDACION_TOKEN = os.environ.get("FUNDACION_TOKEN", "compromisos").strip()
 
+# ---------------------------------------------------------------------------
+# Vigía de ventas de EventoSimple (app.evento-simple.com). Monitorea las
+# entradas vendidas de UN evento del panel del organizador y avisa por WhatsApp
+# cuando hay ventas nuevas (solo lectura). Ver bot/eventosimple_vigia.py.
+# ---------------------------------------------------------------------------
+EVENTOSIMPLE_VIGIA_ENABLED = (
+    os.environ.get("EVENTOSIMPLE_VIGIA_ENABLED", "false").lower()
+    in ("true", "1", "yes", "on")
+)
+# IDs del panel. cuenta = productora (ej. DistritoSiete = 78); evento = el show.
+EVENTOSIMPLE_CUENTA = os.environ.get("EVENTOSIMPLE_CUENTA", "").strip()
+EVENTOSIMPLE_EVENTO = os.environ.get("EVENTOSIMPLE_EVENTO", "").strip()
+# Refresh token INICIAL (semilla). EventoSimple rota el token en cada
+# renovación, así que después del primer ciclo el vigía persiste el token nuevo
+# en la DB y este env var queda solo como bootstrap. Se captura logueándose una
+# vez en app.evento-simple.com y copiando sesionfl_actualizacion.token.
+EVENTOSIMPLE_REFRESH_TOKEN = os.environ.get("EVENTOSIMPLE_REFRESH_TOKEN", "").strip()
+# Número(s) a avisar (E.164, separados por coma). Ej "+5493413373972".
+EVENTOSIMPLE_AVISO_A = os.environ.get("EVENTOSIMPLE_AVISO_A", "").strip()
+
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.
 BOT_OPENAI_MODEL = os.environ.get("BOT_OPENAI_MODEL", "gpt-5-mini")
