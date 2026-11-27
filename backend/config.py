@@ -112,6 +112,13 @@ EVENTOSIMPLE_USUARIO = os.environ.get("EVENTOSIMPLE_USUARIO", "").strip()
 EVENTOSIMPLE_CONTRASENA = os.environ.get("EVENTOSIMPLE_CONTRASENA", "")
 # Número(s) a avisar (E.164, separados por coma). Ej "+5493413373972".
 EVENTOSIMPLE_AVISO_A = os.environ.get("EVENTOSIMPLE_AVISO_A", "").strip()
+# Cada cuántos minutos revisa las ventas. Por defecto 30 (espaciar los logins
+# reduce el riesgo de conflicto de sesiones en EventoSimple). Mínimo 5. Se puede
+# ajustar desde Render sin tocar código (requiere redeploy para tomar el cambio).
+try:
+    EVENTOSIMPLE_INTERVALO_MIN = max(5, int(os.environ.get("EVENTOSIMPLE_INTERVALO_MIN", "30")))
+except ValueError:
+    EVENTOSIMPLE_INTERVALO_MIN = 30
 
 # Modelo de OpenAI para el bot. Por defecto gpt-5-mini (el que ya estaban
 # usando en PipeDream). Se puede sobreescribir vía env var.

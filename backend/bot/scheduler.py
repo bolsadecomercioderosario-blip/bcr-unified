@@ -409,16 +409,16 @@ def start() -> None:
         misfire_grace_time=_DAILY_GRACE_S,
     )
 
-    # Vigía de ventas EventoSimple: cada 15 min renueva token, lee las entradas
-    # vendidas del evento y avisa por WhatsApp si subió. Solo se registra si está
-    # habilitado por env var (EVENTOSIMPLE_VIGIA_ENABLED). Evento puntual: se
-    # saca cuando termina.
+    # Vigía de ventas EventoSimple: cada N min (EVENTOSIMPLE_INTERVALO_MIN, 30 por
+    # defecto) se loguea, lee las entradas vendidas del evento y avisa por WhatsApp
+    # si subió. Solo se registra si está habilitado (EVENTOSIMPLE_VIGIA_ENABLED).
+    # Evento puntual: se saca cuando termina.
     import config
     if config.EVENTOSIMPLE_VIGIA_ENABLED:
         scheduler.add_job(
             _run_eventosimple_vigia,
-            IntervalTrigger(minutes=15),
-            id="eventosimple_vigia_15min",
+            IntervalTrigger(minutes=config.EVENTOSIMPLE_INTERVALO_MIN),
+            id="eventosimple_vigia",
             replace_existing=True,
             max_instances=1,
             coalesce=True,
