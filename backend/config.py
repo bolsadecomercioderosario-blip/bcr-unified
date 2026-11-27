@@ -104,11 +104,12 @@ EVENTOSIMPLE_VIGIA_ENABLED = (
 # IDs del panel. cuenta = productora (ej. DistritoSiete = 78); evento = el show.
 EVENTOSIMPLE_CUENTA = os.environ.get("EVENTOSIMPLE_CUENTA", "").strip()
 EVENTOSIMPLE_EVENTO = os.environ.get("EVENTOSIMPLE_EVENTO", "").strip()
-# Refresh token INICIAL (semilla). EventoSimple rota el token en cada
-# renovación, así que después del primer ciclo el vigía persiste el token nuevo
-# en la DB y este env var queda solo como bootstrap. Se captura logueándose una
-# vez en app.evento-simple.com y copiando sesionfl_actualizacion.token.
-EVENTOSIMPLE_REFRESH_TOKEN = os.environ.get("EVENTOSIMPLE_REFRESH_TOKEN", "").strip()
+# Credenciales con las que el vigía se loguea solo (la API exige una cookie de
+# sesión que no se puede mantener de otra forma). Son de solo lectura del panel.
+# OJO: es una contraseña de un servicio de terceros — va SOLO por env var en
+# Render, nunca hardcodeada ni en el repo.
+EVENTOSIMPLE_USUARIO = os.environ.get("EVENTOSIMPLE_USUARIO", "").strip()
+EVENTOSIMPLE_CONTRASENA = os.environ.get("EVENTOSIMPLE_CONTRASENA", "")
 # Número(s) a avisar (E.164, separados por coma). Ej "+5493413373972".
 EVENTOSIMPLE_AVISO_A = os.environ.get("EVENTOSIMPLE_AVISO_A", "").strip()
 
