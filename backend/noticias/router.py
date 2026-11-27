@@ -292,6 +292,20 @@ async def importar_wp(
                 pass
 
 
+@router.post("/importar-wp-live")
+def importar_wp_live(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Importa noticias directamente del WordPress de masbcr vía su API wp-json,
+    sin necesidad de subir un export WXR. Idempotente: crea sólo las notas cuyo
+    slug no exista todavía (no pisa las existentes). Las imágenes quedan
+    apuntando a masbcr hasta que se corra el re-hosting (/rehost)."""
+    from noticias.importer import fetch_posts_wpjson, importar_posts
+    posts = fetch_posts_wpjson()
+    res = importar_posts(db, posts)
+    res["fuente"] = "wp-json"
+    res["posts_en_sitio"] = len(posts)
+    return res
+
+
 # ===========================================================================
 # API del Kit Multimedia (con auth) — prefijo propio para no chocar con /{nid}
 # ===========================================================================

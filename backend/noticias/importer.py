@@ -14,10 +14,13 @@ Nota sobre imágenes: en esta etapa las URLs siguen apuntando al host de WP
 """
 from __future__ import annotations
 
+import html
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any
+
+import requests
 
 from noticias.models import CATEGORIAS
 
@@ -226,6 +229,82 @@ def scrape_kit_masbcr(db, reset: bool = False) -> dict[str, Any]:
         resumen[slug] = {"nuevas": nuevas, "por_subcat": sub_count}
     db.commit()
     return resumen
+
+
+_WPJSON_BASE = "https://masbcr.com.ar"
+
+
+def _categoria_de_nombres(nombres: list[str]) -> str | None:
+    for c in nombres:
+        if c in _OUR_CATS:
+            return c
+    for c in nombres:
+        if c not in _SKIP_CATS:
+            return c
+    return None
+
+
+def _strip_tags(s: str) -> str:
+    return re.sub(r"<[^>]+>", "", s or "").strip()
+
+
+def _parse_wp_date(s: str) -> datetime | None:
+    s = (s or "").strip()
+    try:
+        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def fetch_posts_wpjson(base: str = _WPJSON_BASE, max_pages: int = 50) -> list[dict[str, Any]]:
+    """Trae los posts PUBLICADOS del WordPress de masbcr vía la API wp-json, en el
+    mismo formato que parse_wxr. Paginado de a 100. Portada = imagen destacada
+    (featured media) o, si no hay, la primera imagen del cuerpo. Las URLs de
+    imagen siguen apuntando a masbcr hasta que se corra el re-hosting."""
+    sess = requests.Session()
+    sess.headers.update({"User-Agent": "bcr-noticias/1.0"})
+    posts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for page in range(1, max_pages + 1):
+        url = f"{base}/wp-json/wp/v2/posts"
+        try:
+            r = sess.get(url, params={"per_page": 100, "page": page, "_embed": 1}, timeout=40)
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"No se pudo consultar wp-json: {e}")
+        if r.status_code == 400:
+            break  # page fuera de rango (WP devuelve 400 cuando page > total)
+        r.raise_for_status()
+        items = r.json()
+        if not items:
+            break
+        for p in items:
+            slug = (p.get("slug") or "").strip()
+            titulo = html.unescape((p.get("title") or {}).get("rendered", "") or "").strip()
+            if not slug or slug == "hello-world" or not titulo:
+                continue
+            if slug in seen:
+                continue
+            cuerpo = (p.get("content") or {}).get("rendered") or ""
+            bajada = html.unescape(_strip_tags((p.get("excerpt") or {}).get("rendered", ""))) or None
+            emb = p.get("_embedded") or {}
+            nombres_cat = [t.get("name") for grp in emb.get("wp:term", []) for t in grp
+                           if isinstance(t, dict) and t.get("taxonomy") == "category" and t.get("name")]
+            media = emb.get("wp:featuredmedia") or []
+            portada = media[0].get("source_url") if media and isinstance(media[0], dict) else None
+            if not portada:
+                m = _IMG_RE.search(cuerpo)
+                portada = m.group(0) if m else None
+            posts.append({
+                "slug": slug,
+                "titulo": titulo,
+                "bajada": bajada,
+                "cuerpo": cuerpo or None,
+                "categoria": _categoria_de_nombres(nombres_cat),
+                "imagen_portada": portada,
+                "fecha_pub": _parse_wp_date(p.get("date", "")),
+            })
+            seen.add(slug)
+    return posts
 
 
 def importar_posts(db, posts: list[dict[str, Any]]) -> dict[str, Any]:
